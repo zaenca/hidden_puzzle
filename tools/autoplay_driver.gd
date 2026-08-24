@@ -45,60 +45,39 @@ func run(tree: SceneTree) -> void:
 	_check("мета: пекарня выбрана", Game.meta.shop_state("bakery") == "in_restoration")
 	_check("мета: план израсходован", PlayerState.amount_of("district_plan") == 0)
 
+	# --- карта: закрытые объекты тоже кликабельны --------------------------
+	_check_map_hit_areas()
+
 	Game.open_shop("bakery")
 	await tree.create_timer(0.3).timeout
 
-	# --- уровень 2: расчистка фасада ---------------------------------------
-	await _play("task_clear_facade")
-	_check("L2: найдены метла и мешок",
-		PlayerState.amount_of("broom") >= 1 and PlayerState.amount_of("trash_bag") >= 1)
-	_apply("task_clear_facade")
-	_check("мета: мусор убран (visual state)",
-		Game.meta.slot_state("bakery", "facade_trash") == "cleaned")
+	# --- фасад: заперто, ключ, применение ключа ----------------------------
+	_check("фасад: дверь заперта", Game.meta.current_slot_state("bakery", "door") == "locked")
+	_check("фасад: вход внутрь пока закрыт", not bool(Game.meta.flags.get("door_open", false)))
 
-	# --- уровни 3-4: вывеска (одна задача, две части) ----------------------
-	await _play("task_install_sign")
-	_check("L3: задача в процессе (нужны ещё предметы)",
-		Game.meta.task_state("task_install_sign") == MetaService.TaskState.IN_PROGRESS)
-	await _play("task_install_sign")
-	_check("L4: задача готова к применению",
-		Game.meta.task_state("task_install_sign") == MetaService.TaskState.READY_TO_APPLY)
-	_apply("task_install_sign")
-	_check("мета: вывеска установлена",
-		Game.meta.slot_state("bakery", "sign") == "installed")
+	var take := Game.meta.interact("bakery", "door", "")
+	_check("тап по двери сработал: %s" % take.get("text", ""), bool(take.get("ok", false)))
+	_check("ключ попал в сумку", PlayerState.amount_of("bakery_key") == 1)
+	_check("дверь всё ещё заперта", Game.meta.current_slot_state("bakery", "door") == "locked")
 
-	# --- cooldown: ремонт замка + параллельная задача ----------------------
-	_check("после вывески открыт ремонт замка",
-		Game.meta.task_state("task_repair_lock") == MetaService.TaskState.READY_TO_APPLY)
-	_check("параллельная задача доступна",
-		Game.meta.task_state("task_polish_window") == MetaService.TaskState.AVAILABLE)
+	var again := Game.meta.interact("bakery", "door", "")
+	_check("повторный тап не выдаёт второй ключ", PlayerState.amount_of("bakery_key") == 1)
+	_check("повторный тап подсказывает, а не открывает",
+		not bool(again.get("narrative", false)))
 
-	_apply("task_repair_lock")
-	var left_before := CooldownService.remaining("repair_lock")
-	_check("cooldown запущен (%d с)" % left_before, left_before > 500)
-	_check("во время cooldown есть чем заняться", not Game.meta.playable_tasks().is_empty())
+	var wrong := Game.meta.interact("bakery", "door", "district_plan")
+	_check("чужой предмет дверь не открывает",
+		not bool(wrong.get("ok", false)) and Game.meta.current_slot_state("bakery", "door") == "locked")
 
-	# --- уровень 5: параллельно, сокращает ожидание ------------------------
-	await _play("task_polish_window")
-	var left_after := CooldownService.remaining("repair_lock")
-	_check("уровень сократил cooldown на 180 c (%d → %d)" % [left_before, left_after],
-		left_before - left_after >= 175)
-	_apply("task_polish_window")
-	_check("мета: витрина вымыта", Game.meta.slot_state("bakery", "window") == "clean")
-	_check("мета: ручка установлена", Game.meta.slot_state("bakery", "door_handle") == "installed")
+	var used := Game.meta.interact("bakery", "door", "bakery_key")
+	_check("ключ применён к двери", bool(used.get("ok", false)))
+	_check("мета: дверь открыта", Game.meta.current_slot_state("bakery", "door") == "open")
+	_check("ключ израсходован", PlayerState.amount_of("bakery_key") == 0)
+	_check("флаг door_open выставлен", bool(Game.meta.flags.get("door_open", false)))
 
-	# --- mock-ускорение и claim --------------------------------------------
-	var hard_before := PlayerState.amount_of("hard")
-	var sped := Game.meta.speed_up_with_hard("task_repair_lock")
-	_check("mock hard-currency ускорение сработало", sped)
-	_check("гемы списаны", PlayerState.amount_of("hard") == hard_before - 25)
-	await tree.create_timer(0.2).timeout
-	_check("cooldown готов к получению", Game.meta.can_claim("task_repair_lock"))
-
-	Game.meta.claim_action("task_repair_lock")
-	_check("мета: дверь открыта", Game.meta.slot_state("bakery", "door") == "open")
-	_check("задача замка завершена",
-		Game.meta.task_state("task_repair_lock") == MetaService.TaskState.COMPLETED)
+	var closed := Game.meta.interact("bakery", "door", "")
+	_check("открытая дверь больше не выдаёт ключ", PlayerState.amount_of("bakery_key") == 0)
+	_check("открытая дверь отвечает текстом", not String(closed.get("text", "")).is_empty())
 
 	# --- сохранение / загрузка ---------------------------------------------
 	SaveService.save_game()
@@ -106,15 +85,33 @@ func run(tree: SceneTree) -> void:
 	PlayerState.reset()
 	CooldownService.reset()
 	Game.meta.reset()
-	_check("состояние в памяти очищено", Game.meta.slot_state("bakery", "door") != "open")
+	_check("состояние в памяти очищено", Game.meta.current_slot_state("bakery", "door") != "open")
 	SaveService.load_game()
 	Game.meta.refresh()
-	_check("сейв: дверь осталась открытой", Game.meta.slot_state("bakery", "door") == "open")
-	_check("сейв: вывеска на месте", Game.meta.slot_state("bakery", "sign") == "installed")
+	_check("сейв: дверь осталась открытой", Game.meta.current_slot_state("bakery", "door") == "open")
+	_check("сейв: флаг door_open на месте", bool(Game.meta.flags.get("door_open", false)))
+	_check("сейв: ключ не воскрес", PlayerState.amount_of("bakery_key") == 0)
 	_check("сейв: пройдено уровней = %d" % levels_done, Game.meta.levels_completed_total == levels_done)
-	_check("сейв: пройдено 5 уровней", Game.meta.completed_levels.size() == 5)
+	_check("сейв: пройден 1 уровень", Game.meta.completed_levels.size() == 1)
 
 	_report()
+
+
+## Мэрия и другие «пока закрытые» здания обязаны попадать в хит-тест: игрок
+## должен получать ответ на тап, а не тишину.
+func _check_map_hit_areas() -> void:
+	var map: Node = Game.current()
+	if map == null or not ("_hit_areas" in map):
+		_check("карта: доступен список кликабельных зданий", false)
+		return
+	var areas: Array = map._hit_areas
+	var without_shop := 0
+	for a in areas:
+		if String(a.get("shop_id", "")).is_empty():
+			without_shop += 1
+	_check("карта: кликабельны все %d зданий" % ContentDB.map_data.get("buildings", []).size(),
+		areas.size() == ContentDB.map_data.get("buildings", []).size())
+	_check("карта: здание без магазина (мэрия) тоже кликабельно", without_shop >= 1)
 
 
 ## --- вспомогательное --------------------------------------------------------

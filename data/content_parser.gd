@@ -258,6 +258,19 @@ static func shop_slot_state(d: Dictionary) -> ShopSlotState:
 	return s
 
 
+static func slot_interaction(d: Dictionary) -> SlotInteraction:
+	var i := SlotInteraction.new()
+	i.state = String(d.get("state", ""))
+	i.use_item = String(d.get("use_item", ""))
+	i.consume = bool(d.get("consume", false))
+	i.grant_item = String(d.get("grant_item", ""))
+	i.set_state = String(d.get("set_state", ""))
+	i.set_flag = String(d.get("set_flag", ""))
+	i.once_flag = String(d.get("once_flag", ""))
+	i.text = String(d.get("text", ""))
+	return i
+
+
 static func shop_slot(d: Dictionary) -> ShopSlotDefinition:
 	var s := ShopSlotDefinition.new()
 	s.id = String(d.get("id", ""))
@@ -267,6 +280,10 @@ static func shop_slot(d: Dictionary) -> ShopSlotDefinition:
 		states.append(shop_slot_state(raw))
 	s.states = states
 	s.default_state = String(d.get("default", states[0].id if not states.is_empty() else ""))
+	var acts: Array[SlotInteraction] = []
+	for raw in d.get("interactions", []):
+		acts.append(slot_interaction(raw))
+	s.interactions = acts
 	return s
 
 
@@ -277,6 +294,7 @@ static func shop(d: Dictionary) -> ShopDefinition:
 	s.palette = String(d.get("palette", "bakery"))
 	s.map_rect = to_rect(d.get("map_rect", [0.1, 0.4, 0.3, 0.2]))
 	s.rooms = d.get("rooms", [])
+	s.enter = d.get("enter", {})
 	var slots: Array[ShopSlotDefinition] = []
 	for raw in d.get("slots", []):
 		slots.append(shop_slot(raw))

@@ -27,6 +27,8 @@ func _initialize() -> void:
 		_check_levels()
 		_check_actions()
 		_check_tasks()
+		_check_shops()
+		_check_item_flow()
 		_simulate_progression()
 	_report()
 	quit(1 if not errors.is_empty() else 0)
@@ -143,12 +145,9 @@ func _check_levels() -> void:
 
 
 func _check_actions() -> void:
-	# Каждый quest-предмет должен кем-то потребляться, иначе это мусор в инвентаре.
-	var consumed := {}
 	for a in actions.values():
 		for r in a.requirements:
 			if r.kind == Requirement.Kind.ITEM:
-				consumed[r.id] = true
 				if not items.has(r.id):
 					_err("action %s: требует несуществующий предмет '%s'" % [a.id, r.id])
 		for c in a.costs:
@@ -172,9 +171,89 @@ func _check_actions() -> void:
 		if a.duration_sec > 0 and a.speedup_hard_cost <= 0 and a.ad_reduce_sec <= 0:
 			_warn("action %s: cooldown без единого способа ускорения" % a.id)
 
-	for it in items.values():
-		if it.is_quest() and not consumed.has(it.id):
-			_warn("Предмет '%s' — quest, но его не требует ни одно meta action" % it.id)
+
+## Слоты магазинов: состояния, ссылки на предметы и достижимость входа внутрь.
+func _check_shops() -> void:
+	for shop_v in shops.values():
+		var shop: ShopDefinition = shop_v
+		for slot in shop.slots:
+			if not slot.default_state.is_empty() and not slot.has_state(slot.default_state):
+				_err("%s/%s: default-состояние '%s' не описано"
+					% [shop.id, slot.id, slot.default_state])
+			for i in slot.interactions:
+				if not i.state.is_empty() and not slot.has_state(i.state):
+					_err("%s/%s: правило ссылается на состояние '%s', которого нет"
+						% [shop.id, slot.id, i.state])
+				if not i.set_state.is_empty() and not slot.has_state(i.set_state):
+					_err("%s/%s: правило переводит в состояние '%s', которого нет"
+						% [shop.id, slot.id, i.set_state])
+				if not i.use_item.is_empty() and not items.has(i.use_item):
+					_err("%s/%s: правило требует предмет '%s', которого нет в items.json"
+						% [shop.id, slot.id, i.use_item])
+				if not i.grant_item.is_empty() and not items.has(i.grant_item):
+					_err("%s/%s: правило выдаёт предмет '%s', которого нет в items.json"
+						% [shop.id, slot.id, i.grant_item])
+				if i.text.is_empty():
+					_warn("%s/%s: правило без текста — игрок не поймёт, что произошло"
+						% [shop.id, slot.id])
+
+		if shop.enter.is_empty():
+			continue
+		var flag := String(shop.enter.get("requires_flag", ""))
+		if not flag.is_empty() and not _flags_set_anywhere().has(flag):
+			_err("%s: вход внутрь ждёт флаг '%s', который никто не выставляет"
+				% [shop.id, flag])
+
+
+## Все флаги, которые кто-то в контенте вообще может выставить.
+func _flags_set_anywhere() -> Dictionary:
+	var out := {}
+	for a in actions.values():
+		for e in a.effects:
+			if e.kind == MetaEffect.Kind.SET_FLAG:
+				out[e.id] = true
+	for shop in shops.values():
+		for slot in shop.slots:
+			for i in slot.interactions:
+				if not i.set_flag.is_empty():
+					out[i.set_flag] = true
+				if not i.once_flag.is_empty():
+					out[i.once_flag] = true
+	return out
+
+
+## Предмет, который выдаётся и никому не нужен, — мусор в сумке. Проверяем
+## только то, что реально выдаётся: уровнями или тапом по объекту.
+func _check_item_flow() -> void:
+	var granted := {}
+	for lvl in levels.values():
+		for g in lvl.quest_grants:
+			granted[String(g)] = "уровень " + lvl.id
+	for shop in shops.values():
+		for slot in shop.slots:
+			for i in slot.interactions:
+				if not i.grant_item.is_empty():
+					granted[i.grant_item] = "%s/%s" % [shop.id, slot.id]
+
+	var consumed := {}
+	for a in actions.values():
+		for r in a.requirements:
+			if r.kind == Requirement.Kind.ITEM:
+				consumed[r.id] = true
+		for e in a.effects:
+			if e.kind == MetaEffect.Kind.CONSUME:
+				consumed[e.id] = true
+	for shop in shops.values():
+		for slot in shop.slots:
+			for i in slot.interactions:
+				if i.consume and not i.use_item.is_empty():
+					consumed[i.use_item] = true
+
+	for id in granted:
+		if not items.has(id):
+			_err("выдаётся несуществующий предмет '%s' (%s)" % [id, granted[id]])
+		elif not consumed.has(id):
+			_warn("Предмет '%s' выдаётся (%s), но его никто не тратит" % [id, granted[id]])
 
 
 func _check_tasks() -> void:

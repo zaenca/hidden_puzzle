@@ -6,8 +6,10 @@ extends Node2D
 
 var slot_id: String = ""
 var current_state: String = ""
+var world_rect: Rect2 = Rect2()   ## область слота на экране — по ней идёт хит-тест
 
 var _variants: Dictionary = {}   ## state_id -> Node2D
+var _highlight: Line2D = null
 
 
 static func create(def: ShopSlotDefinition, area: Rect2) -> StateSlot:
@@ -18,6 +20,7 @@ static func create(def: ShopSlotDefinition, area: Rect2) -> StateSlot:
 	var rect := Rect2(
 		area.position + Vector2(def.rect.position.x * area.size.x, def.rect.position.y * area.size.y),
 		Vector2(def.rect.size.x * area.size.x, def.rect.size.y * area.size.y))
+	slot.world_rect = rect
 
 	for state in def.states:
 		var variant := Node2D.new()
@@ -66,6 +69,35 @@ func set_state(state_id: String, animate: bool = true) -> void:
 		var tw := variant.create_tween().set_parallel(true)
 		tw.tween_property(variant, "modulate:a", 1.0, 0.35)
 		tw.tween_property(variant, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Подсветка «с этим объектом сейчас можно что-то сделать». Рисуется поверх
+## варианта состояния и живёт отдельно от него: состояния меняются, рамка нет.
+func set_highlight(on: bool) -> void:
+	if on == (_highlight != null):
+		return
+	if not on:
+		_highlight.queue_free()
+		_highlight = null
+		return
+
+	var inset := world_rect.grow(-4.0)
+	_highlight = Line2D.new()
+	_highlight.points = PackedVector2Array([
+		inset.position,
+		inset.position + Vector2(inset.size.x, 0),
+		inset.position + inset.size,
+		inset.position + Vector2(0, inset.size.y),
+		inset.position,
+	])
+	_highlight.width = 5.0
+	_highlight.default_color = UIKit.ACCENT
+	_highlight.joint_mode = Line2D.LINE_JOINT_ROUND
+	add_child(_highlight)
+
+	var tw := _highlight.create_tween().set_loops()
+	tw.tween_property(_highlight, "modulate:a", 0.35, 0.7)
+	tw.tween_property(_highlight, "modulate:a", 1.0, 0.7)
 
 
 static func _shape_polygon(rect: Rect2, shape: String) -> PackedVector2Array:

@@ -8,6 +8,7 @@
   { "id": "postbox",         "name": "Почтовый ящик",     "color": "#d1495b", "shape": "rect" },
   { "id": "bakery_building", "name": "Пекарня",           "color": "#e8a33d", "shape": "triangle" },
   { "id": "district_plan",   "name": "План района",       "kind": "quest", "color": "#7ee081", "shape": "rect" },
+  { "id": "bakery_key",      "name": "Ключ от пекарни",   "kind": "quest", "color": "#e8c25a", "shape": "cross" },
 
   { "id": "trash_pile",  "name": "Куча мусора", "color": "#7a6a4f", "shape": "circle" },
   { "id": "box",         "name": "Коробка",     "color": "#a9743c", "shape": "rect" },

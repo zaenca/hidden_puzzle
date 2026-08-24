@@ -12,8 +12,12 @@ var shop_id: String = ""
 var shop: ShopDefinition
 
 var _slots: Dictionary = {}          ## slot_id -> StateSlot
+var _slot_defs: Dictionary = {}      ## slot_id -> ShopSlotDefinition
+var _selected_item: String = ""      ## что игрок «взял в руку» из сумки
 var _focus: MetaFocus = null
 var _task_list: VBoxContainer
+var _bag: HBoxContainer
+var _bag_panel: Control
 var _wallet: Label
 var _timers: Dictionary = {}         ## task_id -> Label
 var _rows: Dictionary = {}           ## task_id -> Control
@@ -44,16 +48,19 @@ func _build() -> void:
 		var slot := StateSlot.create(def, VISUAL_RECT)
 		_slots_root.add_child(slot)
 		_slots[def.id] = slot
-		var state := Game.meta.slot_state(shop_id, def.id)
-		slot.set_state(state if not state.is_empty() else def.default_state, false)
+		_slot_defs[def.id] = def
+		slot.set_state(Game.meta.current_slot_state(shop_id, def.id), false)
 
 	_build_ui()
 	_rebuild_tasks()
+	_rebuild_bag()
+	_refresh_highlights()
 
 	EventBus.shop_visual_changed.connect(_on_visual_changed)
 	EventBus.task_state_changed.connect(func(_t, _s): _queue_rebuild())
 	EventBus.cooldown_finished.connect(func(_a): _queue_rebuild())
 	EventBus.currency_changed.connect(func(_i, _v): _update_wallet())
+	EventBus.inventory_changed.connect(func(_i, _v): call_deferred("_rebuild_bag"))
 
 	_show_pending_narrative()
 
@@ -66,6 +73,57 @@ func _on_visual_changed(changed_shop: String, slot_id: String, state_id: String)
 	var slot: StateSlot = _slots.get(slot_id)
 	if slot != null:
 		slot.set_state(state_id, true)
+	_refresh_highlights()
+	_queue_rebuild()
+
+
+## --- point-and-click --------------------------------------------------------
+
+## Тап по фасаду. UI-слой ловит свои нажатия сам (Control'ы стоят на STOP),
+## сюда доходит только то, что мимо интерфейса.
+func _unhandled_input(event: InputEvent) -> void:
+	if not (event is InputEventScreenTouch and event.pressed):
+		return
+	var world: Vector2 = get_canvas_transform().affine_inverse() * event.position
+
+	# С конца: слоты объявлены снизу вверх по слоям, верхний должен побеждать.
+	var ids: Array = _slot_defs.keys()
+	ids.reverse()
+	for slot_id in ids:
+		var def: ShopSlotDefinition = _slot_defs[slot_id]
+		if not def.is_interactive():
+			continue
+		var slot: StateSlot = _slots[slot_id]
+		if not slot.world_rect.has_point(world):
+			continue
+		_interact(String(slot_id))
+		return
+
+
+func _interact(slot_id: String) -> void:
+	var result := Game.meta.interact(shop_id, slot_id, _selected_item)
+	if bool(result.get("ok", false)):
+		if not String(result.get("consumed", "")).is_empty():
+			_selected_item = ""
+		SaveService.save_game()
+
+	if bool(result.get("narrative", false)):
+		_show_pending_narrative()
+	elif not String(result.get("text", "")).is_empty():
+		EventBus.toast.emit(String(result["text"]))
+
+	_rebuild_bag()
+	_refresh_highlights()
+	_rebuild_tasks()
+
+
+## Подсвечены те объекты, с которыми прямо сейчас есть что сделать.
+func _refresh_highlights() -> void:
+	for slot_id in _slot_defs:
+		var def: ShopSlotDefinition = _slot_defs[slot_id]
+		var slot: StateSlot = _slots[slot_id]
+		var state := Game.meta.current_slot_state(shop_id, String(slot_id))
+		slot.set_highlight(def.has_progress_in(state, Game.meta.flags))
 
 
 ## --- UI ---------------------------------------------------------------------
@@ -111,8 +169,10 @@ func _build_ui() -> void:
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(spacer)
 
+	col.add_child(_build_bag())
+
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 640)
+	scroll.custom_minimum_size = Vector2(0, 320)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	col.add_child(scroll)
 
@@ -120,6 +180,111 @@ func _build_ui() -> void:
 	_task_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_task_list.add_theme_constant_override("separation", 10)
 	scroll.add_child(_task_list)
+
+
+## --- сумка ------------------------------------------------------------------
+
+## Инвентарь как полка предметов: тап выбирает предмет «в руку», повторный тап
+## снимает выбор. Дальше выбранным предметом тыкают в объект на фасаде.
+func _build_bag() -> Control:
+	var panel := UIKit.panel(Color(0.1, 0.1, 0.13, 0.82))
+	_bag_panel = panel
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 6)
+	panel.add_child(col)
+
+	col.add_child(UIKit.label("Сумка", 24, Color(0.82, 0.8, 0.76)))
+
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 150)
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	col.add_child(scroll)
+
+	_bag = HBoxContainer.new()
+	_bag.add_theme_constant_override("separation", 12)
+	scroll.add_child(_bag)
+	return panel
+
+
+func _rebuild_bag() -> void:
+	if _bag == null:
+		return
+	for c in _bag.get_children():
+		c.queue_free()
+
+	var ids := _bag_items()
+	if _bag_panel != null:
+		_bag_panel.visible = not ids.is_empty()
+	if _selected_item not in ids:
+		_selected_item = ""
+
+	for id in ids:
+		_bag.add_child(_bag_slot(String(id)))
+
+
+## Бустеры живут в UI уровня, а не на фасаде — им в сумке делать нечего.
+func _bag_items() -> Array:
+	var ids := []
+	for id in PlayerState.items:
+		if String(id) == Game.BOOSTER_ID:
+			continue
+		ids.append(String(id))
+	ids.sort()
+	return ids
+
+
+func _bag_slot(item_id: String) -> Control:
+	var selected := item_id == _selected_item
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(150, 138)
+	button.focus_mode = Control.FOCUS_NONE
+	button.toggle_mode = false
+	button.tooltip_text = ContentDB.item_name(item_id)
+	if selected:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.30, 0.24, 0.10, 0.95)
+		sb.border_color = UIKit.ACCENT
+		sb.set_border_width_all(4)
+		sb.set_corner_radius_all(14)
+		button.add_theme_stylebox_override("normal", sb)
+	button.pressed.connect(func(): _select_item(item_id))
+
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	button.add_child(box)
+
+	var icon := TextureRect.new()
+	icon.texture = PlaceholderArt.item_icon(ContentDB.item(item_id))
+	icon.custom_minimum_size = Vector2(72, 72)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(icon)
+
+	var name_label := UIKit.label(ContentDB.item_name(item_id), 20)
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_label.custom_minimum_size = Vector2(140, 0)
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(name_label)
+
+	var count := PlayerState.amount_of(item_id)
+	if count > 1:
+		var badge := UIKit.label("×%d" % count, 20, UIKit.ACCENT)
+		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(badge)
+
+	return button
+
+
+func _select_item(item_id: String) -> void:
+	_selected_item = "" if _selected_item == item_id else item_id
+	_rebuild_bag()
+	if not _selected_item.is_empty():
+		EventBus.toast.emit("В руке: %s" % ContentDB.item_name(_selected_item))
 
 
 func _update_wallet() -> void:
@@ -143,9 +308,40 @@ func _rebuild_tasks() -> void:
 	for task in Game.meta.tasks_at("shop", shop_id):
 		_task_list.add_child(_task_row(task))
 
+	var enter_row := _enter_row()
+	if enter_row != null:
+		_task_list.add_child(enter_row)
+
 	if _focus != null and _rows.has(_focus.task_id):
 		_flash(_rows[_focus.task_id])
 	_rebuilding = false
+
+
+## Вход внутрь магазина. Условие открытия — флаг из данных, поэтому сцена не
+## знает ни про дверь, ни про ключ.
+func _enter_row() -> Control:
+	if shop.enter.is_empty():
+		return null
+	var flag := String(shop.enter.get("requires_flag", ""))
+	var unlocked := flag.is_empty() or bool(Game.meta.flags.get(flag, false))
+
+	var panel := UIKit.panel()
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 8)
+	panel.add_child(col)
+
+	var label := String(shop.enter.get("label", "Войти"))
+	if not unlocked:
+		col.add_child(UIKit.label(label, 32, Color(0.72, 0.70, 0.68)))
+		col.add_child(UIKit.label(String(shop.enter.get("locked_text", "")), 24,
+			Color(0.9, 0.82, 0.6)))
+		return panel
+
+	var button := UIKit.button(label, 32)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.pressed.connect(func(): EventBus.toast.emit(String(shop.enter.get("text", ""))))
+	col.add_child(button)
+	return panel
 
 
 func _task_row(task: MetaTaskDefinition) -> Control:

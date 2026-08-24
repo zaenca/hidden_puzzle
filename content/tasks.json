@@ -10,53 +10,5 @@
     "level_ids": ["bakery_01"],
     "action_id": "choose_bakery",
     "hotspot": "facade_trash"
-  },
-  {
-    "id": "task_clear_facade",
-    "shop_id": "bakery",
-    "room_id": "outside",
-    "location": "shop",
-    "title": "Расчистить вход",
-    "hint": "Перед дверью гора мусора — пройти невозможно.",
-    "unlock": [{ "type": "flag", "flag": "bakery_chosen" }],
-    "level_ids": ["bakery_02"],
-    "action_id": "clear_facade",
-    "hotspot": "facade_trash"
-  },
-  {
-    "id": "task_install_sign",
-    "shop_id": "bakery",
-    "room_id": "outside",
-    "location": "shop",
-    "title": "Восстановить вывеску",
-    "hint": "От вывески остались крепления. Нужны части, буквы и инструмент.",
-    "unlock": [{ "type": "flag", "flag": "facade_clean" }],
-    "level_ids": ["bakery_03", "bakery_04"],
-    "action_id": "install_sign",
-    "hotspot": "sign"
-  },
-  {
-    "id": "task_repair_lock",
-    "shop_id": "bakery",
-    "room_id": "outside",
-    "location": "shop",
-    "title": "Починить заржавевший замок",
-    "hint": "Мастер займётся замком входной двери. Это требует времени.",
-    "unlock": [{ "type": "flag", "flag": "sign_installed" }],
-    "level_ids": [],
-    "action_id": "repair_lock",
-    "hotspot": "door"
-  },
-  {
-    "id": "task_polish_window",
-    "shop_id": "bakery",
-    "room_id": "outside",
-    "location": "shop",
-    "title": "Витрина и дверная ручка",
-    "hint": "Пока мастер возится с замком — займись витриной снаружи.",
-    "unlock": [{ "type": "flag", "flag": "sign_installed" }],
-    "level_ids": ["bakery_05"],
-    "action_id": "polish_window",
-    "hotspot": "window"
   }
 ]

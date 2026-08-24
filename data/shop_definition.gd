@@ -11,6 +11,9 @@ extends Resource
 @export var visual_scene: PackedScene = null   ## финальный арт; пока null
 @export var rooms: Array = []                  ## [{id, title}]
 @export var slots: Array[ShopSlotDefinition] = []
+## Вход внутрь: {label, requires_flag, locked_text, text}. Пока это заглушка
+## под комнату — сцена торгового зала появится отдельным этапом.
+@export var enter: Dictionary = {}
 
 func slot(slot_id: String) -> ShopSlotDefinition:
 	for s in slots:

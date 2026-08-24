@@ -9,3 +9,6 @@ boot_log.txt
 # Экспорт
 export_presets.cfg
 build/
+
+# Локальные артефакты Claude Code (в т.ч. worktrees — это чекаут того же репо)
+.claude/

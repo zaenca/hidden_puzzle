@@ -166,6 +166,72 @@ func set_flag(flag: String, value: bool = true) -> void:
 	flags[flag] = value
 
 
+## --- point-and-click: тап по слоту ------------------------------------------
+
+## Единственная точка обработки тапа по объекту магазина. Сцена не знает ни про
+## ключ, ни про дверь: она сообщает «тапнули по слоту, в руке предмет» и
+## показывает то, что вернула мета. Поэтому то же самое умеет headless-прогон.
+##
+## Возвращает: {ok, text, narrative, granted, consumed, state}
+func interact(shop_id: String, slot_id: String, selected_item: String = "") -> Dictionary:
+	var out := {"ok": false, "text": "", "narrative": false,
+		"granted": "", "consumed": "", "state": ""}
+
+	var shop: ShopDefinition = db.shop(shop_id)
+	var slot: ShopSlotDefinition = shop.slot(slot_id) if shop != null else null
+	if slot == null:
+		return out
+
+	var state := current_slot_state(shop_id, slot_id)
+	for rule in slot.interactions:
+		if not rule.matches(state, selected_item, flags):
+			continue
+
+		if not rule.use_item.is_empty() and rule.consume:
+			if not player.pay(rule.use_item, 1):
+				continue
+			out["consumed"] = rule.use_item
+		if not rule.grant_item.is_empty():
+			player.grant(rule.grant_item, 1)
+			out["granted"] = rule.grant_item
+		if not rule.once_flag.is_empty():
+			set_flag(rule.once_flag, true)
+		if not rule.set_state.is_empty():
+			set_slot_state(shop_id, slot_id, rule.set_state)
+			out["state"] = rule.set_state
+		if not rule.set_flag.is_empty():
+			set_flag(rule.set_flag, true)
+
+		out["ok"] = true
+		out["text"] = rule.text
+		out["narrative"] = rule.is_progress()
+		if rule.is_progress() and not rule.text.is_empty():
+			pending_narrative.append(rule.text)
+		refresh()
+		return out
+
+	# Ни одно правило не подошло — это нормальная ситуация, а не ошибка:
+	# игрок ткнул не тем предметом или объектом, с которым уже всё сделано.
+	if selected_item.is_empty():
+		out["text"] = "Здесь ничего не происходит."
+	else:
+		out["text"] = "«%s» здесь не поможет." % db.item_name(selected_item)
+	return out
+
+
+## Состояние слота с подстраховкой: в сейве может лежать состояние, которого
+## в контенте уже нет (контент переписали) — тогда берём default.
+func current_slot_state(shop_id: String, slot_id: String) -> String:
+	var shop: ShopDefinition = db.shop(shop_id)
+	var slot: ShopSlotDefinition = shop.slot(slot_id) if shop != null else null
+	if slot == null:
+		return ""
+	var state := slot_state(shop_id, slot_id)
+	if state.is_empty() or not slot.has_state(state):
+		return slot.default_state
+	return state
+
+
 ## --- главный вход: результат уровня ----------------------------------------
 
 func apply_level_result(result: LevelResult) -> MetaFocus:

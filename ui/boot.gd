@@ -54,30 +54,27 @@ func _build_overlay() -> void:
 	_overlay.add_child(root)
 
 	_toast = UIKit.label("", 30, UIKit.ACCENT)
-	_toast.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_toast.position = Vector2(0, 140)
-	_toast.size = Vector2(1080, 60)
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_toast.modulate.a = 0.0
 	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_toast)
+	## Геометрия — строго после add_child. Без родителя его размер равен нулю,
+	## offsets считаются от нуля, и якорь по правому краю уносит ноду за экран.
+	_anchor_box(_toast, Control.PRESET_TOP_WIDE, 0, 140, 0, 200)
 
 	if not OS.is_debug_build():
 		return
 
 	var toggle := UIKit.button("⚙", 30)
 	toggle.custom_minimum_size = Vector2(84, 84)
-	toggle.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	toggle.position = Vector2(1080 - 100, 1180)
 	toggle.pressed.connect(func(): _debug_panel.visible = not _debug_panel.visible)
 	root.add_child(toggle)
+	_anchor_box(toggle, Control.PRESET_TOP_RIGHT, -104, 1180, -20, 1264)
 
 	_debug_panel = UIKit.panel(Color(0.1, 0.1, 0.14, 0.96))
-	_debug_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_debug_panel.position = Vector2(1080 - 470, 1270)
-	_debug_panel.size = Vector2(450, 0)
 	_debug_panel.visible = false
 	root.add_child(_debug_panel)
+	_anchor_box(_debug_panel, Control.PRESET_TOP_RIGHT, -470, 1270, -20, 1270)
 
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 8)
@@ -93,6 +90,16 @@ func _build_overlay() -> void:
 		SaveService.save_game()
 		EventBus.toast.emit("Сохранено")))
 	col.add_child(UIKit.label("В уровне: S — собрать пазл, F — найти всё", 20))
+
+
+## Якоря + offsets явно, вместо position/size. Control пересчитывает offsets от
+## размера родителя, поэтому вызывать это можно только когда нода уже в дереве.
+func _anchor_box(c: Control, preset: int, l: float, t: float, r: float, b: float) -> void:
+	c.set_anchors_preset(preset)
+	c.offset_left = l
+	c.offset_top = t
+	c.offset_right = r
+	c.offset_bottom = b
 
 
 func _debug_button(text: String, action: Callable) -> Button:
