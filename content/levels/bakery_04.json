@@ -1,0 +1,41 @@
+{
+  "id": "bakery_04",
+  "shop_id": "bakery",
+  "task_id": "task_install_sign",
+  "order": 4,
+  "difficulty": 2,
+  "title": "Вывеска",
+  "narrative": [
+    "Вывеска нашлась на чердаке — рассыпанная на части.",
+    "Собери её и найди крепёж. И прихвати что-нибудь для заржавевшего замка."
+  ],
+  "art": {
+    "reference_size": [1080, 1350],
+    "palette": "wood",
+    "seed": 4044,
+    "clutter": 30,
+    "decor": [
+      { "rect": [0.05, 0.05, 0.90, 0.28], "color": "#6f5433", "shape": "rect" },
+      { "rect": [0.08, 0.34, 0.84, 0.18], "color": "#8f6c40", "shape": "rect" },
+      { "rect": [0.05, 0.54, 0.90, 0.40], "color": "#5d4527", "shape": "rect" }
+    ]
+  },
+  "puzzle": { "module_id": "jigsaw", "cols": 4, "rows": 4, "seed": 4401, "tab_ratio": 0.22, "snap_distance_px": 85 },
+  "hidden_object": {
+    "required_normal": 5,
+    "targets": [
+      { "id": "t01", "item_id": "glue",       "rect": [0.10, 0.18, 0.07, 0.07] },
+      { "id": "t02", "item_id": "bolt",       "rect": [0.30, 0.14, 0.06, 0.06] },
+      { "id": "t03", "item_id": "lamp_bulb",  "rect": [0.50, 0.20, 0.07, 0.07] },
+      { "id": "t04", "item_id": "ruler",      "rect": [0.70, 0.16, 0.12, 0.045] },
+      { "id": "t05", "item_id": "wire",       "rect": [0.14, 0.36, 0.11, 0.045] },
+      { "id": "t06", "item_id": "level_tool", "rect": [0.42, 0.38, 0.11, 0.05] },
+      { "id": "q01", "item_id": "sign_letter", "kind": "quest", "rect": [0.68, 0.36, 0.09, 0.08] },
+      { "id": "q02", "item_id": "sign_screw",  "kind": "quest", "rect": [0.20, 0.56, 0.07, 0.07] },
+      { "id": "q03", "item_id": "lock_oil",    "kind": "quest", "rect": [0.46, 0.60, 0.07, 0.075] },
+      { "id": "q04", "item_id": "wire_brush",  "kind": "quest", "rect": [0.70, 0.62, 0.10, 0.06] }
+    ]
+  },
+  "rewards": { "coins": 80, "xp": 14 },
+  "quest_grants": ["sign_letter", "sign_screw", "lock_oil", "wire_brush"]
+}

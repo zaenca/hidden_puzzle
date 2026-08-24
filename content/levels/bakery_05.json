@@ -1,0 +1,39 @@
+{
+  "id": "bakery_05",
+  "shop_id": "bakery",
+  "task_id": "task_polish_window",
+  "order": 5,
+  "difficulty": 2,
+  "title": "Витрина и дверь",
+  "narrative": [
+    "Мастер забрал замок. Ждать без дела не обязательно.",
+    "Витрина заросла грязью, а дверная ручка валяется где-то тут."
+  ],
+  "art": {
+    "reference_size": [1080, 1350],
+    "palette": "door",
+    "seed": 5055,
+    "clutter": 30,
+    "decor": [
+      { "rect": [0.04, 0.06, 0.44, 0.60], "color": "#5b5346", "shape": "rect" },
+      { "rect": [0.54, 0.06, 0.42, 0.76], "color": "#3f362c", "shape": "rect" },
+      { "rect": [0.02, 0.72, 0.96, 0.26], "color": "#4a4137", "shape": "rect" }
+    ]
+  },
+  "puzzle": { "module_id": "jigsaw", "cols": 4, "rows": 4, "seed": 5501, "tab_ratio": 0.22, "snap_distance_px": 85 },
+  "hidden_object": {
+    "required_normal": 5,
+    "targets": [
+      { "id": "t01", "item_id": "sponge",   "rect": [0.12, 0.20, 0.09, 0.06] },
+      { "id": "t02", "item_id": "soap",     "rect": [0.34, 0.16, 0.06, 0.06] },
+      { "id": "t03", "item_id": "squeegee", "rect": [0.56, 0.22, 0.08, 0.07] },
+      { "id": "t04", "item_id": "bucket",   "rect": [0.78, 0.20, 0.09, 0.08] },
+      { "id": "t05", "item_id": "cloth",    "rect": [0.16, 0.42, 0.10, 0.05] },
+      { "id": "t06", "item_id": "brush",    "rect": [0.44, 0.44, 0.08, 0.07] },
+      { "id": "q01", "item_id": "door_handle", "kind": "quest", "rect": [0.70, 0.46, 0.08, 0.06] },
+      { "id": "q02", "item_id": "glass_pane",  "kind": "quest", "rect": [0.28, 0.64, 0.14, 0.10] }
+    ]
+  },
+  "rewards": { "coins": 80, "xp": 14 },
+  "quest_grants": ["door_handle", "glass_pane"]
+}

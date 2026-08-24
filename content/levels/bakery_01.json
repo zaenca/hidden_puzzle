@@ -1,0 +1,39 @@
+{
+  "id": "bakery_01",
+  "shop_id": "bakery",
+  "task_id": "task_survey_district",
+  "order": 1,
+  "difficulty": 1,
+  "title": "Район у ратуши",
+  "narrative": [
+    "Мэр: фестиваль через месяц, а квартал выглядит так, будто про него забыли.",
+    "Мэр: пройдись по району и составь план. С чего-то надо начинать."
+  ],
+  "art": {
+    "reference_size": [1080, 1350],
+    "palette": "street",
+    "seed": 1011,
+    "clutter": 24,
+    "decor": [
+      { "rect": [0.0, 0.55, 1.0, 0.45], "color": "#6b6152", "shape": "rect" },
+      { "rect": [0.02, 0.20, 0.30, 0.40], "color": "#8a7f6d", "shape": "rect" },
+      { "rect": [0.55, 0.10, 0.40, 0.50], "color": "#7d8590", "shape": "rect" },
+      { "rect": [0.36, 0.34, 0.16, 0.26], "color": "#9a8c74", "shape": "rect" }
+    ]
+  },
+  "puzzle": { "module_id": "jigsaw", "cols": 3, "rows": 3, "seed": 1101, "tab_ratio": 0.2, "snap_distance_px": 100 },
+  "hidden_object": {
+    "required_normal": 5,
+    "targets": [
+      { "id": "t01", "item_id": "townhall",        "rect": [0.60, 0.14, 0.10, 0.075] },
+      { "id": "t02", "item_id": "fountain",        "rect": [0.30, 0.22, 0.085, 0.062] },
+      { "id": "t03", "item_id": "lamp_post",       "rect": [0.08, 0.40, 0.075, 0.075] },
+      { "id": "t04", "item_id": "bench",           "rect": [0.46, 0.46, 0.10, 0.055] },
+      { "id": "t05", "item_id": "postbox",         "rect": [0.78, 0.55, 0.075, 0.065] },
+      { "id": "t06", "item_id": "bakery_building", "rect": [0.16, 0.62, 0.11, 0.08] },
+      { "id": "q01", "item_id": "district_plan",   "kind": "quest", "rect": [0.62, 0.76, 0.10, 0.07] }
+    ]
+  },
+  "rewards": { "coins": 60, "xp": 10 },
+  "quest_grants": ["district_plan"]
+}

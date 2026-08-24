@@ -1,0 +1,11 @@
+{
+  "title": "Район у ратуши",
+  "palette": "street",
+  "shops": ["shops/bakery.json"],
+  "buildings": [
+    { "shop_id": "bakery", "label": "Пекарня",    "rect": [0.05, 0.36, 0.42, 0.34], "color": "#c08a4e" },
+    { "shop_id": "",       "label": "Ратуша",     "rect": [0.53, 0.18, 0.42, 0.52], "color": "#8a8f9c" },
+    { "shop_id": "",       "label": "Цветочный",  "rect": [0.06, 0.76, 0.38, 0.18], "color": "#6f8a63" },
+    { "shop_id": "",       "label": "Кафе",       "rect": [0.52, 0.76, 0.42, 0.18], "color": "#9c6f63" }
+  ]
+}

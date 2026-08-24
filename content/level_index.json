@@ -1,0 +1,7 @@
+[
+  { "id": "bakery_01", "path": "res://content/levels/bakery_01.json", "shop_id": "bakery", "task_id": "task_survey_district", "order": 1 },
+  { "id": "bakery_02", "path": "res://content/levels/bakery_02.json", "shop_id": "bakery", "task_id": "task_clear_facade",    "order": 2 },
+  { "id": "bakery_03", "path": "res://content/levels/bakery_03.json", "shop_id": "bakery", "task_id": "task_install_sign",    "order": 3 },
+  { "id": "bakery_04", "path": "res://content/levels/bakery_04.json", "shop_id": "bakery", "task_id": "task_install_sign",    "order": 4 },
+  { "id": "bakery_05", "path": "res://content/levels/bakery_05.json", "shop_id": "bakery", "task_id": "task_polish_window",   "order": 5 }
+]

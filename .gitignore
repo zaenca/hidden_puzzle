@@ -1,0 +1,11 @@
+# Godot
+.godot/
+*.translation
+
+# Отладочные артефакты dev-запусков
+autoplay_report.txt
+boot_log.txt
+
+# Экспорт
+export_presets.cfg
+build/

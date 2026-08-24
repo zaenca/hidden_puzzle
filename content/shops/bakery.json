@@ -1,0 +1,57 @@
+{
+  "id": "bakery",
+  "display_name": "Пекарня «Тёплый угол»",
+  "palette": "bakery",
+  "map_rect": [0.05, 0.36, 0.42, 0.34],
+  "rooms": [
+    { "id": "outside", "title": "Фасад" },
+    { "id": "hall", "title": "Торговый зал" }
+  ],
+  "slots": [
+    {
+      "id": "sign",
+      "rect": [0.18, 0.06, 0.64, 0.14],
+      "default": "missing",
+      "states": [
+        { "id": "missing",   "label": "вывески нет", "hidden": true },
+        { "id": "installed", "label": "ПЕКАРНЯ",     "color": "#e8a33d", "shape": "rect" }
+      ]
+    },
+    {
+      "id": "window",
+      "rect": [0.08, 0.28, 0.34, 0.30],
+      "default": "dirty",
+      "states": [
+        { "id": "dirty", "label": "витрина грязная", "color": "#6b6455", "shape": "rect" },
+        { "id": "clean", "label": "витрина чистая",  "color": "#a8d8e8", "shape": "rect" }
+      ]
+    },
+    {
+      "id": "door",
+      "rect": [0.52, 0.28, 0.26, 0.44],
+      "default": "rusty",
+      "states": [
+        { "id": "rusty", "label": "замок заржавел", "color": "#5a4130", "shape": "rect" },
+        { "id": "open",  "label": "дверь открыта",  "color": "#3f6b46", "shape": "rect" }
+      ]
+    },
+    {
+      "id": "door_handle",
+      "rect": [0.735, 0.46, 0.045, 0.07],
+      "default": "missing",
+      "states": [
+        { "id": "missing",   "label": "", "hidden": true },
+        { "id": "installed", "label": "", "color": "#e0b04f", "shape": "circle" }
+      ]
+    },
+    {
+      "id": "facade_trash",
+      "rect": [0.06, 0.74, 0.86, 0.20],
+      "default": "dirty",
+      "states": [
+        { "id": "dirty",   "label": "мусор у входа", "color": "#6d5f47", "shape": "rect" },
+        { "id": "cleaned", "label": "",              "hidden": true }
+      ]
+    }
+  ]
+}

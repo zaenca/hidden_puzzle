@@ -1,0 +1,45 @@
+; Engine configuration file.
+; Hybrid Puzzle + Hidden Object — prototype
+; Целевая версия: Godot 4.7.2 stable. Локально проверено на 4.6.2 stable
+; (см. PROJECT_STATUS.md). Для перехода на 4.7 достаточно поменять
+; config/features ниже.
+
+config_version=5
+
+[application]
+
+config/name="Puzzle Hidden — Bakery"
+config/description="Гибрид puzzle + hidden object. Vertical slice: пекарня, уровни 1-5."
+run/main_scene="res://ui/boot.tscn"
+config/features=PackedStringArray("4.6", "GL Compatibility")
+
+[autoload]
+
+EventBus="*res://autoload/event_bus.gd"
+TimeService="*res://autoload/time_service.gd"
+ContentDB="*res://autoload/content_db.gd"
+PlayerState="*res://autoload/player_state.gd"
+CooldownService="*res://autoload/cooldown_service.gd"
+SaveService="*res://autoload/save_service.gd"
+MockServices="*res://autoload/mock_services.gd"
+Game="*res://autoload/game.gd"
+
+[display]
+
+window/size/viewport_width=1080
+window/size/viewport_height=1920
+window/size/window_width_override=540
+window/size/window_height_override=960
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=1
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
