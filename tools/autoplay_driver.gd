@@ -89,23 +89,31 @@ func run(tree: SceneTree) -> void:
 	_check("после фасада — разговор с хозяйкой", Game.screen == Game.Screen.DIALOG)
 	_check_dialog_runs()
 	await tree.create_timer(0.4).timeout
-	_check("после разговора игрок внутри пекарни", Game.screen == Game.Screen.SHOP)
+	_check("после разговора игрок попадает сразу в уборку, а не в локацию",
+		Game.screen == Game.Screen.LEVEL)
 	_check("знакомство отмечено", bool(Game.meta.flags.get("met_baker", false)))
 	_check("задача «Осмотреть пекарню» закрылась знакомством",
 		Game.meta.task_state("task_visit_bakery") == MetaService.TaskState.COMPLETED)
 
-	Game.enter_shop("bakery")
-	await tree.create_timer(0.4).timeout
-	_check("повторный вход ведёт сразу в локацию, без сцены",
-		Game.screen == Game.Screen.SHOP)
+	# --- уровень 2: пазл зала и уборка перетаскиванием ----------------------
+	_check_hall_scene()
+	await _finish_current_level()
+	_check("после уборки — локация пекарни", Game.screen == Game.Screen.SHOP)
+	_check("зал: задача уборки закрылась сама",
+		Game.meta.task_state("task_clear_hall") == MetaService.TaskState.COMPLETED)
+	_check("зал: флаг hall_clean выставлен", bool(Game.meta.flags.get("hall_clean", false)))
+	_check_task_notification("Прибраться в торговом зале")
+	## Предметы уборки живут внутри уровня и там же расходуются — в инвентарь
+	## игрока они не попадают.
+	_check("уборочный инвентарь не осел в сумке", _bag_size() == 0)
 
-	# --- фасад: заперто, ключ, применение ключа ----------------------------
-	_check("фасад: дверь заперта", Game.meta.current_slot_state("bakery", "door") == "locked")
-	_check("фасад: вход внутрь пока закрыт", not bool(Game.meta.flags.get("door_open", false)))
+	# --- дверь в цех: заперто, ключ, применение ключа -----------------------
+	_check("зал: дверь заперта", Game.meta.current_slot_state("bakery", "door") == "locked")
+	_check("зал: вход в цех пока закрыт", not bool(Game.meta.flags.get("door_open", false)))
 
 	var take := Game.meta.interact("bakery", "door", "")
 	_check("тап по двери сработал: %s" % take.get("text", ""), bool(take.get("ok", false)))
-	_check("ключ попал в сумку", PlayerState.amount_of("bakery_key") == 1)
+	_check("ключ попал в инвентарь", PlayerState.amount_of("bakery_key") == 1)
 	_check("дверь всё ещё заперта", Game.meta.current_slot_state("bakery", "door") == "locked")
 
 	var again := Game.meta.interact("bakery", "door", "")
@@ -126,35 +134,6 @@ func run(tree: SceneTree) -> void:
 	var closed := Game.meta.interact("bakery", "door", "")
 	_check("открытая дверь больше не выдаёт ключ", PlayerState.amount_of("bakery_key") == 0)
 	_check("открытая дверь отвечает текстом", not String(closed.get("text", "")).is_empty())
-
-	# --- уровень 2: завал в зале, метла и мешок падают в инвентарь ----------
-	_check("зал: задача уборки открылась",
-		Game.meta.task_state("task_clear_hall") == MetaService.TaskState.AVAILABLE)
-	_check("зал: пол засыпан мусором",
-		Game.meta.current_slot_state("bakery", "floor_litter") == "dirty")
-	_check("зал: витрина грязная",
-		Game.meta.current_slot_state("bakery", "showcase") == "dirty")
-
-	_check_hall_scene()
-
-	await _play("task_clear_hall")
-	_check("L2: метла выдана", PlayerState.amount_of("broom") >= 1)
-	_check("L2: мешок для мусора выдан", PlayerState.amount_of("trash_bag") >= 1)
-	await tree.create_timer(0.4).timeout
-	_check_inventory_shows(["broom", "trash_bag"])
-
-	_apply("task_clear_hall")
-	_check("зал: пол убран",
-		Game.meta.current_slot_state("bakery", "floor_litter") == "cleaned")
-	_check("мешок израсходован", PlayerState.amount_of("trash_bag") == 0)
-	_check("метла осталась инструментом", PlayerState.amount_of("broom") >= 1)
-	_check("под завалом нашлась ветошь", PlayerState.amount_of("rag") >= 1)
-
-	var wipe := Game.meta.interact("bakery", "showcase", "rag")
-	_check("витрина отмыта ветошью: %s" % wipe.get("text", ""), bool(wipe.get("ok", false)))
-	_check("витрина: состояние clean",
-		Game.meta.current_slot_state("bakery", "showcase") == "clean")
-	_check("ветошь израсходована", PlayerState.amount_of("rag") == 0)
 
 	# --- сохранение / загрузка ---------------------------------------------
 	SaveService.save_game()
@@ -211,32 +190,44 @@ func _check_inventory_shows(item_ids: Array) -> void:
 			bar.shows(String(id)))
 
 
-## Зал ищется по настоящему интерьеру и ровно по двум предметам. Проверяем
-## именно это: «целей две» и «предметы лежат в отдельном слое» — два разных
-## утверждения, и второе ломается незаметно, стоит кому-то запечь предметы
-## обратно в фон.
+## Зал — пазл, потом уборка перетаскиванием. Проверяем структуру уровня: что
+## именно там происходит и в каком порядке. Сам drag прогон не эмулирует —
+## он форсирует шаги, а вот что шагов три и у каждого свой кадр, ломается
+## незаметно.
 func _check_hall_scene() -> void:
 	var def: LevelDefinition = ContentDB.level("bakery_02")
 	if def == null:
 		_check("зал: уровень bakery_02 загружается", false)
 		return
 
-	var targets := def.hidden_object.targets
-	_check("зал: в сцене ровно три цели", targets.size() == 3)
-
-	var quest_items := {}
-	for t in targets:
-		if t.is_quest():
-			quest_items[t.item_id] = true
-	_check("зал: все цели сюжетные — метла, щётка и мешок",
-		quest_items.has("broom") and quest_items.has("trash_bag")
-		and quest_items.has("brush") and quest_items.size() == 3)
-	_check("зал: отвлекающих предметов искать не нужно", def.hidden_object.required_normal == 0)
 	_check("зал: пазл собирается из 9 частей", def.puzzle.piece_count() == 9)
-	_check_targets_apart(targets)
+	_check("зал: предметы не ищут — фазы поиска нет",
+		def.hidden_object.targets.is_empty())
+
+	var steps := def.cleanup
+	_check("зал: три шага уборки", steps.size() == 3)
+	var order := PackedStringArray()
+	for s in steps:
+		order.append(s.item_id)
+	_check("зал: порядок уборки — метла, щётка, мешок",
+		"/".join(order) == "broom/brush/trash_bag")
+
+	## Каждый шаг обязан менять кадр: без нового состояния комнаты игрок тащит
+	## предмет и не видит результата.
+	var arts := {}
+	var arts_ok := true
+	for s in steps:
+		if s.art_path.is_empty() or arts.has(s.art_path) or not ResourceLoader.exists(s.art_path):
+			arts_ok = false
+		arts[s.art_path] = true
+	_check("зал: у каждого шага свой кадр комнаты", arts_ok and arts.size() == 3)
+
+	_check("зал: экран результата не показывается", not def.show_result)
+	_check("зал: предметы уборки известны уровню",
+		Game.items_for_level(def).size() >= 3)
 
 	_check("зал: пазл собирается по интерьеру пекарни",
-		def.art.background_path == "res://art/bakery_interior.png")
+		def.art.background_path == "res://art/bakery_interior.jpg")
 	_check("зал: предметы лежат отдельным слоем, а не запечены в пазл",
 		def.art.objects_background_path == "res://art/bakery_interior_objects.png")
 
@@ -249,23 +240,8 @@ func _check_task_notification(expected_title: String) -> void:
 		_check("плашка: виджет уведомлений на месте", false)
 		return
 	_check("плашка: показана после закрытия задачи", node.is_showing())
-	_check("плашка: на ней «%s»" % expected_title, node.shown_title() == expected_title)
+	_check("плашка: игрок извещён про «%s»" % expected_title, node.knows(expected_title))
 
-
-## Цели не должны стоять вплотную. Прощение промаха отдаёт цель, только если
-## рядом ровно одна: у двух соседних тап между ними не засчитывается никуда, и
-## для игрока это выглядит не как «мимо», а как «игра не отвечает».
-func _check_targets_apart(targets: Array[HOTarget]) -> void:
-	var closest := 1.0
-	for i in targets.size():
-		for j in range(i + 1, targets.size()):
-			var a: Rect2 = targets[i].bounds().grow(0.02)
-			var b: Rect2 = targets[j].bounds()
-			if a.intersects(b):
-				closest = 0.0
-			else:
-				closest = minf(closest, targets[i].centroid().distance_to(targets[j].centroid()))
-	_check("зал: цели разнесены (ближайшие — %.2f)" % closest, closest > 0.1)
 
 
 ## Что игрок видит в инвентаре: бустеры в полосу не попадают.

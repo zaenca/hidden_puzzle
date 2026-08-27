@@ -133,6 +133,15 @@ static func rewards(d: Dictionary) -> RewardTable:
 	return r
 
 
+static func cleanup_step(d: Dictionary) -> CleanupStep:
+	var s := CleanupStep.new()
+	s.item_id = String(d.get("item_id", ""))
+	s.rect = to_rect(d.get("rect", [0, 0, 1, 1]))
+	s.art_path = String(d.get("art", ""))
+	s.hint = String(d.get("hint", ""))
+	return s
+
+
 static func level(d: Dictionary) -> LevelDefinition:
 	var l := LevelDefinition.new()
 	l.id = String(d.get("id", ""))
@@ -148,6 +157,10 @@ static func level(d: Dictionary) -> LevelDefinition:
 	l.rewards = rewards(d.get("rewards", {}))
 	l.quest_grants = PackedStringArray(d.get("quest_grants", []))
 	l.show_result = bool(d.get("show_result", true))
+	var steps: Array[CleanupStep] = []
+	for raw in d.get("cleanup", []):
+		steps.append(cleanup_step(raw))
+	l.cleanup = steps
 	return l
 
 

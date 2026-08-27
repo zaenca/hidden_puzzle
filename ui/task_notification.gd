@@ -167,3 +167,10 @@ func shown_title() -> String:
 
 func pending() -> int:
 	return _queue.size()
+
+
+## Знает ли виджет про это уведомление — показывает сейчас или ещё покажет.
+## Две задачи умеют закрыться подряд, и «плашка про вторую уже на экране» было
+## бы проверкой очерёдности, а не того, что игрока вообще известили.
+func knows(title: String) -> bool:
+	return _current == title or _queue.has(title)

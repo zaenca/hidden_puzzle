@@ -70,6 +70,36 @@ func has_objects_layer() -> bool:
 	return objects_texture != null
 
 
+## Сменить кадр комнаты на следующее состояние. Новый кадр проявляется поверх
+## старого и только потом становится фоном: подмена «в лоб» читается как
+## моргание, а не как результат действия игрока.
+##
+## rect не пересчитывается: состояния одной комнаты — это один и тот же кадр,
+## и любое смещение между ними выглядело бы прыжком камеры.
+func swap_background(path: String, duration: float) -> void:
+	var tex := Backdrop.load_texture(path)
+	if tex == null:
+		return
+	var layer := Sprite2D.new()
+	layer.centered = false
+	layer.texture = tex
+	layer.position = rect.position
+	var tex_size := Vector2(tex.get_size())
+	layer.scale = Vector2(rect.size.x / tex_size.x, rect.size.y / tex_size.y)
+	layer.modulate.a = 0.0
+	add_child(layer)
+	move_child(layer, objects.get_index() + 1)
+
+	var tw := create_tween()
+	tw.tween_property(layer, "modulate:a", 1.0, duration)
+	tw.tween_callback(func():
+		texture = tex
+		_place(background, tex)
+		background.modulate = Color.WHITE
+		objects.visible = false
+		layer.queue_free())
+
+
 ## Проявление предметов — вторая половина бесшовного раскрытия: комната собрана,
 ## и в ней «обнаруживается» то, что предстоит найти.
 func reveal_objects(duration: float) -> void:

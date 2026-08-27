@@ -126,7 +126,7 @@ func _check_levels() -> void:
 		## предмет тогда приходит из quest_grants. Дырой он становится только
 		## если он вообще ни на что не влияет — ни находкой, ни выдачей, ни как
 		## условие мета-действия («пазл собран» само по себе двигает историю).
-		if ho.targets.is_empty() and lvl.quest_grants.is_empty() \
+		if ho.targets.is_empty() and lvl.quest_grants.is_empty() and lvl.cleanup.is_empty() \
 				and not _levels_required_by_actions().has(lvl.id):
 			_warn("%s: ни целей hidden object, ни quest_grants — уровень не двигает сюжет" % lvl.id)
 
@@ -148,6 +148,8 @@ func _check_levels() -> void:
 				_err("%s / %s: цель выходит за пределы изображения" % [lvl.id, t.id])
 			if b.size.x < MIN_TARGET_SIDE or b.size.y < MIN_TARGET_SIDE:
 				_warn("%s / %s: цель мельче минимального touch-таргета" % [lvl.id, t.id])
+
+		_check_cleanup(lvl)
 
 		for granted in lvl.quest_grants:
 			var gid := String(granted)
@@ -347,6 +349,38 @@ func _scene_flags() -> Dictionary:
 			if not flag.is_empty():
 				out[flag] = true
 	return out
+
+
+## Шаги уборки. Каждый обещает игроку три вещи: предмет в полосе, место, куда
+## его тащить, и следующий кадр комнаты. Не хватает любой — шаг молча становится
+## тупиком: тащить нечего, некуда или картинка не меняется.
+func _check_cleanup(lvl: LevelDefinition) -> void:
+	var seen := {}
+	for i in lvl.cleanup.size():
+		var step: CleanupStep = lvl.cleanup[i]
+		var who := "%s / уборка %d" % [lvl.id, i + 1]
+
+		if not items.has(step.item_id):
+			_err("%s: нет предмета '%s' в items.json" % [who, step.item_id])
+		if seen.has(step.item_id):
+			_err("%s: предмет '%s' используется дважды" % [who, step.item_id])
+		seen[step.item_id] = true
+
+		if step.art_path.is_empty():
+			_err("%s: не задан кадр после шага" % who)
+		elif not ResourceLoader.exists(step.art_path):
+			_err("%s: нет файла кадра '%s'" % [who, step.art_path])
+
+		var r := step.rect
+		if r.position.x < 0.0 or r.position.y < 0.0 or r.end.x > 1.0 or r.end.y > 1.0:
+			_err("%s: область выходит за пределы кадра" % who)
+		if r.size.x < MIN_TARGET_SIDE or r.size.y < MIN_TARGET_SIDE:
+			_warn("%s: область мельче минимального touch-таргета" % who)
+
+	## Уровень, который заканчивается уборкой, не должен ещё и требовать поиска:
+	## это две разные концовки, и вторая просто не наступит.
+	if not lvl.cleanup.is_empty() and not lvl.hidden_object.targets.is_empty():
+		_err("%s: заданы и цели поиска, и шаги уборки — фаза может быть только одна" % lvl.id)
 
 
 ## Уровни, на которые ссылается хоть одно мета-действие как на условие.

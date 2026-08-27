@@ -237,7 +237,12 @@ func _rebuild_tasks() -> void:
 	_timers.clear()
 	_rows.clear()
 
+	## Панель показывает только то, чем можно заняться. «✓ выполнено» вечным
+	## списком — не прогресс, а мусор поверх локации, и на нём теряется строка,
+	## которая сейчас важна.
 	for task in Game.meta.tasks_at("shop", shop_id):
+		if Game.meta.task_state(task.id) == MetaService.TaskState.COMPLETED:
+			continue
 		_task_list.add_child(_task_row(task))
 
 	var enter_row := _enter_row()

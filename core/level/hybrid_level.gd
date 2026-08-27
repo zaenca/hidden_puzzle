@@ -9,7 +9,7 @@ extends Node2D
 signal finished(result: LevelResult)
 signal abandoned
 
-enum Phase { INTRO, PUZZLE, REVEAL, HIDDEN_OBJECT, OUTRO, RESULT }
+enum Phase { INTRO, PUZZLE, REVEAL, HIDDEN_OBJECT, CLEANUP, OUTRO, RESULT }
 
 const IMAGE_RECT := Rect2(0, 250, 1080, 1300)
 const TRAY_RECT := Rect2(30, 1595, 1020, 290)
@@ -22,6 +22,9 @@ const FADE_OUT_SEC := 0.45
 
 ## За сколько проявляется слой предметов поиска после сборки пазла.
 const OBJECTS_FADE_IN_SEC := 0.5
+
+## Сколько предметы «доезжают» в нижнюю полосу перед фазой уборки.
+const COLLECT_SEC := 0.55
 
 ## Подложка уровня. Тёплый casual-градиент вместо пустоты движка: доска и лоток
 ## должны читаться как предметы НА чём-то, иначе экран выглядит недорисованным.
@@ -42,6 +45,7 @@ var phase: int = Phase.INTRO
 var _puzzle: PuzzleModule
 var _hand: TutorialHand = null        ## обучающий ход в пазле
 var _find_hand: TutorialHand = null   ## бустер-подсказка в поиске
+var _cleanup: CleanupPhase = null
 var _hint_active: bool = false
 var _tray_slot: Panel = null
 var _boosters_left: int = 0
@@ -216,12 +220,15 @@ func _reveal() -> void:
 	tw.tween_property(_camera, "zoom", Vector2(1.05, 1.05), 0.55).set_trans(Tween.TRANS_SINE)
 	await tw.finished
 
-	if not _has_hidden_object():
+	if not _has_hidden_object() and not _has_cleanup():
 		_finish_after_puzzle()
 		return
 
 	await _reveal_objects()
-	_start_hidden_object()
+	if _has_cleanup():
+		await _start_cleanup()
+	else:
+		_start_hidden_object()
 
 
 ## Комната собрана — и в ней проявляется то, что предстоит найти. Пазл шёл по
@@ -278,6 +285,47 @@ func _slip_into_meta() -> void:
 		_emit_result()
 
 
+## --- CLEANUP: перетащить найденное туда, где оно нужно ----------------------
+
+func _has_cleanup() -> bool:
+	return not definition.cleanup.is_empty()
+
+
+## Предметы, только что проявившиеся в кадре, перелетают в нижнюю полосу. Тапать
+## по ним не нужно: их не искали — их показали. Кадр на это время глухой, и
+## единственное, что игрок может сделать дальше, — потянуть предмет.
+func _start_cleanup() -> void:
+	phase = Phase.CLEANUP
+	_hud.show_progress(false)
+
+	var ids := PackedStringArray()
+	for step in definition.cleanup:
+		ids.append(step.item_id)
+	_hud.show_item_row(ids, context.items)
+	await get_tree().create_timer(COLLECT_SEC).timeout
+	if not is_inside_tree():
+		return
+
+	_cleanup = CleanupPhase.new()
+	_cleanup.name = "CleanupPhase"
+	add_child(_cleanup)
+	_cleanup.setup(definition.cleanup, _view, _hud, context.items,
+		func(world: Vector2) -> Vector2: return get_canvas_transform() * world)
+	_cleanup.completed.connect(_on_cleanup_completed)
+	_cleanup.begin()
+
+
+func _on_cleanup_completed() -> void:
+	phase = Phase.OUTRO
+	_hud.set_phase("")
+	_hud.hide_items()
+	if not definition.show_result:
+		await _slip_into_meta()
+		return
+	await get_tree().create_timer(0.6).timeout
+	_show_result()
+
+
 func _start_hidden_object() -> void:
 	phase = Phase.HIDDEN_OBJECT
 	_hud.set_phase("Найди предметы")
@@ -290,10 +338,29 @@ func _start_hidden_object() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch and event.pressed and _hint_active:
 		_stop_drag_hint()
+
+	if phase == Phase.CLEANUP:
+		_cleanup_input(event)
+		return
 	if phase != Phase.HIDDEN_OBJECT:
 		return
 	if event is InputEventScreenTouch and event.pressed:
 		_ho.handle_tap(get_canvas_transform().affine_inverse() * event.position)
+
+
+## Ввод фазы уборки приходит сюда, а не в саму фазу: нажатие начинается на
+## интерфейсе (чип в полосе), а заканчивается в мире (место в кадре), и перевод
+## между этими системами координат знает уровень.
+func _cleanup_input(event: InputEvent) -> void:
+	if _cleanup == null:
+		return
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			_cleanup.handle_press(event.position)
+		else:
+			_cleanup.handle_release(get_canvas_transform().affine_inverse() * event.position)
+	elif event is InputEventScreenDrag:
+		_cleanup.handle_drag(event.position)
 
 
 func _on_target_found(target: HOTarget, item: ItemDefinition) -> void:
@@ -362,6 +429,10 @@ func _on_booster() -> void:
 			if t != null:
 				_show_find_hint(t)
 				used = true
+		Phase.CLEANUP:
+			if _cleanup != null and _cleanup.current() != null:
+				_cleanup.show_hint()
+				used = true
 	if used:
 		_boosters_left -= 1
 		_boosters_spent += 1
@@ -391,16 +462,19 @@ func debug_autoplay() -> void:
 		_start_puzzle()
 	if _puzzle != null:
 		_puzzle.force_solve()
+	await _settle_playable()
+	if not is_inside_tree():
+		return
+	if phase == Phase.HIDDEN_OBJECT:
+		_ho.force_complete()
+	elif phase == Phase.CLEANUP and _cleanup != null:
+		_cleanup.force_complete()
+
 	## Уровень без экрана результата доигрывает переход и уходит в мету сам.
 	## Дожидаться его здесь нельзя: нода освободится посреди этой корутины, и
 	## тот, кто её ждёт, не дождётся никогда. Прогон ждёт смены экрана снаружи.
 	if not definition.show_result:
 		return
-	await _settle(Phase.HIDDEN_OBJECT)
-	if not is_inside_tree():
-		return
-	if phase == Phase.HIDDEN_OBJECT:
-		_ho.force_complete()
 	await _settle(Phase.RESULT)
 	if not is_inside_tree():
 		return
@@ -411,6 +485,19 @@ func debug_autoplay() -> void:
 ## Ждём фазу, а не фиксированные секунды: длительность раскрытия зависит от
 ## того, есть ли у сцены отдельный слой предметов, и захардкоженный таймер
 ## начинает врать ровно при добавлении такого слоя.
+## Ждём фазу, в которой прогону есть что доиграть за игрока. Фаза уборки
+## доступна не сразу: предметы сперва «доезжают» в полосу, и до этого момента
+## форсировать в ней нечего.
+func _settle_playable(timeout_sec: float = 8.0) -> void:
+	var deadline := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
+	while is_inside_tree() and Time.get_ticks_msec() < deadline:
+		if phase == Phase.HIDDEN_OBJECT or phase == Phase.OUTRO or phase == Phase.RESULT:
+			return
+		if phase == Phase.CLEANUP and _cleanup != null:
+			return
+		await get_tree().process_frame
+
+
 func _settle(target: int, timeout_sec: float = 8.0) -> void:
 	var deadline := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
 	while is_inside_tree() and phase != target and Time.get_ticks_msec() < deadline:

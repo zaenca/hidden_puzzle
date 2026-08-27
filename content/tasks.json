@@ -28,11 +28,11 @@
     "shop_id": "bakery",
     "room_id": "hall",
     "location": "shop",
-    "title": "Разобрать завал в зале",
-    "hint": "Пол засыпан листьями и мусором. Нужно найти, чем убирать.",
+    "title": "Прибраться в торговом зале",
+    "hint": "",
     "unlock": [{ "type": "flag", "flag": "met_baker" }],
     "level_ids": ["bakery_02"],
     "action_id": "clear_hall",
-    "hotspot": "floor_litter"
+    "hotspot": ""
   }
 ]

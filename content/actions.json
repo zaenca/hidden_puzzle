@@ -30,22 +30,16 @@
   },
   {
     "id": "clear_hall",
-    "title": "Вынести мусор из зала",
-    "description": "Метла, щётка и мешок уже в инвентаре — можно браться за зал.",
-    "button_label": "Убрать зал",
-    "requirements": [
-      { "type": "item", "item_id": "broom", "amount": 1 },
-      { "type": "item", "item_id": "trash_bag", "amount": 1 },
-      { "type": "item", "item_id": "brush", "amount": 1 }
-    ],
+    "title": "Прибраться в торговом зале",
+    "description": "Пол вымыт, витрина обметена, мусор собран.",
+    "button_label": "Прибраться в зале",
+    "_auto_note": "Уборка целиком происходит внутри уровня: игрок перетаскивает метлу, щётку и мешок. Задача закрывается сама по факту пройденного уровня — кнопки, дублирующей уже сделанное, быть не должно.",
+    "auto_apply": true,
+    "requirements": [{ "type": "level", "level_id": "bakery_02" }],
     "costs": [],
     "duration_sec": 0,
     "effects": [
-      { "type": "consume", "id": "trash_bag", "amount": 1 },
-      { "type": "set_visual_state", "shop_id": "bakery", "slot_id": "floor_litter", "state_id": "cleaned" },
-      { "type": "grant", "id": "rag", "amount": 1 },
-      { "type": "set_flag", "flag": "hall_clean" },
-      { "type": "narrative", "text": "Листья выметены, полки обметены, мешок завязан. Под завалом нашлась старая ветошь — ей можно отмыть витрину." }
+      { "type": "set_flag", "flag": "hall_clean" }
     ]
   }
 ]

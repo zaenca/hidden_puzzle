@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://1svydrt2rl8r"
-path="res://.godot/imported/bakery_interior_objects.png-ec650d4116c89e4c9998a8e757929ceb.ctex"
+uid="uid://dhcjoh8mypslh"
+path="res://.godot/imported/bakery_interior.jpg-dbb5a0580ab2c69b7c958477695c97c7.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/bakery_interior_objects.png"
-dest_files=["res://.godot/imported/bakery_interior_objects.png-ec650d4116c89e4c9998a8e757929ceb.ctex"]
+source_file="res://art/bakery_interior.jpg"
+dest_files=["res://.godot/imported/bakery_interior.jpg-dbb5a0580ab2c69b7c958477695c97c7.ctex"]
 
 [params]
 

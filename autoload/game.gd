@@ -298,6 +298,12 @@ func items_for_level(def: LevelDefinition) -> Dictionary:
 		var item: ItemDefinition = ContentDB.item(String(id))
 		if item != null:
 			out[String(id)] = item
+	## Предметы уборки не ищут и не выдают — их показывают и тут же тащат.
+	## В инвентарь игрока они не попадают, но уровню нужны их иконки и названия.
+	for step in def.cleanup:
+		var item: ItemDefinition = ContentDB.item(step.item_id)
+		if item != null:
+			out[step.item_id] = item
 	return out
 
 

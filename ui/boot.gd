@@ -99,12 +99,11 @@ func _build_overlay() -> void:
 	_debug_panel.add_child(col)
 	col.add_child(UIKit.label("DEBUG", 26, UIKit.ACCENT))
 	col.add_child(_debug_button("Сброс прогресса", func(): Game.hard_reset()))
-	col.add_child(_debug_button("Показать интро", func():
+	## Заставка и разговор с мэром — одна сцена завязки: игрок в ней ничего не
+	## решает, а на две кнопки она делилась только потому, что внутри две сцены.
+	col.add_child(_debug_button("Интро", func():
 		_debug_panel.visible = false
 		Game.replay_intro()))
-	col.add_child(_debug_button("Диалог: мэр", func():
-		_debug_panel.visible = false
-		Game.open_dialog("intro_mayor")))
 	col.add_child(_debug_button("Пекарня: фасад + хозяйка", func():
 		_debug_panel.visible = false
 		Game.open_intro("bakery_facade")))
