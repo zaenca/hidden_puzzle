@@ -40,7 +40,8 @@ var definition: LevelDefinition
 var phase: int = Phase.INTRO
 
 var _puzzle: PuzzleModule
-var _hand: TutorialHand = null
+var _hand: TutorialHand = null        ## обучающий ход в пазле
+var _find_hand: TutorialHand = null   ## бустер-подсказка в поиске
 var _hint_active: bool = false
 var _tray_slot: Panel = null
 var _boosters_left: int = 0
@@ -163,6 +164,28 @@ func _start_drag_hint() -> void:
 	_hint_active = true
 
 
+## --- подсказка в поиске -----------------------------------------------------
+
+## Бустер в фазе поиска показывает пальцем, куда нажать, а не обводит предмет
+## рамкой. Обводка отвечает на вопрос «где он», палец — на вопрос «что делать»,
+## и второй ответ здесь единственный нужный: предмет уже нарисован в сцене,
+## игроку остаётся по нему попасть.
+func _show_find_hint(t: HOTarget) -> void:
+	_stop_find_hint()
+	_find_hand = TutorialHand.new()
+	$FX.add_child(_find_hand)
+	_find_hand.play_tap(_view.norm_to_world(t.centroid()))
+
+
+## Палец держится, пока предмет не найден: промах — это повод показывать
+## дальше, а не прятать подсказку, за которую заплатили бустером.
+func _stop_find_hint() -> void:
+	if _find_hand == null:
+		return
+	_find_hand.stop()
+	_find_hand = null
+
+
 ## Любое касание означает «я понял» — подсказка молча уходит.
 func _stop_drag_hint() -> void:
 	if not _hint_active:
@@ -274,6 +297,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_target_found(target: HOTarget, item: ItemDefinition) -> void:
+	_stop_find_hint()
 	_hud.mark_found(target.id)
 	var found := definition.hidden_object.targets.size() - _ho.remaining().size()
 	_hud.set_progress(found, definition.hidden_object.targets.size())
@@ -336,7 +360,7 @@ func _on_booster() -> void:
 		Phase.HIDDEN_OBJECT:
 			var t := _ho.hint_target()
 			if t != null:
-				_ho.highlight(t)
+				_show_find_hint(t)
 				used = true
 	if used:
 		_boosters_left -= 1

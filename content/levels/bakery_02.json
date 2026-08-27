@@ -17,8 +17,8 @@
     "palette": "bakery",
     "seed": 2022
   },
-  "puzzle": { "module_id": "jigsaw", "cols": 3, "rows": 4, "seed": 2201, "tab_ratio": 0.2, "snap_distance_px": 95 },
-  "_targets_note": "Ровно две цели, обе сюжетные: метла у стеллажа и мешок у столика справа. required_normal 0 — отвлекающих предметов в сцене нет.",
+  "puzzle": { "module_id": "jigsaw", "cols": 3, "rows": 3, "seed": 2201, "tab_ratio": 0.2, "snap_distance_px": 95 },
+  "_targets_note": "Три цели, все сюжетные: метла у стеллажа, щётка на полке, мешок у столика справа. required_normal 0 — отвлекающих предметов в сцене нет.",
   "hidden_object": {
     "required_normal": 0,
     "targets": [
@@ -29,9 +29,10 @@
           [0.243, 0.670], [0.218, 0.662], [0.217, 0.586]
         ]
       },
-      { "id": "q02", "item_id": "trash_bag", "kind": "quest", "rect": [0.749, 0.655, 0.067, 0.085] }
+      { "id": "q02", "item_id": "trash_bag", "kind": "quest", "rect": [0.749, 0.655, 0.067, 0.085] },
+      { "id": "q03", "item_id": "brush",     "kind": "quest", "rect": [0.420, 0.420, 0.131, 0.039] }
     ]
   },
   "rewards": { "coins": 70, "xp": 12 },
-  "quest_grants": ["broom", "trash_bag"]
+  "quest_grants": ["broom", "trash_bag", "brush"]
 }

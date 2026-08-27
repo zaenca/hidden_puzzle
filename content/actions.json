@@ -31,11 +31,12 @@
   {
     "id": "clear_hall",
     "title": "Вынести мусор из зала",
-    "description": "Метла и мешок уже в инвентаре — можно браться за пол.",
+    "description": "Метла, щётка и мешок уже в инвентаре — можно браться за зал.",
     "button_label": "Убрать зал",
     "requirements": [
       { "type": "item", "item_id": "broom", "amount": 1 },
-      { "type": "item", "item_id": "trash_bag", "amount": 1 }
+      { "type": "item", "item_id": "trash_bag", "amount": 1 },
+      { "type": "item", "item_id": "brush", "amount": 1 }
     ],
     "costs": [],
     "duration_sec": 0,
@@ -44,7 +45,7 @@
       { "type": "set_visual_state", "shop_id": "bakery", "slot_id": "floor_litter", "state_id": "cleaned" },
       { "type": "grant", "id": "rag", "amount": 1 },
       { "type": "set_flag", "flag": "hall_clean" },
-      { "type": "narrative", "text": "Листья выметены, мешок завязан. Под завалом нашлась старая ветошь — ей можно отмыть витрину." }
+      { "type": "narrative", "text": "Листья выметены, полки обметены, мешок завязан. Под завалом нашлась старая ветошь — ей можно отмыть витрину." }
     ]
   }
 ]

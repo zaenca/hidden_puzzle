@@ -43,7 +43,7 @@
   { "id": "squeegee",    "name": "Сгонка",      "color": "#4f9bd1", "shape": "cross" },
   { "id": "bucket",      "name": "Ведро",       "color": "#d15f4f", "shape": "rect" },
   { "id": "cloth",       "name": "Тряпка",      "color": "#cfc2a8", "shape": "rect" },
-  { "id": "brush",       "name": "Щётка",       "color": "#b07a3e", "shape": "cross" },
+  { "id": "brush",       "name": "Щётка", "kind": "quest", "icon": "res://art/items/brush.png",     "color": "#4f9bd1", "shape": "cross" },
   { "id": "door_handle", "name": "Дверная ручка", "kind": "quest", "color": "#e0b04f", "shape": "rect" },
   { "id": "glass_pane",  "name": "Стекло витрины", "kind": "quest", "color": "#a8e0f0", "shape": "rect" }
 ]

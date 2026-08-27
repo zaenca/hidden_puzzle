@@ -7,6 +7,7 @@ extends Node
 var _toast: Label
 var _debug_panel: Control
 var _inventory: InventoryBar
+var _notification: TaskNotification
 var _autoplay: AutoplayDriver = null
 
 
@@ -72,6 +73,13 @@ func _build_overlay() -> void:
 	_inventory.set_active(false)
 	Game.attach_inventory(_inventory)
 
+	## Плашка «задание выполнено» — тоже в оверлее и по той же причине: задача
+	## закрывается ровно на стыке экранов, и в сцене это событие некому поймать.
+	_notification = TaskNotification.new()
+	_notification.name = "TaskNotification"
+	root.add_child(_notification)
+	_notification.set_active(false)
+
 	if not OS.is_debug_build():
 		return
 
@@ -132,8 +140,11 @@ func _debug_button(text: String, action: Callable) -> Button:
 ## туда не помещается и там не нужен. Он ждёт возвращения в мету вместе с
 ## наградой, которую ещё не показал.
 func _on_screen_changed(screen: int) -> void:
+	var in_meta := screen == Game.Screen.MAP or screen == Game.Screen.SHOP
 	if _inventory != null:
-		_inventory.set_active(screen == Game.Screen.MAP or screen == Game.Screen.SHOP)
+		_inventory.set_active(in_meta)
+	if _notification != null:
+		_notification.set_active(in_meta)
 
 
 func _show_toast(text: String) -> void:

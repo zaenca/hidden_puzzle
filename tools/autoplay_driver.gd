@@ -59,6 +59,10 @@ func run(tree: SceneTree) -> void:
 
 	_check("L1: задача осмотра закрылась сама",
 		Game.meta.task_state("task_survey_district") == MetaService.TaskState.COMPLETED)
+	## Плашку копим, пока идёт уровень, и показываем уже в мете: поздравлять
+	## поверх раскрытия сцены значит перебивать ровно тот кадр, ради которого
+	## уровень и собирали.
+	_check_task_notification("Осмотреть район")
 	_check("мета: пекарня выбрана", Game.meta.shop_state("bakery") == "in_restoration")
 
 	# --- площадь: ровно одна активная задача и указатель на неё -------------
@@ -218,20 +222,50 @@ func _check_hall_scene() -> void:
 		return
 
 	var targets := def.hidden_object.targets
-	_check("зал: в сцене ровно две цели", targets.size() == 2)
+	_check("зал: в сцене ровно три цели", targets.size() == 3)
 
 	var quest_items := {}
 	for t in targets:
 		if t.is_quest():
 			quest_items[t.item_id] = true
-	_check("зал: обе цели сюжетные — метла и мешок",
-		quest_items.has("broom") and quest_items.has("trash_bag") and quest_items.size() == 2)
+	_check("зал: все цели сюжетные — метла, щётка и мешок",
+		quest_items.has("broom") and quest_items.has("trash_bag")
+		and quest_items.has("brush") and quest_items.size() == 3)
 	_check("зал: отвлекающих предметов искать не нужно", def.hidden_object.required_normal == 0)
+	_check("зал: пазл собирается из 9 частей", def.puzzle.piece_count() == 9)
+	_check_targets_apart(targets)
 
 	_check("зал: пазл собирается по интерьеру пекарни",
 		def.art.background_path == "res://art/bakery_interior.png")
 	_check("зал: предметы лежат отдельным слоем, а не запечены в пазл",
 		def.art.objects_background_path == "res://art/bakery_interior_objects.png")
+
+
+## «Задача закрыта» и «игрок про это узнал» — разные утверждения. Плашка живёт
+## в оверлее Boot, поэтому ищем её там, а не в текущей сцене.
+func _check_task_notification(expected_title: String) -> void:
+	var node: Node = _tree.root.find_child("TaskNotification", true, false)
+	if node == null:
+		_check("плашка: виджет уведомлений на месте", false)
+		return
+	_check("плашка: показана после закрытия задачи", node.is_showing())
+	_check("плашка: на ней «%s»" % expected_title, node.shown_title() == expected_title)
+
+
+## Цели не должны стоять вплотную. Прощение промаха отдаёт цель, только если
+## рядом ровно одна: у двух соседних тап между ними не засчитывается никуда, и
+## для игрока это выглядит не как «мимо», а как «игра не отвечает».
+func _check_targets_apart(targets: Array[HOTarget]) -> void:
+	var closest := 1.0
+	for i in targets.size():
+		for j in range(i + 1, targets.size()):
+			var a: Rect2 = targets[i].bounds().grow(0.02)
+			var b: Rect2 = targets[j].bounds()
+			if a.intersects(b):
+				closest = 0.0
+			else:
+				closest = minf(closest, targets[i].centroid().distance_to(targets[j].centroid()))
+	_check("зал: цели разнесены (ближайшие — %.2f)" % closest, closest > 0.1)
 
 
 ## Что игрок видит в инвентаре: бустеры в полосу не попадают.
