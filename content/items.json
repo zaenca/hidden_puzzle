@@ -15,8 +15,8 @@
   { "id": "newspaper",   "name": "Газета",      "color": "#e6e2d3", "shape": "rect" },
   { "id": "can",         "name": "Банка",       "color": "#b5b5c2", "shape": "circle" },
   { "id": "leaf_pile",   "name": "Листья",      "color": "#8f9e4a", "shape": "triangle" },
-  { "id": "broom",       "name": "Метла",       "kind": "quest", "color": "#d98f3a", "shape": "cross" },
-  { "id": "trash_bag",   "name": "Мешок для мусора", "kind": "quest", "color": "#4a4a55", "shape": "circle" },
+  { "id": "broom",       "name": "Метла",  "kind": "quest", "icon": "res://art/items/broom.png",     "color": "#d98f3a", "shape": "cross" },
+  { "id": "trash_bag",   "name": "Мешок", "kind": "quest", "icon": "res://art/items/trash_bag.png", "color": "#4a4a55", "shape": "circle" },
 
   { "id": "hammer",       "name": "Молоток",     "color": "#9b7653", "shape": "cross" },
   { "id": "nail",         "name": "Гвозди",      "color": "#c9ccd1", "shape": "rect" },

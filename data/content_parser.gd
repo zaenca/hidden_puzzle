@@ -50,6 +50,9 @@ static func item(d: Dictionary) -> ItemDefinition:
 	it.display_name = String(d.get("name", it.id))
 	it.color = to_color(d.get("color", "#cccccc"))
 	it.shape = String(d.get("shape", "rect"))
+	## Есть иконка — она и рисуется; нет — цвет с формой, как раньше. Смешивать
+	## не нужно: PlaceholderArt сам предпочитает icon, когда тот заполнен.
+	it.icon = Backdrop.load_texture(String(d.get("icon", "")))
 	match String(d.get("kind", "normal")):
 		"quest": it.kind = ItemDefinition.Kind.QUEST
 		"themed": it.kind = ItemDefinition.Kind.THEMED

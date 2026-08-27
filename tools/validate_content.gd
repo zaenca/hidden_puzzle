@@ -52,6 +52,12 @@ func _load() -> void:
 	for d in items_raw:
 		var it := ContentParser.item(d)
 		items[it.id] = it
+		## Опечатка в пути иконки не ломает игру — предмет просто откатывается к
+		## цветной фигуре. Именно поэтому её надо ловить здесь: в готовой сборке
+		## это заметят не сразу и не по тому признаку.
+		var icon_path := String(d.get("icon", ""))
+		if not icon_path.is_empty() and not ResourceLoader.exists(icon_path):
+			_err("предмет %s: нет файла иконки '%s'" % [it.id, icon_path])
 
 	for d in ContentParser.read_json(ROOT + "tasks.json"):
 		var t := ContentParser.task(d)

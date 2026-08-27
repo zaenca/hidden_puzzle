@@ -127,7 +127,8 @@ godot --headless --path . --script res://tools/validate_content.gd
 Финальный арт: `map_city.jpg` (площадь), `bakery.png` (фасад в заставке),
 `puzzle_district.jpg` (пазл 1), `bakery_interior.png` +
 `bakery_interior_objects.png` (торговый зал: локация и уровень 2),
-четыре кадра говорящих, `ui_hand.png`.
+четыре кадра говорящих, `ui_hand.png`,
+иконки предметов в `art/items/` (метла, мешок).
 **Ни одного скрипта под конкретный уровень** — добавление уровня это один JSON.
 Ни одного скрипта под конкретную дверь: правило тапа — это тоже JSON.
 
