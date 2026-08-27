@@ -38,6 +38,17 @@ func setup(art: SceneArt, targets: Array[HOTarget], items: Dictionary, area: Rec
 	background.scale = Vector2(s, s)
 
 
+## Во сколько раз пиксели текстуры плотнее экранных. Пазл режет изображение в
+## координатах rect, а сэмплирует в пиксельных — без этого множителя части
+## сходятся со сдвигом ровно там, где картинка не 1:1 к своей области, и
+## собранный пазл остаётся разлинованным швами.
+func uv_scale() -> Vector2:
+	if texture == null or rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return Vector2.ONE
+	var tex_size := Vector2(texture.get_size())
+	return Vector2(tex_size.x / rect.size.x, tex_size.y / rect.size.y)
+
+
 func norm_to_world(p: Vector2) -> Vector2:
 	return rect.position + Vector2(p.x * rect.size.x, p.y * rect.size.y)
 

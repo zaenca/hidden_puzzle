@@ -15,3 +15,8 @@ extends Resource
 @export var hidden_object: HOConfig
 @export var rewards: RewardTable
 @export var quest_grants: PackedStringArray = PackedStringArray()
+
+## Показывать ли экран результата. Сюжетный пазл без начислений заканчивается
+## плавным уходом в мету: «Уровень пройден. Монеты: +60» посреди завязки
+## превращает сцену истории в отчёт о проделанной работе.
+@export var show_result: bool = true

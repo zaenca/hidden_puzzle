@@ -15,6 +15,11 @@ const IMAGE_RECT := Rect2(0, 250, 1080, 1300)
 const TRAY_RECT := Rect2(30, 1595, 1020, 290)
 const SCREEN := Vector2(1080, 1920)
 
+## Уход в мету без экрана результата: сколько держим собранную картинку и за
+## сколько гасим экран.
+const HOLD_BEFORE_FADE := 1.0
+const FADE_OUT_SEC := 0.45
+
 ## Подложка уровня. Тёплый casual-градиент вместо пустоты движка: доска и лоток
 ## должны читаться как предметы НА чём-то, иначе экран выглядит недорисованным.
 const SKY_TOP := Color("#5fb3e0")
@@ -127,7 +132,7 @@ func _start_puzzle() -> void:
 	_puzzle_host.add_child(_puzzle)
 	## Не IMAGE_RECT, а то, что SceneView реально занял: картинка вписана в
 	## отведённую область по своему формату, и резать пазл надо по ней.
-	_puzzle.setup(definition.puzzle, _view.texture, _view.rect, TRAY_RECT)
+	_puzzle.setup(definition.puzzle, _view.texture, _view.rect, TRAY_RECT, _view.uv_scale())
 	_puzzle.progress_changed.connect(_hud.set_progress)
 	_puzzle.solved.connect(_reveal)
 	_puzzle.begin()
@@ -203,9 +208,37 @@ func _has_hidden_object() -> bool:
 
 func _finish_after_puzzle() -> void:
 	phase = Phase.OUTRO
+	if not definition.show_result:
+		await _slip_into_meta()
+		return
 	_hud.set_phase("Готово")
 	await get_tree().create_timer(0.6).timeout
 	_show_result()
+
+
+## Конец уровня без экрана результата. Собранная картинка держится секунду —
+## это и есть награда, — потом экран гаснет, и игрок оказывается там, куда его
+## ведёт история. Никакой строки «Монеты: +60» между двумя кадрами сюжета.
+func _slip_into_meta() -> void:
+	_hud.set_phase("")
+	await get_tree().create_timer(HOLD_BEFORE_FADE).timeout
+	if not is_inside_tree():
+		return
+
+	var veil := ColorRect.new()
+	veil.color = Color(0, 0, 0, 0)
+	veil.set_anchors_preset(Control.PRESET_FULL_RECT)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	## Последним ребёнком слоя — поверх HUD: гаснуть должен весь экран, иначе
+	## заголовок и счётчик частей висят над чернотой.
+	$UI.add_child(veil)
+
+	var tw := create_tween()
+	tw.tween_property(veil, "color:a", 1.0, FADE_OUT_SEC)
+	await tw.finished
+	if is_inside_tree():
+		_emit_result()
+
 
 func _start_hidden_object() -> void:
 	phase = Phase.HIDDEN_OBJECT
@@ -239,8 +272,11 @@ func _on_miss(_world: Vector2) -> void:
 
 func _on_ho_completed() -> void:
 	phase = Phase.OUTRO
-	_hud.set_phase("Готово")
 	_hud.hide_items()
+	if not definition.show_result:
+		await _slip_into_meta()
+		return
+	_hud.set_phase("Готово")
 	await get_tree().create_timer(0.5).timeout
 	_show_result()
 
@@ -316,9 +352,18 @@ func debug_autoplay() -> void:
 		_start_puzzle()
 	if _puzzle != null:
 		_puzzle.force_solve()
+	## Уровень без экрана результата доигрывает переход и уходит в мету сам.
+	## Дожидаться его здесь нельзя: нода освободится посреди этой корутины, и
+	## тот, кто её ждёт, не дождётся никогда. Прогон ждёт смены экрана снаружи.
+	if not definition.show_result:
+		return
 	await get_tree().create_timer(1.4).timeout
+	if not is_inside_tree():
+		return
 	if phase == Phase.HIDDEN_OBJECT:
 		_ho.force_complete()
 	await get_tree().create_timer(0.8).timeout
+	if not is_inside_tree():
+		return
 	if phase == Phase.RESULT:
 		_emit_result()

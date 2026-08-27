@@ -118,8 +118,10 @@ func _check_levels() -> void:
 			_err("%s: required_normal=%d, а обычных целей всего %d" % [lvl.id, ho.required_normal, normals])
 		## Уровень без целей — это чистый пазл, а не ошибка контента: сюжетный
 		## предмет тогда приходит из quest_grants. Дырой он становится только
-		## если не выдаёт вообще ничего, кроме монет.
-		if ho.targets.is_empty() and lvl.quest_grants.is_empty():
+		## если он вообще ни на что не влияет — ни находкой, ни выдачей, ни как
+		## условие мета-действия («пазл собран» само по себе двигает историю).
+		if ho.targets.is_empty() and lvl.quest_grants.is_empty() \
+				and not _levels_required_by_actions().has(lvl.id):
 			_warn("%s: ни целей hidden object, ни quest_grants — уровень не двигает сюжет" % lvl.id)
 
 		var seen := {}
@@ -322,6 +324,36 @@ func _check_dialogs() -> void:
 					% [file, sid])
 
 
+## Флаги, которые ставят заставки и диалоги через on_finish.set_flag.
+func _scene_flags() -> Dictionary:
+	var out := {}
+	for folder in ["dialogs", "intros"]:
+		var dir := DirAccess.open(ROOT + folder)
+		if dir == null:
+			continue
+		for file in dir.get_files():
+			if not file.ends_with(".json"):
+				continue
+			var d = ContentParser.read_json("%s%s/%s" % [ROOT, folder, file])
+			if not (d is Dictionary):
+				continue
+			var flag := String((d.get("on_finish", {}) as Dictionary).get("set_flag", ""))
+			if not flag.is_empty():
+				out[flag] = true
+	return out
+
+
+## Уровни, на которые ссылается хоть одно мета-действие как на условие.
+## Такой уровень двигает историю самим фактом прохождения.
+func _levels_required_by_actions() -> Dictionary:
+	var out := {}
+	for a in actions.values():
+		for r in a.requirements:
+			if r.kind == Requirement.Kind.LEVEL:
+				out[r.id] = a.id
+	return out
+
+
 ## Все флаги, которые кто-то в контенте вообще может выставить.
 func _flags_set_anywhere() -> Dictionary:
 	var out := {}
@@ -398,8 +430,13 @@ func _check_tasks() -> void:
 		for lid in t.level_ids:
 			if not levels.has(String(lid)):
 				_err("task %s: неизвестный уровень '%s'" % [t.id, lid])
-		if t.level_ids.is_empty() and t.location != "shop":
-			_warn("task %s: нет уровней и не в магазине" % t.id)
+		## Задача без уровней вне магазина — либо указатель («сходи туда»,
+		## закрывается сама), либо дырка в контенте: строка, по которой игроку
+		## нечего нажать и нечего сделать.
+		var act: MetaActionDefinition = actions.get(t.action_id)
+		if t.level_ids.is_empty() and t.location != "shop" \
+				and (act == null or not act.auto_apply):
+			_warn("task %s: нет уровней, не в магазине и не закрывается сама" % t.id)
 
 
 ## Симуляция линейного прохождения. Проверяет два инварианта:
@@ -407,7 +444,12 @@ func _check_tasks() -> void:
 ##  2) в момент старта cooldown есть хотя бы одна параллельная задача.
 func _simulate_progression() -> void:
 	var inv := {}
-	var flags := {}
+	## Флаги, которые поднимают сцены (знакомство с хозяйкой ставит диалог, а не
+	## действие), считаем достижимыми сразу. Собственных условий у сцен нет — до
+	## них доводит цепочка on_finish, а её целостность проверяют _check_intros и
+	## _check_dialogs. Моделировать здесь ещё и порядок сцен значило бы держать
+	## вторую копию маршрутизации Game.
+	var flags := _scene_flags()
 	var done_levels := {}
 	var done_tasks := {}
 	var coins := 100000

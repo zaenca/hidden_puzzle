@@ -143,6 +143,7 @@ static func level(d: Dictionary) -> LevelDefinition:
 	l.hidden_object = ho_config(d.get("hidden_object", {}))
 	l.rewards = rewards(d.get("rewards", {}))
 	l.quest_grants = PackedStringArray(d.get("quest_grants", []))
+	l.show_result = bool(d.get("show_result", true))
 	return l
 
 
@@ -219,6 +220,7 @@ static func action(d: Dictionary) -> MetaActionDefinition:
 	for raw in d.get("costs", []):
 		costs.append(cost(raw))
 	a.costs = costs
+	a.auto_apply = bool(d.get("auto_apply", false))
 	a.duration_sec = int(d.get("duration_sec", 0))
 	a.reduce_per_level_sec = int(d.get("reduce_per_level_sec", 0))
 	a.speedup_hard_cost = int(d.get("speedup_hard_cost", 0))

@@ -8,6 +8,7 @@ extends RefCounted
 enum TaskState { LOCKED, AVAILABLE, IN_PROGRESS, READY_TO_APPLY, APPLYING, COMPLETED }
 
 const STATE_NAMES := ["locked", "available", "in_progress", "ready_to_apply", "applying", "completed"]
+const AUTO_APPLY_PASSES := 4
 
 var player: Node
 var db: Node
@@ -19,6 +20,8 @@ var completed_levels: Dictionary = {} ## level_id -> сколько раз пр�
 var flags: Dictionary = {}
 var levels_completed_total: int = 0
 var pending_narrative: PackedStringArray = PackedStringArray()
+
+var _auto_applying: bool = false
 
 
 func _init(p: Node, content: Node, cd: Node) -> void:
@@ -53,7 +56,39 @@ func refresh() -> void:
 			if after != before:
 				task_states[task_id] = after
 				EventBus.task_state_changed.emit(task_id, after)
+	_auto_apply_ready()
 	_check_parallel_task_invariant()
+
+
+## Часть задач не требует от игрока ни кнопки, ни выбора: они выполнены ровно
+## тогда, когда выполнены их условия. Такие действия помечены auto_apply и
+## применяются здесь, сразу после пересчёта, — иначе задача зависала бы в
+## READY_TO_APPLY с кнопкой, которая ничего не решает.
+##
+## Место выбрано намеренно: refresh() — единственная точка, где состояния задач
+## становятся актуальными, и её зовут все, кто меняет мир. Развесить
+## авто-применение по вызывающим значило бы однажды забыть одного из них.
+func _auto_apply_ready() -> void:
+	# start_action → _complete_action → refresh(): без охраны это рекурсия.
+	if _auto_applying:
+		return
+	_auto_applying = true
+	# Выполнение одной задачи открывает следующую — крутим, пока есть что.
+	for _pass in AUTO_APPLY_PASSES:
+		var applied := false
+		for task_id in db.tasks:
+			if task_state(task_id) != TaskState.READY_TO_APPLY:
+				continue
+			var action := action_for_task(task_id)
+			## Cooldown-действие само себя не запускает: ждать десять минут —
+			## это решение игрока, а не следствие условий.
+			if action == null or not action.auto_apply or not action.is_instant():
+				continue
+			if start_action(task_id):
+				applied = true
+		if not applied:
+			break
+	_auto_applying = false
 
 
 ## Инвариант: у игрока всегда есть чем заняться. Нарушение — баг контента,
@@ -162,8 +197,14 @@ func set_shop_state(shop_id: String, state: String) -> void:
 		shop_states[shop_id]["state"] = state
 
 
+## Флаг — это состояние мира: он открывает одни задачи и закрывает те, что ждали
+## именно его. Пересчёт живёт здесь, а не у вызывающих: диалог, тап по объекту и
+## эффект действия поднимают флаги по-разному, и однажды кто-то из них забудет.
 func set_flag(flag: String, value: bool = true) -> void:
+	if bool(flags.get(flag, false)) == value:
+		return
 	flags[flag] = value
+	refresh()
 
 
 ## --- point-and-click: тап по слоту ------------------------------------------

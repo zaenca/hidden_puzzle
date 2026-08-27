@@ -50,14 +50,22 @@ func run(tree: SceneTree) -> void:
 	_check("L1: пазл собирается из 6 частей",
 		ContentDB.level("bakery_01").puzzle.piece_count() == 6)
 	await _finish_current_level()
-	_check("L1: получен сюжетный предмет 'План района'", PlayerState.amount_of("district_plan") >= 1)
-	_check("после пазла — городская площадь", Game.screen == Game.Screen.MAP)
-	_check("L1: задача готова к применению",
-		Game.meta.task_state("task_survey_district") == MetaService.TaskState.READY_TO_APPLY)
+	_check("после пазла — сразу городская площадь, без экрана результата",
+		Game.screen == Game.Screen.MAP)
+	## Осмотр района — часть разговора с мэром, а не добыча: ни предмета в
+	## инвентаре, ни начислений за первый пазл.
+	_check("L1: инвентарь после первого пазла пуст", _bag_size() == 0)
+	_check("L1: за сюжетный пазл не начислено монет", PlayerState.amount_of("coins") == 300)
 
-	_apply("task_survey_district")
+	_check("L1: задача осмотра закрылась сама",
+		Game.meta.task_state("task_survey_district") == MetaService.TaskState.COMPLETED)
 	_check("мета: пекарня выбрана", Game.meta.shop_state("bakery") == "in_restoration")
-	_check("мета: план израсходован", PlayerState.amount_of("district_plan") == 0)
+
+	# --- площадь: ровно одна активная задача и указатель на неё -------------
+	_check("площадь: задача «Осмотреть пекарню» открыта",
+		Game.meta.task_state("task_visit_bakery") == MetaService.TaskState.AVAILABLE)
+	_check_map_task_bar(["task_visit_bakery"])
+	_check_map_hint_points_at("bakery")
 
 	# --- карта: закрытые объекты тоже кликабельны --------------------------
 	_check_map_hit_areas()
@@ -67,9 +75,8 @@ func run(tree: SceneTree) -> void:
 		not bool(Game.meta.flags.get("met_baker", false)))
 	Game.enter_shop("bakery")
 	await tree.create_timer(0.5).timeout
-	## Кадр с фасадом проскакивает сам, пока его арта нет в проекте, — проверяем
-	## не его наличие, а инвариант: в первый раз игрок не попадает внутрь, минуя
-	## знакомство.
+	## Проверяем инвариант, а не конкретную сцену: в первый раз игрок не
+	## попадает внутрь, минуя знакомство.
 	_check("первый вход ведёт в сцену, а не сразу в локацию",
 		Game.screen == Game.Screen.INTRO or Game.screen == Game.Screen.DIALOG)
 	if Game.screen == Game.Screen.INTRO:
@@ -80,6 +87,8 @@ func run(tree: SceneTree) -> void:
 	await tree.create_timer(0.4).timeout
 	_check("после разговора игрок внутри пекарни", Game.screen == Game.Screen.SHOP)
 	_check("знакомство отмечено", bool(Game.meta.flags.get("met_baker", false)))
+	_check("задача «Осмотреть пекарню» закрылась знакомством",
+		Game.meta.task_state("task_visit_bakery") == MetaService.TaskState.COMPLETED)
 
 	Game.enter_shop("bakery")
 	await tree.create_timer(0.4).timeout
@@ -100,7 +109,7 @@ func run(tree: SceneTree) -> void:
 	_check("повторный тап подсказывает, а не открывает",
 		not bool(again.get("narrative", false)))
 
-	var wrong := Game.meta.interact("bakery", "door", "district_plan")
+	var wrong := Game.meta.interact("bakery", "door", Game.BOOSTER_ID)
 	_check("чужой предмет дверь не открывает",
 		not bool(wrong.get("ok", false)) and Game.meta.current_slot_state("bakery", "door") == "locked")
 
@@ -196,6 +205,54 @@ func _check_inventory_shows(item_ids: Array) -> void:
 			bar.shows(String(id)))
 
 
+## Что игрок видит в инвентаре: бустеры в полосу не попадают.
+func _bag_size() -> int:
+	var n := 0
+	for id in PlayerState.items:
+		if String(id) != Game.BOOSTER_ID:
+			n += 1
+	return n
+
+
+## Панель задач на карте показывает ровно то, чем можно заняться сейчас.
+## Проверяем сцену, а не мету: «задача выполнена» и «строка про неё убралась с
+## экрана» — разные утверждения, и ломается обычно второе.
+func _check_map_task_bar(expected_ids: PackedStringArray) -> void:
+	var map: Node = Game.current()
+	if map == null or not ("_task_list" in map):
+		_check("площадь: панель задач доступна", false)
+		return
+	var list: Node = map._task_list
+	var rows := 0
+	for c in list.get_children():
+		if not c.is_queued_for_deletion():
+			rows += 1
+	var titles := PackedStringArray()
+	for id in expected_ids:
+		var t: MetaTaskDefinition = ContentDB.task(String(id))
+		if t != null:
+			titles.append(t.title)
+	_check("площадь: в панели ровно %d задача — %s" % [expected_ids.size(), ", ".join(titles)],
+		rows == expected_ids.size())
+
+
+## Указатель обязан стоять на здании, а не «где-то на карте».
+func _check_map_hint_points_at(shop_id: String) -> void:
+	var map: Node = Game.current()
+	if map == null or not ("_hand" in map):
+		_check("площадь: указатель доступен", false)
+		return
+	_check("площадь: рука показывает на здание", map._hand != null)
+	if map._hand == null:
+		return
+	var rect := Rect2()
+	for area in map._hit_areas:
+		if String(area["shop_id"]) == shop_id:
+			rect = area["rect"]
+	_check("площадь: рука стоит именно на пекарне",
+		rect.size.x > 0.0 and rect.has_point(map._hand.position))
+
+
 ## Мэрия и другие «пока закрытые» здания обязаны попадать в хит-тест: игрок
 ## должен получать ответ на тап, а не тишину.
 func _check_map_hit_areas() -> void:
@@ -231,7 +288,17 @@ func _finish_current_level() -> void:
 		_check("уровень доступен и управляем", false)
 		return
 	await level.debug_autoplay()
-	await _tree.create_timer(0.6).timeout
+	await _await_left_level()
+
+
+## Ждём не секунды, а смену экрана. Уровень без экрана результата доигрывает
+## переход сам и ровно поэтому не может дождаться сам себя: он освобождается
+## посреди собственной корутины.
+func _await_left_level(timeout_sec: float = 6.0) -> void:
+	var deadline := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
+	while Game.screen == Game.Screen.LEVEL and Time.get_ticks_msec() < deadline:
+		await _tree.process_frame
+	await _tree.create_timer(0.4).timeout
 
 
 func _apply(task_id: String) -> void:

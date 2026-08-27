@@ -4,14 +4,28 @@
     "title": "Выбрать пекарню",
     "description": "Отметить пекарню первым объектом восстановления.",
     "button_label": "Выбрать пекарню",
-    "requirements": [{ "type": "item", "item_id": "district_plan", "amount": 1 }],
+    "_auto_note": "Выбора у игрока здесь нет — мэр уже назвал пекарню в диалоге. Задача закрывается сама, как только план собран.",
+    "auto_apply": true,
+    "requirements": [{ "type": "level", "level_id": "bakery_01" }],
     "costs": [],
     "duration_sec": 0,
     "effects": [
-      { "type": "consume", "id": "district_plan", "amount": 1 },
       { "type": "set_shop_state", "shop_id": "bakery", "state": "in_restoration" },
-      { "type": "set_flag", "flag": "bakery_chosen" },
-      { "type": "narrative", "text": "Мэр: начинай с пекарни. Когда-то за её хлебом стояла очередь через весь квартал." }
+      { "type": "set_flag", "flag": "bakery_chosen" }
+    ]
+  },
+  {
+    "id": "visit_bakery",
+    "title": "Осмотреть пекарню",
+    "description": "Познакомиться с хозяйкой пекарни.",
+    "button_label": "Осмотреть пекарню",
+    "_auto_note": "Закрывается знакомством с хозяйкой: флаг met_baker ставит диалог bakery_owner.",
+    "auto_apply": true,
+    "requirements": [{ "type": "flag", "flag": "met_baker" }],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "set_flag", "flag": "bakery_visited" }
     ]
   },
   {
