@@ -11,7 +11,9 @@ signal abandoned
 
 enum Phase { INTRO, PUZZLE, REVEAL, HIDDEN_OBJECT, OUTRO, RESULT }
 
-const IMAGE_RECT := Rect2(0, 250, 1080, 1300)
+## Кадр под изображение. Реальный прямоугольник сцены — _view.rect: он вписан
+## в этот кадр по пропорциям арта, поэтому картинка не растягивается.
+const IMAGE_FRAME := Rect2(0, 250, 1080, 1300)
 const TRAY_RECT := Rect2(30, 1595, 1020, 290)
 
 @onready var _view: SceneView = $SceneView
@@ -52,7 +54,7 @@ func _build() -> void:
 	_hud.narrative_finished.connect(_start_puzzle)
 	_hud.result_continue.connect(_emit_result)
 
-	_view.setup(definition.art, definition.hidden_object.targets, context.items, IMAGE_RECT)
+	_view.setup(definition.art, definition.hidden_object.targets, context.items, IMAGE_FRAME)
 	_view.set_dim(1.0)
 
 	_ho.setup(definition.hidden_object, _view, context.items)
@@ -74,7 +76,7 @@ func _start_puzzle() -> void:
 		push_error("HybridLevel: не создан puzzle-модуль")
 		return
 	_puzzle_host.add_child(_puzzle)
-	_puzzle.setup(definition.puzzle, _view.texture, IMAGE_RECT, TRAY_RECT)
+	_puzzle.setup(definition.puzzle, _view.texture, _view.rect, TRAY_RECT, _view.uv_scale())
 	_puzzle.progress_changed.connect(_hud.set_progress)
 	_puzzle.solved.connect(_reveal)
 	_puzzle.begin()
@@ -95,7 +97,18 @@ func _reveal() -> void:
 	tw.tween_property(_camera, "zoom", Vector2(1.05, 1.05), 0.55).set_trans(Tween.TRANS_SINE)
 	await tw.finished
 
+	await _reveal_objects()
 	_start_hidden_object()
+
+
+## Вторая половина перехода: собранная комната «оживает» — в неё проявляются
+## предметы поиска. Пазл собирался по чистому кадру, поэтому подсмотреть их
+## заранее в лотке было нельзя.
+func _reveal_objects() -> void:
+	if not _view.has_objects_layer():
+		return
+	_view.reveal_objects(0.5)
+	await get_tree().create_timer(0.5).timeout
 
 
 ## --- HIDDEN OBJECT ----------------------------------------------------------
@@ -206,9 +219,17 @@ func debug_autoplay() -> void:
 		_start_puzzle()
 	if _puzzle != null:
 		_puzzle.force_solve()
-	await get_tree().create_timer(1.4).timeout
+	# Ждём фазу, а не секунды: длительность reveal зависит от того, есть ли у
+	# сцены отдельный слой предметов, и захардкоженный таймер здесь врёт.
+	await _await_phase(Phase.HIDDEN_OBJECT)
 	if phase == Phase.HIDDEN_OBJECT:
 		_ho.force_complete()
-	await get_tree().create_timer(0.8).timeout
+	await _await_phase(Phase.RESULT)
 	if phase == Phase.RESULT:
 		_emit_result()
+
+
+func _await_phase(target: int, timeout_sec: float = 5.0) -> void:
+	var deadline := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
+	while phase != target and Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame

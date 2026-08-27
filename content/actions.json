@@ -4,14 +4,31 @@
     "title": "Выбрать пекарню",
     "description": "Отметить пекарню первым объектом восстановления.",
     "button_label": "Выбрать пекарню",
-    "requirements": [{ "type": "item", "item_id": "district_plan", "amount": 1 }],
+    "requirements": [{ "type": "level", "level_id": "bakery_01" }],
     "costs": [],
     "duration_sec": 0,
     "effects": [
-      { "type": "consume", "id": "district_plan", "amount": 1 },
       { "type": "set_shop_state", "shop_id": "bakery", "state": "in_restoration" },
       { "type": "set_flag", "flag": "bakery_chosen" },
       { "type": "narrative", "text": "Мэр: начинай с пекарни. Когда-то за её хлебом стояла очередь через весь квартал." }
+    ]
+  },
+  {
+    "id": "clear_hall",
+    "title": "Убраться в зале",
+    "description": "Вымести листву и вынести мусор из торгового зала.",
+    "button_label": "Убраться в зале",
+    "requirements": [
+      { "type": "item", "item_id": "broom", "amount": 1 },
+      { "type": "item", "item_id": "trash_bag", "amount": 1 }
+    ],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "consume", "id": "broom", "amount": 1 },
+      { "type": "consume", "id": "trash_bag", "amount": 1 },
+      { "type": "set_flag", "flag": "hall_cleared" },
+      { "type": "narrative", "text": "Пол выметен, мусор вынесен. Зал наконец похож на пекарню, а не на чердак." }
     ]
   }
 ]

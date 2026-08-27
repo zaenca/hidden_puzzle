@@ -16,7 +16,8 @@ var _outline: Line2D
 var _bounds: Rect2
 
 
-static func create(poly: PackedVector2Array, origin: Vector2, texture: Texture2D) -> JigsawPiece:
+static func create(poly: PackedVector2Array, origin: Vector2, texture: Texture2D,
+		uv_scale: Vector2 = Vector2.ONE) -> JigsawPiece:
 	var piece := JigsawPiece.new()
 	piece.polygon = poly
 
@@ -24,7 +25,7 @@ static func create(poly: PackedVector2Array, origin: Vector2, texture: Texture2D
 	piece._poly.polygon = poly
 	var uv := PackedVector2Array()
 	for p in poly:
-		uv.append(p + origin)
+		uv.append((p + origin) * uv_scale)
 	piece._poly.uv = uv
 	piece._poly.texture = texture
 	piece.add_child(piece._poly)

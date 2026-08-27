@@ -11,9 +11,18 @@ extends RefCounted
 const OUTLINE := Color(0, 0, 0, 0.35)
 
 
+## Текстура по пути ресурса. Отсутствующий файл — не ошибка: слой просто не
+## появляется, и уровень остаётся играбельным на процедурном арте.
+static func load_texture(path: String) -> Texture2D:
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return null
+	return load(path) as Texture2D
+
+
 static func build_scene_texture(art: SceneArt, targets: Array[HOTarget], items: Dictionary) -> Texture2D:
-	if not art.background_path.is_empty() and ResourceLoader.exists(art.background_path):
-		return load(art.background_path)
+	var final_art := load_texture(art.background_path)
+	if final_art != null:
+		return final_art
 	if art.background != null:
 		return art.background
 

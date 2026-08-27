@@ -30,10 +30,9 @@
       { "id": "t03", "item_id": "lamp_post",       "rect": [0.08, 0.40, 0.075, 0.075] },
       { "id": "t04", "item_id": "bench",           "rect": [0.46, 0.46, 0.10, 0.055] },
       { "id": "t05", "item_id": "postbox",         "rect": [0.78, 0.55, 0.075, 0.065] },
-      { "id": "t06", "item_id": "bakery_building", "rect": [0.16, 0.62, 0.11, 0.08] },
-      { "id": "q01", "item_id": "district_plan",   "kind": "quest", "rect": [0.62, 0.76, 0.10, 0.07] }
+      { "id": "t06", "item_id": "bakery_building", "rect": [0.16, 0.62, 0.11, 0.08] }
     ]
   },
   "rewards": { "coins": 60, "xp": 10 },
-  "quest_grants": ["district_plan"]
+  "quest_grants": []
 }

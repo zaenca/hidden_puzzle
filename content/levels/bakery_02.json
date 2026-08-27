@@ -1,40 +1,35 @@
 {
   "id": "bakery_02",
   "shop_id": "bakery",
-  "task_id": "task_clear_facade",
+  "task_id": "task_clear_hall",
   "order": 2,
   "difficulty": 1,
-  "title": "Фасад пекарни",
+  "title": "Торговый зал",
   "narrative": [
-    "К двери не подойти: всё завалено мусором.",
-    "Сначала разберём, что тут вообще лежит."
+    "Витрина пустая, полки в паутине, под ногами хрустит сухая листва.",
+    "Разгрести это руками не выйдет — сначала найдём, чем убираться."
   ],
   "art": {
-    "reference_size": [1080, 1350],
-    "palette": "facade",
-    "seed": 2022,
-    "clutter": 26,
-    "decor": [
-      { "rect": [0.04, 0.08, 0.92, 0.62], "color": "#7a6754", "shape": "rect" },
-      { "rect": [0.42, 0.30, 0.24, 0.40], "color": "#4b3d30", "shape": "rect" },
-      { "rect": [0.10, 0.30, 0.26, 0.24], "color": "#5d5344", "shape": "rect" },
-      { "rect": [0.0, 0.70, 1.0, 0.30], "color": "#6a5f4c", "shape": "rect" }
-    ]
+    "reference_size": [1122, 1402],
+    "background": "res://art/bakery_interior.png",
+    "objects_background": "res://art/bakery_interior_objects.png",
+    "palette": "bakery",
+    "seed": 2022
   },
   "puzzle": { "module_id": "jigsaw", "cols": 3, "rows": 4, "seed": 2201, "tab_ratio": 0.2, "snap_distance_px": 95 },
   "hidden_object": {
-    "required_normal": 5,
+    "required_normal": 0,
     "targets": [
-      { "id": "t01", "item_id": "trash_pile", "rect": [0.12, 0.70, 0.12, 0.09] },
-      { "id": "t02", "item_id": "box",        "rect": [0.36, 0.74, 0.10, 0.07] },
-      { "id": "t03", "item_id": "bottle",     "rect": [0.56, 0.76, 0.06, 0.075] },
-      { "id": "t04", "item_id": "newspaper",  "rect": [0.70, 0.70, 0.10, 0.055] },
-      { "id": "t05", "item_id": "can",        "rect": [0.84, 0.78, 0.06, 0.06] },
-      { "id": "t06", "item_id": "leaf_pile",  "rect": [0.24, 0.58, 0.10, 0.07] },
-      { "id": "q01", "item_id": "broom",      "kind": "quest", "rect": [0.46, 0.52, 0.06, 0.14] },
-      { "id": "q02", "item_id": "trash_bag",  "kind": "quest", "rect": [0.62, 0.58, 0.09, 0.09] }
+      {
+        "id": "q01", "item_id": "broom", "kind": "quest",
+        "shape": [
+          [0.186, 0.406], [0.193, 0.408], [0.246, 0.590], [0.262, 0.650],
+          [0.243, 0.670], [0.218, 0.662], [0.217, 0.586]
+        ]
+      },
+      { "id": "q02", "item_id": "trash_bag", "kind": "quest", "rect": [0.749, 0.655, 0.067, 0.085] }
     ]
   },
-  "rewards": { "coins": 60, "xp": 10 },
+  "rewards": { "coins": 70, "xp": 12 },
   "quest_grants": ["broom", "trash_bag"]
 }

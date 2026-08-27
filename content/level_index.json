@@ -1,3 +1,4 @@
 [
-  { "id": "bakery_01", "path": "res://content/levels/bakery_01.json", "shop_id": "bakery", "task_id": "task_survey_district", "order": 1 }
+  { "id": "bakery_01", "path": "res://content/levels/bakery_01.json", "shop_id": "bakery", "task_id": "task_survey_district", "order": 1 },
+  { "id": "bakery_02", "path": "res://content/levels/bakery_02.json", "shop_id": "bakery", "task_id": "task_clear_hall",     "order": 2 }
 ]

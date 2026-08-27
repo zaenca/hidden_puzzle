@@ -2,6 +2,7 @@
   "id": "bakery",
   "display_name": "Пекарня «Тёплый угол»",
   "palette": "bakery",
+  "background": "res://art/bakery.png",
   "map_rect": [0.0, 0.293, 0.347, 0.25],
   "rooms": [
     { "id": "outside", "title": "Фасад" },
@@ -11,34 +12,34 @@
     "label": "Войти в пекарню",
     "requires_flag": "door_open",
     "locked_text": "Дверь заперта — сначала нужно её открыть.",
-    "text": "Торговый зал ждёт: следующий этап разработки."
+    "text": "Внутри всё в пыли и паутине. Разбирать завал — задача «Разобрать завал в зале»."
   },
   "slots": [
     {
       "id": "sign",
-      "rect": [0.18, 0.06, 0.64, 0.14],
+      "rect": [0.298, 0.478, 0.424, 0.064],
       "default": "installed",
       "states": [
-        { "id": "missing",   "label": "вывески нет", "hidden": true },
-        { "id": "installed", "label": "ПЕКАРНЯ",     "color": "#e8a33d", "shape": "rect" }
+        { "id": "missing",   "label": "вывески нет", "color": "#2b211a", "shape": "rect" },
+        { "id": "installed", "label": "",            "hidden": true }
       ]
     },
     {
       "id": "window",
-      "rect": [0.08, 0.28, 0.34, 0.30],
+      "rect": [0.170, 0.549, 0.403, 0.147],
       "default": "clean",
       "states": [
-        { "id": "dirty", "label": "витрина грязная", "color": "#6b6455", "shape": "rect" },
-        { "id": "clean", "label": "витрина чистая",  "color": "#a8d8e8", "shape": "rect" }
+        { "id": "dirty", "label": "витрина грязная", "color": "#5a5244cc", "shape": "rect" },
+        { "id": "clean", "label": "",                "hidden": true }
       ]
     },
     {
       "id": "door",
-      "rect": [0.52, 0.28, 0.26, 0.44],
+      "rect": [0.611, 0.545, 0.208, 0.212],
       "default": "locked",
       "states": [
-        { "id": "locked", "label": "дверь заперта", "color": "#5a4130", "shape": "rect" },
-        { "id": "open",   "label": "дверь открыта", "color": "#3f6b46", "shape": "rect" }
+        { "id": "locked", "label": "", "hidden": true },
+        { "id": "open",   "label": "", "color": "#ffd98a55", "shape": "rect" }
       ],
       "interactions": [
         {
@@ -67,16 +68,16 @@
     },
     {
       "id": "door_handle",
-      "rect": [0.735, 0.46, 0.045, 0.07],
+      "rect": [0.632, 0.645, 0.048, 0.052],
       "default": "installed",
       "states": [
-        { "id": "missing",   "label": "", "hidden": true },
-        { "id": "installed", "label": "", "color": "#e0b04f", "shape": "circle" }
+        { "id": "missing",   "label": "", "color": "#2b211a", "shape": "circle" },
+        { "id": "installed", "label": "", "hidden": true }
       ]
     },
     {
       "id": "facade_trash",
-      "rect": [0.06, 0.74, 0.86, 0.20],
+      "rect": [0.116, 0.750, 0.782, 0.070],
       "default": "cleaned",
       "states": [
         { "id": "dirty",   "label": "мусор у входа", "color": "#6d5f47", "shape": "rect" },

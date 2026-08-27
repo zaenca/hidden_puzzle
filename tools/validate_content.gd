@@ -279,12 +279,13 @@ func _simulate_progression() -> void:
 	var flags := {}
 	var done_levels := {}
 	var done_tasks := {}
+	var slot_states := {}
 	var coins := 100000
 	var guard := 0
 
 	while done_tasks.size() < tasks.size() and guard < 200:
 		guard += 1
-		var acted := false
+		var acted := _tap_shop_objects(slot_states, inv, flags)
 
 		for t in tasks.values():
 			if done_tasks.has(t.id):
@@ -343,6 +344,46 @@ func _simulate_progression() -> void:
 	for lvl in levels.values():
 		if not done_levels.has(lvl.id):
 			_warn("Уровень %s недостижим при линейном прохождении" % lvl.id)
+
+
+## Point-and-click тоже двигает прогресс: ключ из-под коврика и открытая им
+## дверь выставляют флаги, на которые опираются задачи. Без этого шага
+## симуляция считает недостижимым всё, что живёт за дверью.
+##
+## Модель намеренно щедрая — «игрок перетыкал все объекты всем, что есть в
+## сумке». Симуляция отвечает на вопрос «прогресс в принципе достижим?», и
+## ложная тревога здесь дороже пропущенного лишнего тапа.
+func _tap_shop_objects(slot_states: Dictionary, inv: Dictionary, flags: Dictionary) -> bool:
+	var acted := false
+	for shop_v in shops.values():
+		var shop: ShopDefinition = shop_v
+		for slot in shop.slots:
+			var key := "%s/%s" % [shop.id, slot.id]
+			if not slot_states.has(key):
+				slot_states[key] = slot.default_state
+			for rule in slot.interactions:
+				if not rule.is_progress():
+					continue
+				if not rule.state.is_empty() and rule.state != String(slot_states[key]):
+					continue
+				if not rule.once_flag.is_empty() and bool(flags.get(rule.once_flag, false)):
+					continue
+				if not rule.use_item.is_empty() and int(inv.get(rule.use_item, 0)) < 1:
+					continue
+
+				if rule.consume and not rule.use_item.is_empty():
+					inv[rule.use_item] = maxi(0, int(inv.get(rule.use_item, 0)) - 1)
+				if not rule.grant_item.is_empty():
+					inv[rule.grant_item] = int(inv.get(rule.grant_item, 0)) + 1
+				if not rule.once_flag.is_empty():
+					flags[rule.once_flag] = true
+				if not rule.set_state.is_empty():
+					slot_states[key] = rule.set_state
+				if not rule.set_flag.is_empty():
+					flags[rule.set_flag] = true
+				acted = true
+				break
+	return acted
 
 
 func _unlocked(t: MetaTaskDefinition, flags, done_levels, done_tasks, inv) -> bool:

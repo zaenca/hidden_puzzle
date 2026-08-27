@@ -3,6 +3,7 @@ extends Node2D
 ## Сцена не знает слова «пекарня».
 
 const VISUAL_RECT := Rect2(30, 210, 1020, 940)
+const SCREEN := Vector2(1080, 1920)
 
 @onready var _bg: Sprite2D = $Visuals/Background
 @onready var _slots_root: Node2D = $Visuals/Slots
@@ -24,6 +25,10 @@ var _rows: Dictionary = {}           ## task_id -> Control
 var _refresh_acc: float = 0.0
 var _rebuilding: bool = false
 
+## Область, к которой нормализованы rect'ы слотов. С реальным артом это сама
+## картинка, без него — условная VISUAL_RECT.
+var _visual_rect: Rect2 = VISUAL_RECT
+
 
 func setup(payload: Dictionary) -> void:
 	shop_id = String(payload.get("shop_id", ""))
@@ -39,13 +44,10 @@ func _build() -> void:
 		push_error("ShopScene: неизвестный магазин '%s'" % shop_id)
 		return
 
-	var tex := PlaceholderArt.flat_texture(
-		Vector2i(1080, 1920), Palette.top(shop.palette), Palette.bottom(shop.palette))
-	_bg.texture = tex
-	_bg.centered = false
+	_setup_background()
 
 	for def in shop.slots:
-		var slot := StateSlot.create(def, VISUAL_RECT)
+		var slot := StateSlot.create(def, _visual_rect)
 		_slots_root.add_child(slot)
 		_slots[def.id] = slot
 		_slot_defs[def.id] = def
@@ -63,6 +65,29 @@ func _build() -> void:
 	EventBus.inventory_changed.connect(func(_i, _v): call_deferred("_rebuild_bag"))
 
 	_show_pending_narrative()
+
+
+## Фасад «по обрезке»: картинка накрывает экран целиком, лишнее уходит за край.
+## Без файла — прежний процедурный градиент, чтобы проект оставался
+## запускаемым без ассетов.
+func _setup_background() -> void:
+	var tex := PlaceholderArt.load_texture(shop.background_path)
+	_bg.centered = false
+
+	if tex == null:
+		_bg.texture = PlaceholderArt.flat_texture(
+			Vector2i(int(SCREEN.x), int(SCREEN.y)), Palette.top(shop.palette), Palette.bottom(shop.palette))
+		_bg.scale = Vector2.ONE
+		_bg.position = Vector2.ZERO
+		_visual_rect = VISUAL_RECT
+		return
+
+	_bg.texture = tex
+	var tex_size := Vector2(tex.get_size())
+	var s: float = maxf(SCREEN.x / tex_size.x, SCREEN.y / tex_size.y)
+	_bg.scale = Vector2(s, s)
+	_bg.position = (SCREEN - tex_size * s) * 0.5
+	_visual_rect = Rect2(_bg.position, tex_size * s)
 
 
 ## --- визуальные состояния ---------------------------------------------------

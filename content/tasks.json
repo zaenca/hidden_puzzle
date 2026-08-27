@@ -10,5 +10,17 @@
     "level_ids": ["bakery_01"],
     "action_id": "choose_bakery",
     "hotspot": "facade_trash"
+  },
+  {
+    "id": "task_clear_hall",
+    "shop_id": "bakery",
+    "room_id": "hall",
+    "location": "shop",
+    "title": "Разобрать завал в зале",
+    "hint": "Дверь открыта. В зале нужно найти, чем убираться.",
+    "unlock": [{ "type": "flag", "flag": "door_open" }],
+    "level_ids": ["bakery_02"],
+    "action_id": "clear_hall",
+    "hotspot": ""
   }
 ]

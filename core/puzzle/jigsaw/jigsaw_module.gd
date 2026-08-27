@@ -19,7 +19,8 @@ func _ready() -> void:
 	set_process_unhandled_input(false)
 
 
-func setup(params: PuzzleParams, texture: Texture2D, image_rect: Rect2, tray_rect: Rect2) -> void:
+func setup(params: PuzzleParams, texture: Texture2D, image_rect: Rect2, tray_rect: Rect2,
+		uv_scale: Vector2 = Vector2.ONE) -> void:
 	_params = params as JigsawParams
 	if _params == null:
 		_params = JigsawParams.new()
@@ -47,7 +48,7 @@ func setup(params: PuzzleParams, texture: Texture2D, image_rect: Rect2, tray_rec
 		_params.cols, _params.rows, image_rect.size, _params.tab_ratio, _params.seed)
 
 	for entry in geometry:
-		var piece := JigsawPiece.create(entry["polygon"], entry["origin"], texture)
+		var piece := JigsawPiece.create(entry["polygon"], entry["origin"], texture, uv_scale)
 		piece.home = image_rect.position + entry["origin"]
 		_pieces_root.add_child(piece)
 		_pieces.append(piece)

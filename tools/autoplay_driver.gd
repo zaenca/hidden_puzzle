@@ -37,13 +37,14 @@ func run(tree: SceneTree) -> void:
 
 	# --- уровень 1: карта района -------------------------------------------
 	await _play("task_survey_district")
-	_check("L1: получен сюжетный предмет 'План района'", PlayerState.amount_of("district_plan") >= 1)
+	# Осмотр района — это разговор с мэром, а не добыча предмета: сумка после
+	# первого уровня обязана остаться пустой.
+	_check("L1: сумка после первого уровня пуста", _bag_size() == 0)
 	_check("L1: задача готова к применению",
 		Game.meta.task_state("task_survey_district") == MetaService.TaskState.READY_TO_APPLY)
 
 	_apply("task_survey_district")
 	_check("мета: пекарня выбрана", Game.meta.shop_state("bakery") == "in_restoration")
-	_check("мета: план израсходован", PlayerState.amount_of("district_plan") == 0)
 
 	# --- карта: закрытые объекты тоже кликабельны --------------------------
 	_check_map_hit_areas()
@@ -65,7 +66,7 @@ func run(tree: SceneTree) -> void:
 	_check("повторный тап подсказывает, а не открывает",
 		not bool(again.get("narrative", false)))
 
-	var wrong := Game.meta.interact("bakery", "door", "district_plan")
+	var wrong := Game.meta.interact("bakery", "door", Game.BOOSTER_ID)
 	_check("чужой предмет дверь не открывает",
 		not bool(wrong.get("ok", false)) and Game.meta.current_slot_state("bakery", "door") == "locked")
 
@@ -78,6 +79,22 @@ func run(tree: SceneTree) -> void:
 	var closed := Game.meta.interact("bakery", "door", "")
 	_check("открытая дверь больше не выдаёт ключ", PlayerState.amount_of("bakery_key") == 0)
 	_check("открытая дверь отвечает текстом", not String(closed.get("text", "")).is_empty())
+
+	# --- уровень 2: торговый зал -------------------------------------------
+	_check("зал: задача разблокирована открытой дверью",
+		Game.meta.task_state("task_clear_hall") == MetaService.TaskState.AVAILABLE)
+
+	await _play("task_clear_hall")
+	_check("L2: найдена метла", PlayerState.amount_of("broom") == 1)
+	_check("L2: найден мешок для мусора", PlayerState.amount_of("trash_bag") == 1)
+	_check("L2: в зале искали ровно два предмета", _hall_target_count() == 2)
+	_check("L2: задача готова к применению",
+		Game.meta.task_state("task_clear_hall") == MetaService.TaskState.READY_TO_APPLY)
+
+	_apply("task_clear_hall")
+	_check("мета: инвентарь для уборки израсходован",
+		PlayerState.amount_of("broom") == 0 and PlayerState.amount_of("trash_bag") == 0)
+	_check("мета: флаг hall_cleared выставлен", bool(Game.meta.flags.get("hall_cleared", false)))
 
 	# --- сохранение / загрузка ---------------------------------------------
 	SaveService.save_game()
@@ -92,7 +109,7 @@ func run(tree: SceneTree) -> void:
 	_check("сейв: флаг door_open на месте", bool(Game.meta.flags.get("door_open", false)))
 	_check("сейв: ключ не воскрес", PlayerState.amount_of("bakery_key") == 0)
 	_check("сейв: пройдено уровней = %d" % levels_done, Game.meta.levels_completed_total == levels_done)
-	_check("сейв: пройден 1 уровень", Game.meta.completed_levels.size() == 1)
+	_check("сейв: пройдено 2 уровня", Game.meta.completed_levels.size() == 2)
 
 	_report()
 
@@ -115,6 +132,20 @@ func _check_map_hit_areas() -> void:
 
 
 ## --- вспомогательное --------------------------------------------------------
+
+## Что игрок видит в сумке на фасаде: бустеры туда не попадают.
+func _bag_size() -> int:
+	var n := 0
+	for id in PlayerState.items:
+		if String(id) != Game.BOOSTER_ID:
+			n += 1
+	return n
+
+
+func _hall_target_count() -> int:
+	var def: LevelDefinition = ContentDB.level("bakery_02")
+	return def.hidden_object.targets.size() if def != null else -1
+
 
 func _play(task_id: String) -> void:
 	Game.play_task(task_id)

@@ -6,7 +6,11 @@ extends Node2D
 signal solved
 signal progress_changed(done: int, total: int)
 
-func setup(_params: PuzzleParams, _texture: Texture2D, _image_rect: Rect2, _tray_rect: Rect2) -> void:
+## _uv_scale — во сколько раз текстура плотнее _image_rect. Модуль режет
+## изображение в экранных координатах, а сэмплирует в пиксельных, и без этого
+## множителя финальный арт любого размера, кроме 1:1, съезжает относительно фона.
+func setup(_params: PuzzleParams, _texture: Texture2D, _image_rect: Rect2, _tray_rect: Rect2,
+		_uv_scale: Vector2 = Vector2.ONE) -> void:
 	pass
 
 func begin() -> void:

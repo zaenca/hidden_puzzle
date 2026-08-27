@@ -7,6 +7,7 @@ extends Resource
 @export var id: String = ""
 @export var display_name: String = ""
 @export var palette: String = "bakery"
+@export var background_path: String = ""   ## финальный арт фасада; пустой — процедурный градиент
 @export var map_rect: Rect2 = Rect2()
 @export var visual_scene: PackedScene = null   ## финальный арт; пока null
 @export var rooms: Array = []                  ## [{id, title}]
