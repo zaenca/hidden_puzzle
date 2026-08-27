@@ -1,0 +1,9 @@
+{
+  "_note": "Кадр-знакомство с пекарней. Экран без текста — просто картинка на hold секунд, тап пропускает.",
+  "background": "res://art/bakery_facade.jpg",
+  "palette": "bakery",
+  "on_finish": { "dialog": "bakery_owner" },
+  "screens": [
+    { "lines": [], "hold": 2.2 }
+  ]
+}

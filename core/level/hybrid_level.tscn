@@ -8,6 +8,8 @@
 [node name="HybridLevel" type="Node2D"]
 script = ExtResource("1_level")
 
+[node name="Backdrop" type="Node2D" parent="."]
+
 [node name="CameraRig" type="Node2D" parent="."]
 
 [node name="Camera2D" type="Camera2D" parent="CameraRig"]

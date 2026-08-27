@@ -2,43 +2,63 @@
   "id": "bakery",
   "display_name": "Пекарня «Тёплый угол»",
   "palette": "bakery",
+  "background": "res://art/bakery_hall.jpg",
   "map_rect": [0.0, 0.293, 0.347, 0.25],
   "rooms": [
-    { "id": "outside", "title": "Фасад" },
-    { "id": "hall", "title": "Торговый зал" }
+    { "id": "hall", "title": "Торговый зал" },
+    { "id": "bakers_room", "title": "Пекарский цех" }
   ],
+  "first_visit": { "intro": "bakery_facade", "flag": "met_baker" },
   "enter": {
-    "label": "Войти в пекарню",
+    "label": "Зайти в пекарский цех",
     "requires_flag": "door_open",
-    "locked_text": "Дверь заперта — сначала нужно её открыть.",
-    "text": "Торговый зал ждёт: следующий этап разработки."
+    "locked_text": "Дверь в цех заперта — сначала нужно её открыть.",
+    "text": "Пекарский цех ждёт: следующий этап разработки."
   },
   "slots": [
     {
-      "id": "sign",
-      "rect": [0.18, 0.06, 0.64, 0.14],
-      "default": "installed",
+      "id": "floor_litter",
+      "rect": [0.30, 0.63, 0.66, 0.33],
+      "default": "dirty",
       "states": [
-        { "id": "missing",   "label": "вывески нет", "hidden": true },
-        { "id": "installed", "label": "ПЕКАРНЯ",     "color": "#e8a33d", "shape": "rect" }
+        { "id": "dirty",   "label": "", "overlay": "#2b210f66" },
+        { "id": "cleaned", "label": "", "hidden": true }
       ]
     },
     {
-      "id": "window",
-      "rect": [0.08, 0.28, 0.34, 0.30],
-      "default": "clean",
+      "id": "showcase",
+      "rect": [0.0, 0.35, 0.45, 0.25],
+      "default": "dirty",
       "states": [
-        { "id": "dirty", "label": "витрина грязная", "color": "#6b6455", "shape": "rect" },
-        { "id": "clean", "label": "витрина чистая",  "color": "#a8d8e8", "shape": "rect" }
+        { "id": "dirty", "label": "витрина грязная", "color": "#6b6455", "shape": "rect", "overlay": "#1d1a1080" },
+        { "id": "clean", "label": "витрина чистая",  "color": "#a8d8e8", "shape": "rect", "overlay": "#e8f4ff1f" }
+      ],
+      "interactions": [
+        {
+          "state": "dirty",
+          "use_item": "rag",
+          "consume": true,
+          "set_state": "clean",
+          "set_flag": "showcase_clean",
+          "text": "Ветошь сняла слой пыли и паутины — под стеклом снова видно витрину."
+        },
+        {
+          "state": "dirty",
+          "text": "Стекло в пыли и паутине, товар за ним не разглядеть. Нужна ветошь."
+        },
+        {
+          "state": "clean",
+          "text": "Витрина чистая — пирожные снова выглядят как товар."
+        }
       ]
     },
     {
       "id": "door",
-      "rect": [0.52, 0.28, 0.26, 0.44],
+      "rect": [0.775, 0.155, 0.19, 0.375],
       "default": "locked",
       "states": [
-        { "id": "locked", "label": "дверь заперта", "color": "#5a4130", "shape": "rect" },
-        { "id": "open",   "label": "дверь открыта", "color": "#3f6b46", "shape": "rect" }
+        { "id": "locked", "label": "дверь заперта", "color": "#5a4130", "shape": "rect", "overlay": "#0b0a1859" },
+        { "id": "open",   "label": "дверь открыта", "color": "#3f6b46", "shape": "rect", "overlay": "#ffd98a1f" }
       ],
       "interactions": [
         {
@@ -47,40 +67,22 @@
           "consume": true,
           "set_state": "open",
           "set_flag": "door_open",
-          "text": "Ключ со скрипом провернулся в замке. Дверь пекарни открыта."
+          "text": "Ключ со скрипом провернулся в замке. Дверь в пекарский цех открыта."
         },
         {
           "state": "locked",
           "once_flag": "bakery_key_found",
           "grant_item": "bakery_key",
-          "text": "Заперто. Под ковриком у порога лежал ключ — он в сумке."
+          "text": "Заперто. Под ковриком у порога лежал ключ — он в инвентаре."
         },
         {
           "state": "locked",
-          "text": "Дверь заперта. Возьми ключ в сумке и нажми на дверь."
+          "text": "Дверь заперта. Возьми ключ в инвентаре и нажми на дверь."
         },
         {
           "state": "open",
-          "text": "Дверь открыта — можно входить."
+          "text": "Дверь в цех открыта — можно входить."
         }
-      ]
-    },
-    {
-      "id": "door_handle",
-      "rect": [0.735, 0.46, 0.045, 0.07],
-      "default": "installed",
-      "states": [
-        { "id": "missing",   "label": "", "hidden": true },
-        { "id": "installed", "label": "", "color": "#e0b04f", "shape": "circle" }
-      ]
-    },
-    {
-      "id": "facade_trash",
-      "rect": [0.06, 0.74, 0.86, 0.20],
-      "default": "cleaned",
-      "states": [
-        { "id": "dirty",   "label": "мусор у входа", "color": "#6d5f47", "shape": "rect" },
-        { "id": "cleaned", "label": "",              "hidden": true }
       ]
     }
   ]

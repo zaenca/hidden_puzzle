@@ -174,6 +174,13 @@ func set_progress(done: int, total: int) -> void:
 	_progress.text = "%d / %d" % [done, total]
 
 
+## Счётчик частей игроку не нужен: пазл и так видно целиком, а «5 / 6» превращает
+## сборку в отчёт о работе. В фазе поиска предметов счётчик остаётся — там
+## сказать, сколько ещё искать, больше нечем.
+func show_progress(on: bool) -> void:
+	_progress.visible = on
+
+
 func set_booster_count(n: int) -> void:
 	_booster.text = "💡 %d" % n
 	_booster.disabled = n <= 0

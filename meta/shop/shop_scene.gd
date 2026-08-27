@@ -3,6 +3,7 @@ extends Node2D
 ## Сцена не знает слова «пекарня».
 
 const VISUAL_RECT := Rect2(30, 210, 1020, 940)
+const SCREEN := Vector2(1080, 1920)
 
 @onready var _bg: Sprite2D = $Visuals/Background
 @onready var _slots_root: Node2D = $Visuals/Slots
@@ -13,12 +14,15 @@ var shop: ShopDefinition
 
 var _slots: Dictionary = {}          ## slot_id -> StateSlot
 var _slot_defs: Dictionary = {}      ## slot_id -> ShopSlotDefinition
-var _selected_item: String = ""      ## что игрок «взял в руку» из сумки
 var _focus: MetaFocus = null
 var _task_list: VBoxContainer
-var _bag: HBoxContainer
-var _bag_panel: Control
 var _wallet: Label
+var _margin: MarginContainer
+
+## Прямоугольник, к которому нормализованы rect'ы слотов. С настоящим артом это
+## область самой картинки на экране, без него — условная VISUAL_RECT.
+var _visual_rect: Rect2 = VISUAL_RECT
+var _has_art: bool = false
 var _timers: Dictionary = {}         ## task_id -> Label
 var _rows: Dictionary = {}           ## task_id -> Control
 var _refresh_acc: float = 0.0
@@ -39,13 +43,10 @@ func _build() -> void:
 		push_error("ShopScene: неизвестный магазин '%s'" % shop_id)
 		return
 
-	var tex := PlaceholderArt.flat_texture(
-		Vector2i(1080, 1920), Palette.top(shop.palette), Palette.bottom(shop.palette))
-	_bg.texture = tex
-	_bg.centered = false
+	_setup_background()
 
 	for def in shop.slots:
-		var slot := StateSlot.create(def, VISUAL_RECT)
+		var slot := StateSlot.create(def, _visual_rect, _has_art)
 		_slots_root.add_child(slot)
 		_slots[def.id] = slot
 		_slot_defs[def.id] = def
@@ -53,16 +54,28 @@ func _build() -> void:
 
 	_build_ui()
 	_rebuild_tasks()
-	_rebuild_bag()
 	_refresh_highlights()
 
 	EventBus.shop_visual_changed.connect(_on_visual_changed)
 	EventBus.task_state_changed.connect(func(_t, _s): _queue_rebuild())
 	EventBus.cooldown_finished.connect(func(_a): _queue_rebuild())
 	EventBus.currency_changed.connect(func(_i, _v): _update_wallet())
-	EventBus.inventory_changed.connect(func(_i, _v): call_deferred("_rebuild_bag"))
+	EventBus.inventory_changed.connect(func(_i, _v): call_deferred("_apply_margins"))
 
 	_show_pending_narrative()
+
+
+## Арт кладётся «по обрезке»: картинка накрывает экран целиком, лишнее уходит за
+## край. Файла нет — прежний градиент по палитре, чтобы магазин без ассетов
+## оставался играбельным.
+func _setup_background() -> void:
+	var tex := Backdrop.load_texture(shop.background_path)
+	_has_art = tex != null
+	if _has_art:
+		_visual_rect = Backdrop.cover(_bg, tex, SCREEN)
+	else:
+		Backdrop.gradient(_bg, shop.palette, SCREEN)
+		_visual_rect = VISUAL_RECT
 
 
 ## --- визуальные состояния ---------------------------------------------------
@@ -101,10 +114,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _interact(slot_id: String) -> void:
-	var result := Game.meta.interact(shop_id, slot_id, _selected_item)
+	var result := Game.meta.interact(shop_id, slot_id, Game.selected_item)
 	if bool(result.get("ok", false)):
 		if not String(result.get("consumed", "")).is_empty():
-			_selected_item = ""
+			Game.clear_selection()
 		SaveService.save_game()
 
 	if bool(result.get("narrative", false)):
@@ -112,7 +125,6 @@ func _interact(slot_id: String) -> void:
 	elif not String(result.get("text", "")).is_empty():
 		EventBus.toast.emit(String(result["text"]))
 
-	_rebuild_bag()
 	_refresh_highlights()
 	_rebuild_tasks()
 
@@ -134,16 +146,16 @@ func _build_ui() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_ui.add_child(root)
 
-	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(margin)
-	SafeArea.apply(margin, 20)
+	_margin = MarginContainer.new()
+	_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_margin)
+	_apply_margins()
 
 	var col := VBoxContainer.new()
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_theme_constant_override("separation", 10)
-	margin.add_child(col)
+	_margin.add_child(col)
 
 	var header := HBoxContainer.new()
 	col.add_child(header)
@@ -169,10 +181,8 @@ func _build_ui() -> void:
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(spacer)
 
-	col.add_child(_build_bag())
-
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 320)
+	scroll.custom_minimum_size = Vector2(0, 280)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	col.add_child(scroll)
 
@@ -182,109 +192,12 @@ func _build_ui() -> void:
 	scroll.add_child(_task_list)
 
 
-## --- сумка ------------------------------------------------------------------
-
-## Инвентарь как полка предметов: тап выбирает предмет «в руку», повторный тап
-## снимает выбор. Дальше выбранным предметом тыкают в объект на фасаде.
-func _build_bag() -> Control:
-	var panel := UIKit.panel(Color(0.1, 0.1, 0.13, 0.82))
-	_bag_panel = panel
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 6)
-	panel.add_child(col)
-
-	col.add_child(UIKit.label("Сумка", 24, Color(0.82, 0.8, 0.76)))
-
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 150)
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	col.add_child(scroll)
-
-	_bag = HBoxContainer.new()
-	_bag.add_theme_constant_override("separation", 12)
-	scroll.add_child(_bag)
-	return panel
-
-
-func _rebuild_bag() -> void:
-	if _bag == null:
-		return
-	for c in _bag.get_children():
-		c.queue_free()
-
-	var ids := _bag_items()
-	if _bag_panel != null:
-		_bag_panel.visible = not ids.is_empty()
-	if _selected_item not in ids:
-		_selected_item = ""
-
-	for id in ids:
-		_bag.add_child(_bag_slot(String(id)))
-
-
-## Бустеры живут в UI уровня, а не на фасаде — им в сумке делать нечего.
-func _bag_items() -> Array:
-	var ids := []
-	for id in PlayerState.items:
-		if String(id) == Game.BOOSTER_ID:
-			continue
-		ids.append(String(id))
-	ids.sort()
-	return ids
-
-
-func _bag_slot(item_id: String) -> Control:
-	var selected := item_id == _selected_item
-	var button := Button.new()
-	button.custom_minimum_size = Vector2(150, 138)
-	button.focus_mode = Control.FOCUS_NONE
-	button.toggle_mode = false
-	button.tooltip_text = ContentDB.item_name(item_id)
-	if selected:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0.30, 0.24, 0.10, 0.95)
-		sb.border_color = UIKit.ACCENT
-		sb.set_border_width_all(4)
-		sb.set_corner_radius_all(14)
-		button.add_theme_stylebox_override("normal", sb)
-	button.pressed.connect(func(): _select_item(item_id))
-
-	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_FULL_RECT)
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	button.add_child(box)
-
-	var icon := TextureRect.new()
-	icon.texture = PlaceholderArt.item_icon(ContentDB.item(item_id))
-	icon.custom_minimum_size = Vector2(72, 72)
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(icon)
-
-	var name_label := UIKit.label(ContentDB.item_name(item_id), 20)
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	name_label.custom_minimum_size = Vector2(140, 0)
-	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(name_label)
-
-	var count := PlayerState.amount_of(item_id)
-	if count > 1:
-		var badge := UIKit.label("×%d" % count, 20, UIKit.ACCENT)
-		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		box.add_child(badge)
-
-	return button
-
-
-func _select_item(item_id: String) -> void:
-	_selected_item = "" if _selected_item == item_id else item_id
-	_rebuild_bag()
-	if not _selected_item.is_empty():
-		EventBus.toast.emit("В руке: %s" % ContentDB.item_name(_selected_item))
+## Полоса инвентаря лежит в оверлее поверх сцены, поэтому место под неё держим
+## отступом. Пересчитывается на изменение инвентаря: пустая полоса не
+## показывается и высоты не занимает.
+func _apply_margins() -> void:
+	if _margin != null:
+		SafeArea.apply(_margin, 20, Game.bottom_reserved())
 
 
 func _update_wallet() -> void:
@@ -405,6 +318,10 @@ func _task_row(task: MetaTaskDefinition) -> Control:
 
 	if buttons.get_child_count() > 0:
 		col.add_child(buttons)
+	else:
+		# У выполненной задачи кнопок нет, и контейнер в дерево не попадает —
+		# без явного free он остаётся сиротой на каждой пересборке списка.
+		buttons.free()
 	return panel
 
 

@@ -30,3 +30,15 @@ func fade_out(_duration: float) -> void:
 ## Для debug-меню и headless-тестов.
 func force_solve() -> void:
 	pass
+
+
+## Показательный первый ход для обучения. Возвращает
+## {from, to, step} в МИРОВЫХ координатах: откуда ведём палец, куда, и Callable,
+## которым модуль сам двигает то, что «едет» вместе с рукой. {} — показывать
+## нечего. Уровень знает только про путь, модуль — только про свою механику.
+func demo_hint() -> Dictionary:
+	return {}
+
+
+func clear_demo_hint() -> void:
+	pass

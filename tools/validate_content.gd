@@ -28,6 +28,8 @@ func _initialize() -> void:
 		_check_actions()
 		_check_tasks()
 		_check_shops()
+		_check_intros()
+		_check_dialogs()
 		_check_item_flow()
 		_simulate_progression()
 	_report()
@@ -114,8 +116,11 @@ func _check_levels() -> void:
 		var normals := ho.normal_target_count()
 		if ho.required_normal > normals:
 			_err("%s: required_normal=%d, а обычных целей всего %d" % [lvl.id, ho.required_normal, normals])
-		if ho.targets.is_empty():
-			_err("%s: нет целей hidden object" % lvl.id)
+		## Уровень без целей — это чистый пазл, а не ошибка контента: сюжетный
+		## предмет тогда приходит из quest_grants. Дырой он становится только
+		## если не выдаёт вообще ничего, кроме монет.
+		if ho.targets.is_empty() and lvl.quest_grants.is_empty():
+			_warn("%s: ни целей hidden object, ни quest_grants — уровень не двигает сюжет" % lvl.id)
 
 		var seen := {}
 		var quest_ids := PackedStringArray()
@@ -137,8 +142,11 @@ func _check_levels() -> void:
 				_warn("%s / %s: цель мельче минимального touch-таргета" % [lvl.id, t.id])
 
 		for granted in lvl.quest_grants:
-			if not quest_ids.has(String(granted)):
-				_err("%s: quest_grants содержит '%s', но такой quest-цели в сцене нет" % [lvl.id, granted])
+			var gid := String(granted)
+			if not items.has(gid):
+				_err("%s: quest_grants содержит несуществующий предмет '%s'" % [lvl.id, gid])
+			elif not ho.targets.is_empty() and not quest_ids.has(gid):
+				_err("%s: quest_grants содержит '%s', но такой quest-цели в сцене нет" % [lvl.id, gid])
 		for q in quest_ids:
 			if not lvl.quest_grants.has(q):
 				_warn("%s: quest-цель '%s' не указана в quest_grants" % [lvl.id, q])
@@ -197,12 +205,121 @@ func _check_shops() -> void:
 					_warn("%s/%s: правило без текста — игрок не поймёт, что произошло"
 						% [shop.id, slot.id])
 
+		## Первый визит обставлен заставкой — обе половины обязаны быть на месте,
+		## иначе игрок либо не увидит сцену, либо увидит её каждый раз.
+		if not shop.first_visit.is_empty():
+			var fv_intro := String(shop.first_visit.get("intro", ""))
+			var fv_flag := String(shop.first_visit.get("flag", ""))
+			if fv_intro.is_empty() or fv_flag.is_empty():
+				_err("%s: first_visit нужен и intro, и flag" % shop.id)
+			elif not FileAccess.file_exists("%sintros/%s.json" % [ROOT, fv_intro]):
+				_err("%s: first_visit ссылается на несуществующую заставку '%s'"
+					% [shop.id, fv_intro])
+			elif not _flags_set_anywhere().has(fv_flag):
+				_err("%s: флаг первого визита '%s' никто не выставляет — сцена будет повторяться"
+					% [shop.id, fv_flag])
+
 		if shop.enter.is_empty():
 			continue
 		var flag := String(shop.enter.get("requires_flag", ""))
 		if not flag.is_empty() and not _flags_set_anywhere().has(flag):
 			_err("%s: вход внутрь ждёт флаг '%s', который никто не выставляет"
 				% [shop.id, flag])
+
+
+## Заставки и связки между сценами. Завязка теперь цепочка
+## «заставка → диалог → уровень → магазин», и оборванная ссылка в середине
+## означает, что игрок упрётся в карту без объяснений.
+func _check_intros() -> void:
+	var dir := DirAccess.open(ROOT + "intros")
+	if dir == null:
+		return
+	for file in dir.get_files():
+		if not file.ends_with(".json"):
+			continue
+		var d = ContentParser.read_json("%sintros/%s" % [ROOT, file])
+		if not (d is Dictionary):
+			_err("заставка %s не читается" % file)
+			continue
+
+		var bg := String(d.get("background", ""))
+		if bg.is_empty():
+			_warn("заставка %s: нет фона" % file)
+		elif not ResourceLoader.exists(bg):
+			_err("заставка %s: нет файла фона '%s'" % [file, bg])
+
+		if (d.get("screens", []) as Array).is_empty():
+			_err("заставка %s: нет ни одного экрана" % file)
+
+		_check_on_finish("заставка " + file, d.get("on_finish", {}))
+
+
+## Куда сцена ведёт после себя. Ссылка на несуществующий диалог/заставку/задачу
+## тихо превращается в «вернуться на карту» — самый незаметный вид обрыва.
+func _check_on_finish(who: String, on_finish: Dictionary) -> void:
+	if on_finish.is_empty():
+		return
+	var next_dialog := String(on_finish.get("dialog", ""))
+	if not next_dialog.is_empty() and not FileAccess.file_exists("%sdialogs/%s.json" % [ROOT, next_dialog]):
+		_err("%s: ведёт в несуществующий диалог '%s'" % [who, next_dialog])
+	var next_intro := String(on_finish.get("intro", ""))
+	if not next_intro.is_empty() and not FileAccess.file_exists("%sintros/%s.json" % [ROOT, next_intro]):
+		_err("%s: ведёт в несуществующую заставку '%s'" % [who, next_intro])
+	var task_id := String(on_finish.get("play_task", ""))
+	if not task_id.is_empty() and not tasks.has(task_id):
+		_err("%s: ведёт в несуществующую задачу '%s'" % [who, task_id])
+	var shop_id := String(on_finish.get("open_shop", ""))
+	if not shop_id.is_empty() and not shops.has(shop_id):
+		_err("%s: ведёт в несуществующий магазин '%s'" % [who, shop_id])
+
+
+## Диалоги. Реплика с опечаткой в говорящем — это пустая табличка имени и не
+## тот фон в готовой игре, поэтому проверяется здесь, а не глазами.
+func _check_dialogs() -> void:
+	var dir := DirAccess.open(ROOT + "dialogs")
+	if dir == null:
+		return
+	for file in dir.get_files():
+		if not file.ends_with(".json"):
+			continue
+		var path := "%sdialogs/%s" % [ROOT, file]
+		var d = ContentParser.read_json(path)
+		if not (d is Dictionary):
+			_err("диалог %s не читается" % file)
+			continue
+
+		_check_on_finish("диалог " + file, d.get("on_finish", {}))
+
+		var speakers: Dictionary = d.get("speakers", {})
+		var lines: Array = d.get("lines", [])
+		if lines.is_empty():
+			_err("диалог %s: нет реплик" % file)
+		if speakers.is_empty():
+			_err("диалог %s: не описан ни один говорящий" % file)
+
+		for sid in speakers:
+			var bg := String(speakers[sid].get("background", ""))
+			if bg.is_empty():
+				_warn("диалог %s / %s: нет фона — говорящего не будет видно" % [file, sid])
+			elif not ResourceLoader.exists(bg):
+				_err("диалог %s / %s: нет файла фона '%s'" % [file, sid, bg])
+			if String(speakers[sid].get("name", "")).is_empty():
+				_warn("диалог %s / %s: пустое имя на табличке" % [file, sid])
+
+		var used := {}
+		for i in lines.size():
+			var line: Dictionary = lines[i]
+			var sid := String(line.get("speaker", ""))
+			used[sid] = true
+			if not speakers.has(sid):
+				_err("диалог %s, реплика %d: неизвестный говорящий '%s'" % [file, i + 1, sid])
+			if String(line.get("text", "")).strip_edges().is_empty():
+				_err("диалог %s, реплика %d: пустой текст" % [file, i + 1])
+
+		for sid in speakers:
+			if not used.has(sid):
+				_warn("диалог %s: говорящий '%s' описан, но не произносит ни одной реплики"
+					% [file, sid])
 
 
 ## Все флаги, которые кто-то в контенте вообще может выставить.
@@ -219,6 +336,20 @@ func _flags_set_anywhere() -> Dictionary:
 					out[i.set_flag] = true
 				if not i.once_flag.is_empty():
 					out[i.once_flag] = true
+	## Сцены тоже поднимают флаги — «познакомился с хозяйкой» ставит именно
+	## диалог, а не действие.
+	for folder in ["dialogs", "intros"]:
+		var dir := DirAccess.open(ROOT + folder)
+		if dir == null:
+			continue
+		for file in dir.get_files():
+			if not file.ends_with(".json"):
+				continue
+			var d = ContentParser.read_json("%s%s/%s" % [ROOT, folder, file])
+			if d is Dictionary:
+				var flag := String((d.get("on_finish", {}) as Dictionary).get("set_flag", ""))
+				if not flag.is_empty():
+					out[flag] = true
 	return out
 
 

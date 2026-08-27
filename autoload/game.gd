@@ -3,9 +3,11 @@ extends Node
 ## Здесь же живёт связка core → мета: уровень отдаёт LevelResult, Game передаёт
 ## его MetaService и маршрутизирует игрока обратно к конкретной задаче.
 
-enum Screen { NONE, MAP, SHOP, LEVEL }
+enum Screen { NONE, INTRO, DIALOG, MAP, SHOP, LEVEL }
 
 const SCENE_PATHS := {
+	Screen.INTRO: "res://ui/intro_scene.tscn",
+	Screen.DIALOG: "res://ui/dialog_scene.tscn",
 	Screen.MAP: "res://meta/map/map_scene.tscn",
 	Screen.SHOP: "res://meta/shop/shop_scene.tscn",
 	Screen.LEVEL: "res://core/level/hybrid_level.tscn",
@@ -13,14 +15,32 @@ const SCENE_PATHS := {
 
 const NEW_GAME_WALLET := {"coins": 300, "hard": 60, "booster_hint": 3}
 const BOOSTER_ID := "booster_hint"
+## Вступление показывается один раз за прохождение. Флаг живёт в мете, а не в
+## настройках: он про эту партию, и «Сброс прогресса» обязан вернуть интро.
+## Ставится только В КОНЦЕ всей завязки: выход посреди диалога с мэром не должен
+## оставлять игрока без объяснения, зачем он тут.
+const INTRO_FLAG := "intro_seen"
+const INTRO_ID := "opening"
 
 signal screen_changed(screen: int)
 
 var meta: MetaService
 var screen: int = Screen.NONE
 
+## Предмет «в руке». Один на всё приложение: инвентарь общий для всех экранов,
+## значит и выбор в нём общий — иначе каждая сцена заводила бы свой и они
+## расходились бы при переходе.
+var selected_item: String = ""
+
+## Полоса инвентаря из оверлея Boot. Тип намеренно широкий: InventoryBar сам
+## обращается к Game, и назвать его здесь по имени класса значит замкнуть
+## автолоад на UI-скрипт.
+var inventory: Control = null
+
 var _root: Node = null
 var _current: Node = null
+var _current_dialog: String = ""
+var _current_intro: String = ""
 var _last_shop_id: String = ""
 var _last_meta_screen: int = Screen.MAP
 
@@ -31,6 +51,39 @@ func _ready() -> void:
 
 func attach(root: Node) -> void:
 	_root = root
+
+
+func attach_inventory(bar: Control) -> void:
+	inventory = bar
+
+
+## --- инвентарь: выбранный предмет -------------------------------------------
+
+## Повторный тап по тому же предмету кладёт его обратно — иначе из режима
+## «в руке ключ» нельзя выйти, не применив ключ хоть куда-нибудь.
+func select_item(item_id: String) -> void:
+	var next := "" if selected_item == item_id else item_id
+	if next == selected_item:
+		return
+	selected_item = next
+	EventBus.inventory_selection_changed.emit(selected_item)
+	if not selected_item.is_empty():
+		EventBus.toast.emit("В руке: %s" % ContentDB.item_name(selected_item))
+
+
+func clear_selection() -> void:
+	if selected_item.is_empty():
+		return
+	selected_item = ""
+	EventBus.inventory_selection_changed.emit("")
+
+
+## Сколько снизу занимает полоса инвентаря. Экраны держат на неё отступ, чтобы
+## их нижние панели не уезжали под инвентарь.
+func bottom_reserved() -> int:
+	if inventory == null or not inventory.has_method("reserved_height"):
+		return 0
+	return int(inventory.reserved_height())
 
 
 ## Текущий экран. Нужен debug-меню и headless-прогону; игровой код им не пользуется.
@@ -46,10 +99,11 @@ func boot() -> void:
 	if not SaveService.load_game():
 		new_game()
 	meta.refresh()
-	open_map()
+	_open_start_screen()
 
 
 func new_game() -> void:
+	clear_selection()
 	PlayerState.reset(NEW_GAME_WALLET)
 	CooldownService.reset()
 	meta.reset()
@@ -60,7 +114,97 @@ func new_game() -> void:
 func hard_reset() -> void:
 	SaveService.wipe()
 	new_game()
+	_open_start_screen()
+
+
+## --- вступление -------------------------------------------------------------
+
+## С чего открывается игра. Новая партия начинается со вступления, продолжение —
+## сразу с площади.
+func _open_start_screen() -> void:
+	if bool(meta.flags.get(INTRO_FLAG, false)):
+		open_map()
+	else:
+		open_intro(INTRO_ID)
+
+
+func open_intro(intro_id: String) -> void:
+	_current_intro = intro_id
+	goto(Screen.INTRO, {"intro_id": intro_id})
+
+
+func open_dialog(dialog_id: String) -> void:
+	_current_dialog = dialog_id
+	goto(Screen.DIALOG, {
+		"dialog_id": dialog_id,
+		"show_tap_hint": is_first_time_player(),
+	})
+
+
+## Сцены умеют только доиграть себя до конца. Что случится дальше — флаг, другая
+## сцена, уровень или магазин — написано в самом контенте (`on_finish`), поэтому
+## порядок «фасад → разговор с хозяйкой → внутрь пекарни» правится в JSON, а не
+## здесь. Иначе каждая новая сцена дописывала бы себе ветку в Game.
+func finish_intro() -> void:
+	var finished := _current_intro
+	_current_intro = ""
+	_route_after(ContentDB.intro(finished).get("on_finish", {}))
+
+
+func finish_dialog() -> void:
+	var finished := _current_dialog
+	_current_dialog = ""
+	_route_after(ContentDB.dialog(finished).get("on_finish", {}))
+
+
+func _route_after(on_finish: Dictionary) -> void:
+	var flag := String(on_finish.get("set_flag", ""))
+	if not flag.is_empty():
+		meta.set_flag(flag, true)
+	SaveService.save_game()
+
+	var next_intro := String(on_finish.get("intro", ""))
+	if not next_intro.is_empty():
+		open_intro(next_intro)
+		return
+
+	var next_dialog := String(on_finish.get("dialog", ""))
+	if not next_dialog.is_empty():
+		open_dialog(next_dialog)
+		return
+
+	var task_id := String(on_finish.get("play_task", ""))
+	if not task_id.is_empty() and not meta.resolve_level_for_task(task_id).is_empty():
+		play_task(task_id)
+		return
+
+	var shop_id := String(on_finish.get("open_shop", ""))
+	if not shop_id.is_empty() and meta.is_shop_open(shop_id):
+		open_shop(shop_id)
+		return
+
 	open_map()
+
+
+## Игрок хочет войти в локацию. Первый визит может быть обставлен сценой — это
+## описано в самом магазине (`first_visit`), поэтому карта просто говорит «сюда»
+## и не знает, будет ли по дороге разговор.
+func enter_shop(shop_id: String) -> void:
+	var shop: ShopDefinition = ContentDB.shop(shop_id)
+	if shop != null:
+		var first: Dictionary = shop.first_visit
+		var flag := String(first.get("flag", ""))
+		var intro_id := String(first.get("intro", ""))
+		if not flag.is_empty() and not intro_id.is_empty() \
+				and not bool(meta.flags.get(flag, false)):
+			open_intro(intro_id)
+			return
+	open_shop(shop_id)
+
+
+## Показать завязку ещё раз, не сбрасывая прогресс. Нужно только debug-панели.
+func replay_intro() -> void:
+	open_intro(INTRO_ID)
 
 
 ## --- маршрутизация ----------------------------------------------------------
@@ -69,6 +213,11 @@ func goto(target: int, payload: Dictionary = {}) -> void:
 	if _root == null:
 		push_error("Game: не вызван attach()")
 		return
+	# Предмет «в руке» имеет смысл только там, где есть куда его применить.
+	# Уносить ключ внутрь уровня и находить его там же выбранным — не имеет.
+	if target == Screen.LEVEL:
+		clear_selection()
+
 	if _current != null:
 		_root.remove_child(_current)
 		_current.queue_free()
@@ -128,7 +277,15 @@ func play_level(level_id: String, replay: bool = false) -> void:
 	ctx.items = items_for_level(def)
 	ctx.booster_id = BOOSTER_ID
 	ctx.boosters_available = PlayerState.amount_of(BOOSTER_ID)
+	ctx.show_drag_hint = is_first_time_player()
 	goto(Screen.LEVEL, {"context": ctx})
+
+
+## Обучающие подсказки показываем, пока игрок не прошёл ни одного уровня.
+## Отдельного флага для этого не нужно: «ни одного уровня» и есть определение
+## новичка, и оно само перестаёт быть верным ровно тогда, когда надо.
+func is_first_time_player() -> bool:
+	return meta.levels_completed_total == 0
 
 
 func items_for_level(def: LevelDefinition) -> Dictionary:

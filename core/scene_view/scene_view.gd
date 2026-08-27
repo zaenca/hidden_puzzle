@@ -21,14 +21,21 @@ func _ensure_nodes() -> void:
 		add_child(markers)
 
 
-func setup(art: SceneArt, targets: Array[HOTarget], items: Dictionary, image_rect: Rect2) -> void:
+## area — место, отведённое уровню под картинку. Картинка ВПИСЫВАЕТСЯ в него по
+## своему формату, а не растягивается на него: арт 9:16 в области 1080x1300
+## иначе сжимался бы по горизонтали в полтора раза. Получившийся прямоугольник
+## и есть rect — по нему же режутся части пазла и считаются цели поиска,
+## поэтому расхождению между картинкой и хитбоксами взяться неоткуда.
+func setup(art: SceneArt, targets: Array[HOTarget], items: Dictionary, area: Rect2) -> void:
 	_ensure_nodes()
-	rect = image_rect
 	texture = PlaceholderArt.build_scene_texture(art, targets, items)
 	background.texture = texture
-	background.position = image_rect.position
 	var tex_size := Vector2(texture.get_size())
-	background.scale = Vector2(image_rect.size.x / tex_size.x, image_rect.size.y / tex_size.y)
+	var s: float = minf(area.size.x / tex_size.x, area.size.y / tex_size.y)
+	var fitted := tex_size * s
+	rect = Rect2(area.position + (area.size - fitted) * 0.5, fitted)
+	background.position = rect.position
+	background.scale = Vector2(s, s)
 
 
 func norm_to_world(p: Vector2) -> Vector2:

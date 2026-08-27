@@ -6,6 +6,7 @@ extends Node
 
 var _toast: Label
 var _debug_panel: Control
+var _inventory: InventoryBar
 var _autoplay: AutoplayDriver = null
 
 
@@ -29,6 +30,7 @@ func _ready() -> void:
 	Game.attach(_screen_root)
 	_build_overlay()
 	EventBus.toast.connect(_show_toast)
+	Game.screen_changed.connect(_on_screen_changed)
 	_dbg("overlay ok")
 	Game.boot()
 	_dbg("Game.boot ok; screen=%d" % Game.screen)
@@ -62,6 +64,14 @@ func _build_overlay() -> void:
 	## offsets считаются от нуля, и якорь по правому краю уносит ноду за экран.
 	_anchor_box(_toast, Control.PRESET_TOP_WIDE, 0, 140, 0, 200)
 
+	## Инвентарь — в оверлее, а не в сцене экрана: он переживает переходы
+	## карта ↔ локация, поэтому и предмет «в руке» не теряется на переходе.
+	_inventory = InventoryBar.new()
+	_inventory.name = "InventoryBar"
+	root.add_child(_inventory)
+	_inventory.set_active(false)
+	Game.attach_inventory(_inventory)
+
 	if not OS.is_debug_build():
 		return
 
@@ -81,6 +91,15 @@ func _build_overlay() -> void:
 	_debug_panel.add_child(col)
 	col.add_child(UIKit.label("DEBUG", 26, UIKit.ACCENT))
 	col.add_child(_debug_button("Сброс прогресса", func(): Game.hard_reset()))
+	col.add_child(_debug_button("Показать интро", func():
+		_debug_panel.visible = false
+		Game.replay_intro()))
+	col.add_child(_debug_button("Диалог: мэр", func():
+		_debug_panel.visible = false
+		Game.open_dialog("intro_mayor")))
+	col.add_child(_debug_button("Пекарня: фасад + хозяйка", func():
+		_debug_panel.visible = false
+		Game.open_intro("bakery_facade")))
 	col.add_child(_debug_button("+50 ◆ hard", func(): MockServices.purchase("debug_pack", 50)))
 	col.add_child(_debug_button("+3 💡 бустера", func(): PlayerState.grant("booster_hint", 3)))
 	col.add_child(_debug_button("Перемотать 10 мин", func():
@@ -107,6 +126,14 @@ func _debug_button(text: String, action: Callable) -> Button:
 	b.custom_minimum_size = Vector2(0, 70)
 	b.pressed.connect(action)
 	return b
+
+
+## На уровне снизу стоит лоток пазла и список искомых предметов — инвентарь
+## туда не помещается и там не нужен. Он ждёт возвращения в мету вместе с
+## наградой, которую ещё не показал.
+func _on_screen_changed(screen: int) -> void:
+	if _inventory != null:
+		_inventory.set_active(screen == Game.Screen.MAP or screen == Game.Screen.SHOP)
 
 
 func _show_toast(text: String) -> void:

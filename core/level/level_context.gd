@@ -9,3 +9,6 @@ var items: Dictionary = {}      ## item_id -> ItemDefinition (для панел�
 var replay: bool = false
 var boosters_available: int = 0
 var booster_id: String = "booster_hint"
+## Показать обучающий ход рукой. Решает мета («игрок ещё не прошёл ни одного
+## уровня»), а не сам уровень: core про прогресс игрока не знает.
+var show_drag_hint: bool = false

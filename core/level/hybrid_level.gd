@@ -13,7 +13,14 @@ enum Phase { INTRO, PUZZLE, REVEAL, HIDDEN_OBJECT, OUTRO, RESULT }
 
 const IMAGE_RECT := Rect2(0, 250, 1080, 1300)
 const TRAY_RECT := Rect2(30, 1595, 1020, 290)
+const SCREEN := Vector2(1080, 1920)
 
+## Подложка уровня. Тёплый casual-градиент вместо пустоты движка: доска и лоток
+## должны читаться как предметы НА чём-то, иначе экран выглядит недорисованным.
+const SKY_TOP := Color("#5fb3e0")
+const SKY_BOTTOM := Color("#f5e2bd")
+
+@onready var _backdrop: Node2D = $Backdrop
 @onready var _view: SceneView = $SceneView
 @onready var _puzzle_host: Node2D = $PuzzleHost
 @onready var _ho: HiddenObjectPhase = $HOPhase
@@ -25,6 +32,9 @@ var definition: LevelDefinition
 var phase: int = Phase.INTRO
 
 var _puzzle: PuzzleModule
+var _hand: TutorialHand = null
+var _hint_active: bool = false
+var _tray_slot: Panel = null
 var _boosters_left: int = 0
 var _boosters_spent: int = 0
 var _started_msec: int = 0
@@ -54,6 +64,7 @@ func _build() -> void:
 
 	_view.setup(definition.art, definition.hidden_object.targets, context.items, IMAGE_RECT)
 	_view.set_dim(1.0)
+	_build_backdrop()
 
 	_ho.setup(definition.hidden_object, _view, context.items)
 	_ho.target_found.connect(_on_target_found)
@@ -65,6 +76,46 @@ func _build() -> void:
 	_hud.show_narrative(definition.narrative)
 
 
+## --- подложка ---------------------------------------------------------------
+
+## Живёт в мире, а не в CanvasLayer: на раскрытии камера подъезжает, и подложка
+## обязана ехать вместе с доской — иначе рамка вокруг картинки поедет отдельно
+## от самой картинки.
+func _build_backdrop() -> void:
+	var cover := SCREEN * 1.35   ## запас под наезд камеры
+
+	var sky := Sprite2D.new()
+	sky.texture = PlaceholderArt.flat_texture(Vector2i(8, 256), SKY_TOP, SKY_BOTTOM)
+	sky.centered = true
+	sky.position = SCREEN * 0.5
+	sky.scale = Vector2(cover.x / 8.0, cover.y / 256.0)
+	_backdrop.add_child(sky)
+
+	## Место под доску: картинка на время сборки приглушена, и без углубления
+	## под ней она читается как грязное пятно, а не как «сюда собирают».
+	_backdrop.add_child(_slot(_view.rect.grow(18.0),
+		Color(0.10, 0.13, 0.20, 0.30), Color(1, 1, 1, 0.22), 28))
+
+	## Лоток — деревянная полка под частями.
+	_tray_slot = _slot(TRAY_RECT.grow(20.0),
+		Color(0.42, 0.28, 0.16, 0.45), Color(1.0, 0.93, 0.80, 0.25), 34)
+	_backdrop.add_child(_tray_slot)
+
+
+func _slot(rect: Rect2, bg: Color, border: Color, radius: int) -> Panel:
+	var panel := Panel.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = border
+	sb.set_border_width_all(3)
+	sb.set_corner_radius_all(radius)
+	panel.add_theme_stylebox_override("panel", sb)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.position = rect.position
+	panel.size = rect.size
+	return panel
+
+
 ## --- PUZZLE -----------------------------------------------------------------
 
 func _start_puzzle() -> void:
@@ -74,16 +125,52 @@ func _start_puzzle() -> void:
 		push_error("HybridLevel: не создан puzzle-модуль")
 		return
 	_puzzle_host.add_child(_puzzle)
-	_puzzle.setup(definition.puzzle, _view.texture, IMAGE_RECT, TRAY_RECT)
+	## Не IMAGE_RECT, а то, что SceneView реально занял: картинка вписана в
+	## отведённую область по своему формату, и резать пазл надо по ней.
+	_puzzle.setup(definition.puzzle, _view.texture, _view.rect, TRAY_RECT)
 	_puzzle.progress_changed.connect(_hud.set_progress)
 	_puzzle.solved.connect(_reveal)
 	_puzzle.begin()
-	_hud.set_phase("Собери сцену")
+	_hud.show_progress(false)
+	## Название фазы нужно только там, где фаз больше одной. На чистом пазле оно
+	## лишь повторяет заголовок уровня другими словами.
+	_hud.set_phase("Собери сцену" if _has_hidden_object() else "")
+
+	if context.show_drag_hint:
+		_start_drag_hint()
+
+
+## --- обучающий ход ----------------------------------------------------------
+
+## Рука ведёт «призрак» части на её место и повторяет это, пока игрок не тронет
+## экран. Путь и то, что по нему едет, знает модуль пазла — уровень только
+## ведёт по этому пути руку.
+func _start_drag_hint() -> void:
+	var hint := _puzzle.demo_hint()
+	if hint.is_empty():
+		return
+	_hand = TutorialHand.new()
+	$FX.add_child(_hand)
+	_hand.play_drag(hint["from"], hint["to"], hint["step"])
+	_hint_active = true
+
+
+## Любое касание означает «я понял» — подсказка молча уходит.
+func _stop_drag_hint() -> void:
+	if not _hint_active:
+		return
+	_hint_active = false
+	if _hand != null:
+		_hand.stop()
+		_hand = null
+	if _puzzle != null:
+		_puzzle.clear_demo_hint()
 
 
 ## --- REVEAL: бесшовный переход ---------------------------------------------
 
 func _reveal() -> void:
+	_stop_drag_hint()
 	phase = Phase.REVEAL
 	_hud.set_phase("…")
 	_puzzle.fade_seams(0.35)
@@ -91,24 +178,47 @@ func _reveal() -> void:
 
 	_puzzle.fade_out(0.3)
 	var tw := create_tween().set_parallel(true)
+	## Пустая полка под собранной картинкой — просто тёмный прямоугольник.
+	if _tray_slot != null:
+		tw.tween_property(_tray_slot, "modulate:a", 0.0, 0.35)
 	tw.tween_method(_view.set_dim, 1.0, 0.0, 0.35)
 	tw.tween_property(_camera, "zoom", Vector2(1.05, 1.05), 0.55).set_trans(Tween.TRANS_SINE)
 	await tw.finished
 
-	_start_hidden_object()
+	if _has_hidden_object():
+		_start_hidden_object()
+	else:
+		_finish_after_puzzle()
 
 
 ## --- HIDDEN OBJECT ----------------------------------------------------------
 
+## Фаза поиска не обязательна. Уровень без целей — это чистый пазл: сюжетный
+## предмет тогда выдаётся из quest_grants, а не «находится» в сцене. Так первый
+## уровень может не учить двум механикам сразу, и для этого не нужен ни отдельный
+## контроллер уровня, ни флаг в данных — достаточно пустого списка целей.
+func _has_hidden_object() -> bool:
+	return not definition.hidden_object.targets.is_empty()
+
+
+func _finish_after_puzzle() -> void:
+	phase = Phase.OUTRO
+	_hud.set_phase("Готово")
+	await get_tree().create_timer(0.6).timeout
+	_show_result()
+
 func _start_hidden_object() -> void:
 	phase = Phase.HIDDEN_OBJECT
 	_hud.set_phase("Найди предметы")
+	_hud.show_progress(true)
 	_hud.show_items(definition.hidden_object.targets, context.items)
 	_hud.set_progress(0, definition.hidden_object.targets.size())
 	_ho.begin()
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and event.pressed and _hint_active:
+		_stop_drag_hint()
 	if phase != Phase.HIDDEN_OBJECT:
 		return
 	if event is InputEventScreenTouch and event.pressed:
@@ -143,7 +253,7 @@ func _build_result() -> LevelResult:
 	r.task_id = definition.task_id
 	r.success = true
 	r.replay = context.replay
-	r.quest_items = _ho.found_quest_items()
+	r.quest_items = _ho.found_quest_items() if _has_hidden_object() else definition.quest_grants
 	r.soft_currency = definition.rewards.coins_for(context.replay)
 	r.xp = definition.rewards.xp_for(context.replay)
 	if _boosters_spent > 0:

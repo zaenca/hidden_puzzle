@@ -255,6 +255,7 @@ static func shop_slot_state(d: Dictionary) -> ShopSlotState:
 	s.color = to_color(d.get("color", "#888888"))
 	s.shape = String(d.get("shape", "rect"))
 	s.hidden = bool(d.get("hidden", false))
+	s.overlay = to_color(d.get("overlay", ""), Color(0, 0, 0, 0))
 	return s
 
 
@@ -292,9 +293,11 @@ static func shop(d: Dictionary) -> ShopDefinition:
 	s.id = String(d.get("id", ""))
 	s.display_name = String(d.get("display_name", s.id))
 	s.palette = String(d.get("palette", "bakery"))
+	s.background_path = String(d.get("background", ""))
 	s.map_rect = to_rect(d.get("map_rect", [0.1, 0.4, 0.3, 0.2]))
 	s.rooms = d.get("rooms", [])
 	s.enter = d.get("enter", {})
+	s.first_visit = d.get("first_visit", {})
 	var slots: Array[ShopSlotDefinition] = []
 	for raw in d.get("slots", []):
 		slots.append(shop_slot(raw))

@@ -17,6 +17,8 @@ var loaded: bool = false
 
 var _level_cache: Dictionary = {}
 var _cache_order: Array[String] = []
+var _dialog_cache: Dictionary = {}
+var _intro_cache: Dictionary = {}
 
 
 func load_all() -> void:
@@ -59,6 +61,30 @@ func load_all() -> void:
 				shops[s.id] = s
 
 	loaded = true
+
+
+## Диалоги и вступления — сырые словари, а не Resource-классы: у реплик нет ни
+## одного правила, которое стоило бы типизировать, это текст и ссылка на
+## говорящего. Индекс не нужен, файл ищется по id.
+func dialog(id: String) -> Dictionary:
+	return _cutscene(_dialog_cache, "dialogs", id)
+
+
+func intro(id: String) -> Dictionary:
+	return _cutscene(_intro_cache, "intros", id)
+
+
+func _cutscene(cache: Dictionary, folder: String, id: String) -> Dictionary:
+	if id.is_empty():
+		return {}
+	if cache.has(id):
+		return cache[id]
+	var d = ContentParser.read_json("%s%s/%s.json" % [CONTENT_ROOT, folder, id])
+	var out: Dictionary = d if d is Dictionary else {}
+	if out.is_empty():
+		push_error("ContentDB: не читается %s/%s.json" % [folder, id])
+	cache[id] = out
+	return out
 
 
 func level(id: String) -> LevelDefinition:

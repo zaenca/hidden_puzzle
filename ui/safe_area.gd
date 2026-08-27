@@ -21,9 +21,12 @@ static func insets(viewport_size: Vector2) -> Dictionary:
 	}
 
 
-static func apply(container: MarginContainer, extra: int = 24) -> void:
+## extra_bottom — место под то, что стоит поверх экрана по низу (полоса
+## инвентаря). Отдельным параметром, а не общим extra: сверху столько отступа
+## не нужно, и раздувать его симметрично значит терять пол-экрана.
+static func apply(container: MarginContainer, extra: int = 24, extra_bottom: int = 0) -> void:
 	var i := insets(container.get_viewport_rect().size)
 	container.add_theme_constant_override("margin_left", int(i["left"]) + extra)
 	container.add_theme_constant_override("margin_top", int(i["top"]) + extra)
 	container.add_theme_constant_override("margin_right", int(i["right"]) + extra)
-	container.add_theme_constant_override("margin_bottom", int(i["bottom"]) + extra)
+	container.add_theme_constant_override("margin_bottom", int(i["bottom"]) + extra + extra_bottom)

@@ -1,0 +1,50 @@
+class_name Backdrop
+extends RefCounted
+## Фон экрана «по обрезке»: картинка накрывает экран целиком, лишнее уходит за
+## край. Приём нужен карте, локации магазина и интро одинаково, но важно в нём
+## не «как растянуть», а какой прямоугольник в итоге занял арт: rect'ы
+## кликабельных объектов нормализованы к КАРТИНКЕ, а не к экрану, и считать их
+## от чего-то другого — значит промахиваться хитбоксами мимо нарисованного.
+
+
+## Текстура по пути из данных или null, если файла нет. Отсутствие арта —
+## нормальная ситуация: экран обязан остаться играбельным на градиенте.
+static func load_texture(path: String) -> Texture2D:
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return null
+	return load(path) as Texture2D
+
+
+## Кладёт текстуру на весь экран и возвращает её прямоугольник.
+static func cover(sprite: Sprite2D, tex: Texture2D, screen: Vector2) -> Rect2:
+	sprite.centered = false
+	sprite.texture = tex
+	var tex_size := Vector2(tex.get_size())
+	var s: float = maxf(screen.x / tex_size.x, screen.y / tex_size.y)
+	sprite.scale = Vector2(s, s)
+	sprite.position = (screen - tex_size * s) * 0.5
+	return Rect2(sprite.position, tex_size * s)
+
+
+## То же покрытие, но арт прижат к низу, а не отцентрован. Нужно там, где на
+## картинке нарисован интерфейс: рамка диалога стоит внизу, и при центрировании
+## её срезает первым же окном, чей формат шире 9:16. Сверху у таких сцен небо —
+## его обрезать не жалко.
+static func cover_bottom(sprite: Sprite2D, tex: Texture2D, screen: Vector2) -> Rect2:
+	sprite.centered = false
+	sprite.texture = tex
+	var tex_size := Vector2(tex.get_size())
+	var s: float = maxf(screen.x / tex_size.x, screen.y / tex_size.y)
+	var size := tex_size * s
+	sprite.scale = Vector2(s, s)
+	sprite.position = Vector2((screen.x - size.x) * 0.5, screen.y - size.y)
+	return Rect2(sprite.position, size)
+
+
+## Запасной фон без арта — градиент по палитре во весь экран.
+static func gradient(sprite: Sprite2D, palette: String, screen: Vector2) -> void:
+	sprite.centered = false
+	sprite.texture = PlaceholderArt.flat_texture(
+		Vector2i(int(screen.x), int(screen.y)), Palette.top(palette), Palette.bottom(palette))
+	sprite.scale = Vector2.ONE
+	sprite.position = Vector2.ZERO

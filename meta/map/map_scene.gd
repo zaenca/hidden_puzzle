@@ -11,6 +11,7 @@ const SCREEN := Vector2(1080, 1920)
 var _focus: MetaFocus = null
 var _hit_areas: Array = []      ## [{rect: Rect2, shop_id: String}]
 var _task_list: VBoxContainer
+var _margin: MarginContainer
 
 ## Прямоугольник, к которому нормализованы координаты зданий. С реальным артом
 ## это область самой картинки, без него — условная MAP_RECT.
@@ -42,27 +43,12 @@ func _build() -> void:
 ## уходит за край. Если файла нет — прежний процедурный градиент, чтобы проект
 ## оставался запускаемым без ассетов.
 func _setup_background() -> void:
-	var path := String(ContentDB.map_data.get("background", ""))
-	var tex: Texture2D = null
-	if not path.is_empty() and ResourceLoader.exists(path):
-		tex = load(path) as Texture2D
-
-	_bg.centered = false
-	if tex != null:
-		_has_art = true
-		_bg.texture = tex
-		var tex_size := Vector2(tex.get_size())
-		var s: float = maxf(SCREEN.x / tex_size.x, SCREEN.y / tex_size.y)
-		_bg.scale = Vector2(s, s)
-		_bg.position = (SCREEN - tex_size * s) * 0.5
-		_map_rect = Rect2(_bg.position, tex_size * s)
+	var tex := Backdrop.load_texture(String(ContentDB.map_data.get("background", "")))
+	_has_art = tex != null
+	if _has_art:
+		_map_rect = Backdrop.cover(_bg, tex, SCREEN)
 	else:
-		_has_art = false
-		var palette := String(ContentDB.map_data.get("palette", "street"))
-		_bg.texture = PlaceholderArt.flat_texture(
-			Vector2i(int(SCREEN.x), int(SCREEN.y)), Palette.top(palette), Palette.bottom(palette))
-		_bg.scale = Vector2.ONE
-		_bg.position = Vector2.ZERO
+		Backdrop.gradient(_bg, String(ContentDB.map_data.get("palette", "street")), SCREEN)
 		_map_rect = MAP_RECT
 
 
@@ -155,7 +141,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if (area["rect"] as Rect2).has_point(world):
 			var shop_id := String(area["shop_id"])
 			if Game.meta.is_shop_open(shop_id):
-				Game.open_shop(shop_id)
+				Game.enter_shop(shop_id)
 			else:
 				EventBus.toast.emit("Объект пока закрыт")
 			return
@@ -169,16 +155,17 @@ func _build_ui() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_ui.add_child(root)
 
-	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(margin)
-	SafeArea.apply(margin, 20)
+	_margin = MarginContainer.new()
+	_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_margin)
+	_apply_margins()
+	EventBus.inventory_changed.connect(func(_i, _v): call_deferred("_apply_margins"))
 
 	var col := VBoxContainer.new()
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_theme_constant_override("separation", 10)
-	margin.add_child(col)
+	_margin.add_child(col)
 
 	var title := UIKit.label(String(ContentDB.map_data.get("title", "Район")), 38)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -190,9 +177,10 @@ func _build_ui() -> void:
 	col.add_child(spacer)
 
 	var scroll := ScrollContainer.new()
-	## Нижние здания арта заканчиваются на y=1642 из 1920 — панель задач обязана
-	## начинаться ниже, иначе она срезает метки статуса у кафе и цветочного.
-	scroll.custom_minimum_size = Vector2(0, 240)
+	## Нижние здания арта заканчиваются на y=1642 из 1920, и полоса инвентаря
+	## забирает низ экрана. Панель задач в остаток не влезает, поэтому она ниже
+	## и прокручивается: перекрыть край арта дешевле, чем спрятать задачи.
+	scroll.custom_minimum_size = Vector2(0, 200)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	col.add_child(scroll)
 
@@ -200,6 +188,12 @@ func _build_ui() -> void:
 	_task_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_task_list.add_theme_constant_override("separation", 10)
 	scroll.add_child(_task_list)
+
+
+## Место под полосу инвентаря, которая лежит в оверлее поверх карты.
+func _apply_margins() -> void:
+	if _margin != null:
+		SafeArea.apply(_margin, 20, Game.bottom_reserved())
 
 
 func _rebuild_tasks() -> void:
@@ -238,7 +232,7 @@ func _rebuild_tasks() -> void:
 	for shop in ContentDB.shops.values():
 		if Game.meta.is_shop_open(shop.id):
 			var enter := UIKit.button("Войти: " + shop.display_name, 30)
-			enter.pressed.connect(func(): Game.open_shop(shop.id))
+			enter.pressed.connect(func(): Game.enter_shop(shop.id))
 			_task_list.add_child(enter)
 
 

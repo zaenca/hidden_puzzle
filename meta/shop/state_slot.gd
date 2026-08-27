@@ -7,15 +7,20 @@ extends Node2D
 var slot_id: String = ""
 var current_state: String = ""
 var world_rect: Rect2 = Rect2()   ## область слота на экране — по ней идёт хит-тест
+var art_mode: bool = false        ## поверх настоящего арта рисуем только плёнку
 
 var _variants: Dictionary = {}   ## state_id -> Node2D
 var _highlight: Line2D = null
 
 
-static func create(def: ShopSlotDefinition, area: Rect2) -> StateSlot:
+## art_mode = у магазина есть настоящий фон. Тогда слот ничего не «рисует
+## вместо» объекта — объект уже нарисован художником. Остаётся только плёнка
+## состояния (грязь, тень) и рамка «сюда можно нажать».
+static func create(def: ShopSlotDefinition, area: Rect2, art_mode: bool = false) -> StateSlot:
 	var slot := StateSlot.new()
 	slot.slot_id = def.id
 	slot.name = "Slot_" + def.id
+	slot.art_mode = art_mode
 
 	var rect := Rect2(
 		area.position + Vector2(def.rect.position.x * area.size.x, def.rect.position.y * area.size.y),
@@ -26,7 +31,13 @@ static func create(def: ShopSlotDefinition, area: Rect2) -> StateSlot:
 		var variant := Node2D.new()
 		variant.name = state.id
 		variant.visible = false
-		if not state.hidden:
+		if art_mode:
+			if state.has_overlay():
+				var film := Polygon2D.new()
+				film.polygon = _shape_polygon(rect, state.shape)
+				film.color = state.overlay
+				variant.add_child(film)
+		elif not state.hidden:
 			var poly := Polygon2D.new()
 			poly.polygon = _shape_polygon(rect, state.shape)
 			poly.color = state.color
@@ -63,12 +74,18 @@ func set_state(state_id: String, animate: bool = true) -> void:
 	var variant: Node2D = _variants[state_id]
 	variant.visible = true
 	current_state = state_id
-	if animate and is_inside_tree():
-		variant.modulate.a = 0.0
-		variant.scale = Vector2(0.86, 0.86)
-		var tw := variant.create_tween().set_parallel(true)
-		tw.tween_property(variant, "modulate:a", 1.0, 0.35)
-		tw.tween_property(variant, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if not (animate and is_inside_tree()):
+		return
+	variant.modulate.a = 0.0
+	# Точки плёнки заданы в мировых координатах, поэтому scale тянул бы её от
+	# начала координат сцены, а не от самого объекта. Поверх арта — только альфа.
+	if art_mode:
+		variant.create_tween().tween_property(variant, "modulate:a", 1.0, 0.35)
+		return
+	variant.scale = Vector2(0.86, 0.86)
+	var tw := variant.create_tween().set_parallel(true)
+	tw.tween_property(variant, "modulate:a", 1.0, 0.35)
+	tw.tween_property(variant, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 ## Подсветка «с этим объектом сейчас можно что-то сделать». Рисуется поверх

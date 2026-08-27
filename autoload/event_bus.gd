@@ -5,6 +5,7 @@ extends Node
 
 signal currency_changed(id: String, value: int)
 signal inventory_changed(id: String, value: int)
+signal inventory_selection_changed(item_id: String)   ## "" — рука пуста
 signal quest_item_granted(id: String)
 signal task_state_changed(task_id: String, state: int)
 signal cooldown_started(action_id: String)

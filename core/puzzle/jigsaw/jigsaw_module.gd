@@ -13,6 +13,7 @@ var _placed_count: int = 0
 var _dragging: JigsawPiece = null
 var _frame: Line2D
 var _pieces_root: Node2D
+var _demo_ghost: Node2D = null
 
 
 func _ready() -> void:
@@ -68,7 +69,9 @@ func progress() -> Vector2i:
 
 func _layout_tray() -> void:
 	var count := _pieces.size()
-	var tray_rows := 2
+	## Шесть частей и меньше кладём одной полосой: в два ряда они мельчают вдвое
+	## без всякой нужды — места по ширине хватает.
+	var tray_rows := 1 if count <= 6 else 2
 	var tray_cols := int(ceil(count / float(tray_rows)))
 	var cell := Vector2(_tray_rect.size.x / float(tray_cols), _tray_rect.size.y / float(tray_rows))
 	var s: float = minf(cell.x / _cell_size.x, cell.y / _cell_size.y) * 0.82
@@ -173,6 +176,48 @@ func force_solve() -> void:
 			_placed_count += 1
 	progress_changed.emit(_placed_count, _pieces.size())
 	_on_solved()
+
+
+## --- показательный ход ------------------------------------------------------
+
+## Берём первую несобранную часть и ведём по её пути «призрак» — полупрозрачную
+## копию. Настоящая часть остаётся в лотке: игрок должен повторить ход сам, а не
+## обнаружить, что за него уже всё сделали.
+func demo_hint() -> Dictionary:
+	clear_demo_hint()
+	for piece in _pieces:
+		if piece.placed:
+			continue
+
+		var ghost: Node2D = piece.duplicate()
+		ghost.name = "DemoGhost"
+		ghost.modulate = Color(1, 1, 1, 0.8)
+		ghost.z_index = 400
+		_pieces_root.add_child(ghost)
+		_demo_ghost = ghost
+
+		var from_pos := piece.tray_point
+		var from_scale := piece.tray_scale
+		var to_pos: Vector2 = piece.home
+		var pivot: Vector2 = piece.centroid
+
+		return {
+			# палец ставим на саму часть, а не в её угол
+			"from": from_pos + pivot * from_scale,
+			"to": to_pos + pivot,
+			"step": func(t: float) -> void:
+				if not is_instance_valid(ghost):
+					return
+				ghost.position = from_pos.lerp(to_pos, t)
+				ghost.scale = Vector2.ONE * lerpf(from_scale, 1.0, t),
+		}
+	return {}
+
+
+func clear_demo_hint() -> void:
+	if is_instance_valid(_demo_ghost):
+		_demo_ghost.queue_free()
+	_demo_ghost = null
 
 
 ## --- бесшовное раскрытие ----------------------------------------------------
