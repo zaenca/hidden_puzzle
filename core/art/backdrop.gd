@@ -26,6 +26,21 @@ static func cover(sprite: Sprite2D, tex: Texture2D, screen: Vector2) -> Rect2:
 	return Rect2(sprite.position, tex_size * s)
 
 
+## Вписать картинку целиком и вернуть её прямоугольник. Нужно там, где арт —
+## не декорация, а само игровое поле: в локации по объектам комнаты кликают, и
+## обрезка по экрану уносит часть из них за край вместе с их хитбоксами.
+## Полосы по краям закрывает подложка сцены.
+static func fit(sprite: Sprite2D, tex: Texture2D, screen: Vector2) -> Rect2:
+	sprite.centered = false
+	sprite.texture = tex
+	var tex_size := Vector2(tex.get_size())
+	var s: float = minf(screen.x / tex_size.x, screen.y / tex_size.y)
+	var size := tex_size * s
+	sprite.scale = Vector2(s, s)
+	sprite.position = (screen - size) * 0.5
+	return Rect2(sprite.position, size)
+
+
 ## То же покрытие, но арт прижат к низу, а не отцентрован. Нужно там, где на
 ## картинке нарисован интерфейс: рамка диалога стоит внизу, и при центрировании
 ## её срезает первым же окном, чей формат шире 9:16. Сверху у таких сцен небо —

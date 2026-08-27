@@ -2,7 +2,7 @@
   "id": "bakery",
   "display_name": "Пекарня «Тёплый угол»",
   "palette": "bakery",
-  "background": "res://art/bakery_hall.jpg",
+  "background": "res://art/bakery_interior.png",
   "map_rect": [0.0, 0.293, 0.347, 0.25],
   "rooms": [
     { "id": "hall", "title": "Торговый зал" },
@@ -18,7 +18,7 @@
   "slots": [
     {
       "id": "floor_litter",
-      "rect": [0.30, 0.63, 0.66, 0.33],
+      "rect": [0.100, 0.760, 0.820, 0.235],
       "default": "dirty",
       "states": [
         { "id": "dirty",   "label": "", "overlay": "#2b210f66" },
@@ -27,7 +27,7 @@
     },
     {
       "id": "showcase",
-      "rect": [0.0, 0.35, 0.45, 0.25],
+      "rect": [0.275, 0.462, 0.315, 0.180],
       "default": "dirty",
       "states": [
         { "id": "dirty", "label": "витрина грязная", "color": "#6b6455", "shape": "rect", "overlay": "#1d1a1080" },
@@ -54,7 +54,7 @@
     },
     {
       "id": "door",
-      "rect": [0.775, 0.155, 0.19, 0.375],
+      "rect": [0.842, 0.190, 0.125, 0.375],
       "default": "locked",
       "states": [
         { "id": "locked", "label": "дверь заперта", "color": "#5a4130", "shape": "rect", "overlay": "#0b0a1859" },

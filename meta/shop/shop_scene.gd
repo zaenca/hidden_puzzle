@@ -4,6 +4,7 @@ extends Node2D
 
 const VISUAL_RECT := Rect2(30, 210, 1020, 940)
 const SCREEN := Vector2(1080, 1920)
+const LETTERBOX := Color(0.06, 0.05, 0.05, 1.0)
 
 @onready var _bg: Sprite2D = $Visuals/Background
 @onready var _slots_root: Node2D = $Visuals/Slots
@@ -71,11 +72,29 @@ func _build() -> void:
 func _setup_background() -> void:
 	var tex := Backdrop.load_texture(shop.background_path)
 	_has_art = tex != null
-	if _has_art:
-		_visual_rect = Backdrop.cover(_bg, tex, SCREEN)
-	else:
+	if not _has_art:
 		Backdrop.gradient(_bg, shop.palette, SCREEN)
 		_visual_rect = VISUAL_RECT
+		return
+
+	## Локация вписывается целиком, а не кроется по экрану. Комната здесь —
+	## игровое поле: обрезка по бокам уносит за край её объекты вместе с
+	## хитбоксами, и игрок ищет дверь, которой на экране нет.
+	_fill_letterbox()
+	_visual_rect = Backdrop.fit(_bg, tex, SCREEN)
+
+
+## Полосы над и под вписанным артом. Пустота движка за краем комнаты читается
+## как обрыв; тёмная подложка — как рамка вокруг сцены.
+func _fill_letterbox() -> void:
+	var pad := ColorRect.new()
+	pad.color = LETTERBOX
+	pad.position = Vector2.ZERO
+	pad.size = SCREEN
+	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pad.z_index = -1
+	_bg.get_parent().add_child(pad)
+	_bg.get_parent().move_child(pad, 0)
 
 
 ## --- визуальные состояния ---------------------------------------------------

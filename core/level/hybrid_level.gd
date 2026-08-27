@@ -20,6 +20,9 @@ const SCREEN := Vector2(1080, 1920)
 const HOLD_BEFORE_FADE := 1.0
 const FADE_OUT_SEC := 0.45
 
+## За сколько проявляется слой предметов поиска после сборки пазла.
+const OBJECTS_FADE_IN_SEC := 0.5
+
 ## Подложка уровня. Тёплый casual-градиент вместо пустоты движка: доска и лоток
 ## должны читаться как предметы НА чём-то, иначе экран выглядит недорисованным.
 const SKY_TOP := Color("#5fb3e0")
@@ -190,10 +193,22 @@ func _reveal() -> void:
 	tw.tween_property(_camera, "zoom", Vector2(1.05, 1.05), 0.55).set_trans(Tween.TRANS_SINE)
 	await tw.finished
 
-	if _has_hidden_object():
-		_start_hidden_object()
-	else:
+	if not _has_hidden_object():
 		_finish_after_puzzle()
+		return
+
+	await _reveal_objects()
+	_start_hidden_object()
+
+
+## Комната собрана — и в ней проявляется то, что предстоит найти. Пазл шёл по
+## пустому кадру, поэтому опознать предметы заранее по частям в лотке было
+## нельзя, и их появление читается как событие, а не как смена подписи в HUD.
+func _reveal_objects() -> void:
+	if not _view.has_objects_layer():
+		return
+	_view.reveal_objects(OBJECTS_FADE_IN_SEC)
+	await get_tree().create_timer(OBJECTS_FADE_IN_SEC).timeout
 
 
 ## --- HIDDEN OBJECT ----------------------------------------------------------
@@ -357,13 +372,22 @@ func debug_autoplay() -> void:
 	## тот, кто её ждёт, не дождётся никогда. Прогон ждёт смены экрана снаружи.
 	if not definition.show_result:
 		return
-	await get_tree().create_timer(1.4).timeout
+	await _settle(Phase.HIDDEN_OBJECT)
 	if not is_inside_tree():
 		return
 	if phase == Phase.HIDDEN_OBJECT:
 		_ho.force_complete()
-	await get_tree().create_timer(0.8).timeout
+	await _settle(Phase.RESULT)
 	if not is_inside_tree():
 		return
 	if phase == Phase.RESULT:
 		_emit_result()
+
+
+## Ждём фазу, а не фиксированные секунды: длительность раскрытия зависит от
+## того, есть ли у сцены отдельный слой предметов, и захардкоженный таймер
+## начинает врать ровно при добавлении такого слоя.
+func _settle(target: int, timeout_sec: float = 8.0) -> void:
+	var deadline := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
+	while is_inside_tree() and phase != target and Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame

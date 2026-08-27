@@ -131,6 +131,8 @@ func run(tree: SceneTree) -> void:
 	_check("зал: витрина грязная",
 		Game.meta.current_slot_state("bakery", "showcase") == "dirty")
 
+	_check_hall_scene()
+
 	await _play("task_clear_hall")
 	_check("L2: метла выдана", PlayerState.amount_of("broom") >= 1)
 	_check("L2: мешок для мусора выдан", PlayerState.amount_of("trash_bag") >= 1)
@@ -203,6 +205,33 @@ func _check_inventory_shows(item_ids: Array) -> void:
 	for id in item_ids:
 		_check("инвентарь: '%s' попал в полосу" % ContentDB.item_name(String(id)),
 			bar.shows(String(id)))
+
+
+## Зал ищется по настоящему интерьеру и ровно по двум предметам. Проверяем
+## именно это: «целей две» и «предметы лежат в отдельном слое» — два разных
+## утверждения, и второе ломается незаметно, стоит кому-то запечь предметы
+## обратно в фон.
+func _check_hall_scene() -> void:
+	var def: LevelDefinition = ContentDB.level("bakery_02")
+	if def == null:
+		_check("зал: уровень bakery_02 загружается", false)
+		return
+
+	var targets := def.hidden_object.targets
+	_check("зал: в сцене ровно две цели", targets.size() == 2)
+
+	var quest_items := {}
+	for t in targets:
+		if t.is_quest():
+			quest_items[t.item_id] = true
+	_check("зал: обе цели сюжетные — метла и мешок",
+		quest_items.has("broom") and quest_items.has("trash_bag") and quest_items.size() == 2)
+	_check("зал: отвлекающих предметов искать не нужно", def.hidden_object.required_normal == 0)
+
+	_check("зал: пазл собирается по интерьеру пекарни",
+		def.art.background_path == "res://art/bakery_interior.png")
+	_check("зал: предметы лежат отдельным слоем, а не запечены в пазл",
+		def.art.objects_background_path == "res://art/bakery_interior_objects.png")
 
 
 ## Что игрок видит в инвентаре: бустеры в полосу не попадают.

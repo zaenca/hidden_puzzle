@@ -82,6 +82,7 @@ static func scene_art(d: Dictionary) -> SceneArt:
 	var size = d.get("reference_size", [1080, 1350])
 	a.reference_size = Vector2i(int(size[0]), int(size[1]))
 	a.background_path = String(d.get("background", ""))
+	a.objects_background_path = String(d.get("objects_background", ""))
 	a.palette = String(d.get("palette", "street"))
 	a.seed = int(d.get("seed", 0))
 	a.clutter = int(d.get("clutter", 26))
