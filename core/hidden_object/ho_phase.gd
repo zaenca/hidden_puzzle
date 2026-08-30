@@ -118,27 +118,11 @@ func is_complete() -> bool:
 	return _quest_found >= _quest_total and _normal_found >= _config.required_normal
 
 
-## Бустер / отладка: подсветить одну ещё не найденную цель.
+## Какую цель подсказать бустером. Фаза называет цель, но не рисует подсказку:
+## как она выглядит — вопрос уровня, а не механики поиска.
 func hint_target() -> HOTarget:
 	var left := remaining()
 	return left[0] if not left.is_empty() else null
-
-
-func highlight(t: HOTarget) -> void:
-	if t == null or _view == null:
-		return
-	var ring := Line2D.new()
-	var poly := _view.norm_polygon_to_world(t.shape)
-	var pts := PackedVector2Array(poly)
-	if pts.size() > 0:
-		pts.append(pts[0])
-	ring.points = pts
-	ring.width = 8.0
-	ring.default_color = Color(1.0, 0.92, 0.35, 0.95)
-	_view.markers.add_child(ring)
-	var tw := ring.create_tween()
-	tw.tween_property(ring, "modulate:a", 0.0, 1.6)
-	tw.tween_callback(ring.queue_free)
 
 
 func force_complete() -> void:

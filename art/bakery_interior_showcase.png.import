@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bpvby52f34gl"
-path="res://.godot/imported/bakery_hall.jpg-5c890e3dae33f0e56031503949260200.ctex"
+uid="uid://phw2rluocmpv"
+path="res://.godot/imported/bakery_interior_showcase.png-b6c5bdd9e433e062ee1144e89541e5ae.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/bakery_hall.jpg"
-dest_files=["res://.godot/imported/bakery_hall.jpg-5c890e3dae33f0e56031503949260200.ctex"]
+source_file="res://art/bakery_interior_showcase.png"
+dest_files=["res://.godot/imported/bakery_interior_showcase.png-b6c5bdd9e433e062ee1144e89541e5ae.ctex"]
 
 [params]
 

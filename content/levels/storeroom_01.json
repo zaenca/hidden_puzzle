@@ -1,0 +1,27 @@
+{
+  "id": "storeroom_01",
+  "shop_id": "bakery",
+  "task_id": "task_open_storeroom",
+  "order": 3,
+  "difficulty": 1,
+  "title": "Кладовая за дверью",
+  "narrative": [
+    "Дверь поддалась. За ней темно, и глаз не сразу складывает кладовую в целое."
+  ],
+  "art": {
+    "reference_size": [1080, 1350],
+    "background": "res://art/bakery_storeroom.png",
+    "palette": "bakery",
+    "seed": 3011,
+    "clutter": 18,
+    "decor": [
+      { "rect": [0.0, 0.0, 1.0, 0.62], "color": "#6d5947", "shape": "rect" },
+      { "rect": [0.55, 0.18, 0.40, 0.62], "color": "#4e3d2f", "shape": "rect" },
+      { "rect": [0.06, 0.30, 0.30, 0.30], "color": "#5f5040", "shape": "rect" },
+      { "rect": [0.0, 0.62, 1.0, 0.38], "color": "#7a6a54", "shape": "rect" }
+    ]
+  },
+  "puzzle": { "module_id": "jigsaw", "cols": 3, "rows": 3, "seed": 3101, "tab_ratio": 0.2, "snap_distance_px": 110 },
+  "hidden_object": { "targets": [] },
+  "rewards": { "coins": 70, "xp": 12 }
+}

@@ -221,6 +221,10 @@ func _play_drops() -> void:
 func _drop(item_id: String, chip: Control, delay: float) -> void:
 	var icon := TextureRect.new()
 	icon.texture = PlaceholderArt.item_icon(ContentDB.item(item_id), 112)
+	## Пропорции держим явно: сгенерированная иконка всегда квадратная, а
+	## нарисованная — нет, и растяжение по квадрату сплющивает её на лету.
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.size = Vector2(112, 112)
 	icon.pivot_offset = Vector2(56, 56)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE

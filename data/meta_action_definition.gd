@@ -9,6 +9,10 @@ extends Resource
 @export var button_label: String = "Применить"
 @export var requirements: Array[Requirement] = []
 @export var costs: Array[Cost] = []
+## Применяется само, как только выполнены условия. Для шагов, где выбора у
+## игрока нет: кнопка «применить», нажатие которой ничего не решает, — это не
+## решение, а лишний тап между ним и следующей сценой.
+@export var auto_apply: bool = false
 @export var duration_sec: int = 0
 @export var reduce_per_level_sec: int = 0   ## сокращение за каждый core level
 @export var speedup_hard_cost: int = 0      ## mock hard currency

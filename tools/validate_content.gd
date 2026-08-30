@@ -52,6 +52,12 @@ func _load() -> void:
 	for d in items_raw:
 		var it := ContentParser.item(d)
 		items[it.id] = it
+		## Опечатка в пути иконки не ломает игру — предмет просто откатывается к
+		## цветной фигуре. Именно поэтому её надо ловить здесь: в готовой сборке
+		## это заметят не сразу и не по тому признаку.
+		var icon_path := String(d.get("icon", ""))
+		if not icon_path.is_empty() and not ResourceLoader.exists(icon_path):
+			_err("предмет %s: нет файла иконки '%s'" % [it.id, icon_path])
 
 	for d in ContentParser.read_json(ROOT + "tasks.json"):
 		var t := ContentParser.task(d)
@@ -107,6 +113,11 @@ func _check_levels() -> void:
 			_err("%s: неизвестная задача '%s'" % [lvl.id, lvl.task_id])
 		if not PuzzleRegistry.is_known(lvl.puzzle.module_id):
 			_err("%s: неизвестный puzzle-модуль '%s'" % [lvl.id, lvl.puzzle.module_id])
+		## Арт часто приезжает позже контента, и уровень остаётся играбельным на
+		## заглушке — но молча собирать не ту картинку игрок не должен.
+		if not lvl.art.background_path.is_empty() and not ResourceLoader.exists(lvl.art.background_path):
+			_warn("%s: нет файла фона '%s' — уровень пойдёт на заглушечном арте"
+				% [lvl.id, lvl.art.background_path])
 
 		var jig := lvl.puzzle as JigsawParams
 		if jig != null and jig.piece_count() < 4:
@@ -118,8 +129,10 @@ func _check_levels() -> void:
 			_err("%s: required_normal=%d, а обычных целей всего %d" % [lvl.id, ho.required_normal, normals])
 		## Уровень без целей — это чистый пазл, а не ошибка контента: сюжетный
 		## предмет тогда приходит из quest_grants. Дырой он становится только
-		## если не выдаёт вообще ничего, кроме монет.
-		if ho.targets.is_empty() and lvl.quest_grants.is_empty():
+		## если он вообще ни на что не влияет — ни находкой, ни выдачей, ни как
+		## условие мета-действия («пазл собран» само по себе двигает историю).
+		if ho.targets.is_empty() and lvl.quest_grants.is_empty() and lvl.cleanup.is_empty() \
+				and not _levels_required_by_actions().has(lvl.id):
 			_warn("%s: ни целей hidden object, ни quest_grants — уровень не двигает сюжет" % lvl.id)
 
 		var seen := {}
@@ -140,6 +153,8 @@ func _check_levels() -> void:
 				_err("%s / %s: цель выходит за пределы изображения" % [lvl.id, t.id])
 			if b.size.x < MIN_TARGET_SIDE or b.size.y < MIN_TARGET_SIDE:
 				_warn("%s / %s: цель мельче минимального touch-таргета" % [lvl.id, t.id])
+
+		_check_cleanup(lvl)
 
 		for granted in lvl.quest_grants:
 			var gid := String(granted)
@@ -173,6 +188,9 @@ func _check_actions() -> void:
 							_err("action %s: у магазина '%s' нет слота '%s'" % [a.id, e.shop_id, e.slot_id])
 						elif not slot.has_state(e.state_id):
 							_err("action %s: у слота '%s' нет состояния '%s'" % [a.id, e.slot_id, e.state_id])
+				MetaEffect.Kind.SET_SHOP_STATE:
+					if not shops.has(e.shop_id):
+						_err("action %s: переводит в состояние несуществующий магазин '%s'" % [a.id, e.shop_id])
 				MetaEffect.Kind.CONSUME, MetaEffect.Kind.GRANT:
 					if not items.has(e.id) and not (e.id in ["coins", "hard", "xp"]):
 						_err("action %s: эффект ссылается на неизвестный id '%s'" % [a.id, e.id])
@@ -184,10 +202,22 @@ func _check_actions() -> void:
 func _check_shops() -> void:
 	for shop_v in shops.values():
 		var shop: ShopDefinition = shop_v
+		## Локация без арта играется на градиенте, но rect'ы слотов размечены
+		## под картинку — попадать пальцем в пустоту игрок будет уже как есть.
+		if not shop.background_path.is_empty() and not ResourceLoader.exists(shop.background_path):
+			_warn("%s: нет файла фона '%s' — локация пойдёт на градиенте"
+				% [shop.id, shop.background_path])
+		var back_shop := String(shop.back.get("shop_id", ""))
+		if not back_shop.is_empty() and not shops.has(back_shop):
+			_err("%s: кнопка «назад» ведёт в несуществующую локацию '%s'" % [shop.id, back_shop])
 		for slot in shop.slots:
 			if not slot.default_state.is_empty() and not slot.has_state(slot.default_state):
 				_err("%s/%s: default-состояние '%s' не описано"
 					% [shop.id, slot.id, slot.default_state])
+			for st in slot.states:
+				if st.has_texture() and not ResourceLoader.exists(st.texture_path):
+					_warn("%s/%s: нет файла картинки '%s' — объект не будет виден"
+						% [shop.id, slot.id, st.texture_path])
 			for i in slot.interactions:
 				if not i.state.is_empty() and not slot.has_state(i.state):
 					_err("%s/%s: правило ссылается на состояние '%s', которого нет"
@@ -204,6 +234,30 @@ func _check_shops() -> void:
 				if i.text.is_empty():
 					_warn("%s/%s: правило без текста — игрок не поймёт, что произошло"
 						% [shop.id, slot.id])
+
+		## Режим подсветки — из закрытого набора: опечатка в нём молча
+		## превращается в «auto», и объект, который игрок должен искать,
+		## оказывается обведён рамкой.
+		for slot in shop.slots:
+			if not (slot.highlight in ["auto", "always", "never"]):
+				_err("%s/%s: неизвестный режим подсветки '%s'"
+					% [shop.id, slot.id, slot.highlight])
+
+		## Полоска «что здесь собрать»: ячейки должны ссылаться на настоящие
+		## предметы, а флаг завершения — кем-то выставляться, иначе полоска
+		## останется висеть в убранной локации.
+		if not shop.collection.is_empty():
+			var coll_items: Array = shop.collection.get("items", [])
+			if coll_items.is_empty():
+				_err("%s: collection без единой ячейки" % shop.id)
+			for raw in coll_items:
+				if not items.has(String(raw)):
+					_err("%s: в collection предмет '%s', которого нет в items.json"
+						% [shop.id, raw])
+			var done_flag := String(shop.collection.get("done_flag", ""))
+			if not done_flag.is_empty() and not _flags_set_anywhere().has(done_flag):
+				_err("%s: collection ждёт флаг '%s', который никто не выставляет"
+					% [shop.id, done_flag])
 
 		## Первый визит обставлен заставкой — обе половины обязаны быть на месте,
 		## иначе игрок либо не увидит сцену, либо увидит её каждый раз.
@@ -225,6 +279,11 @@ func _check_shops() -> void:
 		if not flag.is_empty() and not _flags_set_anywhere().has(flag):
 			_err("%s: вход внутрь ждёт флаг '%s', который никто не выставляет"
 				% [shop.id, flag])
+		var enter_shop := String(shop.enter.get("open_shop", ""))
+		if not enter_shop.is_empty() and not shops.has(enter_shop):
+			_err("%s: вход ведёт в несуществующую локацию '%s'" % [shop.id, enter_shop])
+		elif enter_shop.is_empty() and String(shop.enter.get("text", "")).is_empty():
+			_warn("%s: вход никуда не ведёт и ничего не говорит" % shop.id)
 
 
 ## Заставки и связки между сценами. Завязка теперь цепочка
@@ -322,6 +381,78 @@ func _check_dialogs() -> void:
 					% [file, sid])
 
 
+## Флаги, которые ставят заставки и диалоги через on_finish.set_flag.
+func _scene_flags() -> Dictionary:
+	var out := {}
+	for folder in ["dialogs", "intros"]:
+		var dir := DirAccess.open(ROOT + folder)
+		if dir == null:
+			continue
+		for file in dir.get_files():
+			if not file.ends_with(".json"):
+				continue
+			var d = ContentParser.read_json("%s%s/%s" % [ROOT, folder, file])
+			if not (d is Dictionary):
+				continue
+			var flag := String((d.get("on_finish", {}) as Dictionary).get("set_flag", ""))
+			if not flag.is_empty():
+				out[flag] = true
+	return out
+
+
+## Шаги уборки. Каждый обещает игроку три вещи: предмет в полосе, место, куда
+## его тащить, и следующий кадр комнаты. Не хватает любой — шаг молча становится
+## тупиком: тащить нечего, некуда или картинка не меняется.
+func _check_cleanup(lvl: LevelDefinition) -> void:
+	var seen := {}
+	for i in lvl.cleanup.size():
+		var step: CleanupStep = lvl.cleanup[i]
+		var who := "%s / уборка %d" % [lvl.id, i + 1]
+
+		if not items.has(step.item_id):
+			_err("%s: нет предмета '%s' в items.json" % [who, step.item_id])
+		if seen.has(step.item_id):
+			_err("%s: предмет '%s' используется дважды" % [who, step.item_id])
+		seen[step.item_id] = true
+
+		if step.art_path.is_empty():
+			_err("%s: не задан кадр после шага" % who)
+		elif not ResourceLoader.exists(step.art_path):
+			_err("%s: нет файла кадра '%s'" % [who, step.art_path])
+
+		var r := step.rect
+		if r.position.x < 0.0 or r.position.y < 0.0 or r.end.x > 1.0 or r.end.y > 1.0:
+			_err("%s: область выходит за пределы кадра" % who)
+		if r.size.x < MIN_TARGET_SIDE or r.size.y < MIN_TARGET_SIDE:
+			_warn("%s: область мельче минимального touch-таргета" % who)
+
+	## Уровень, который заканчивается уборкой, не должен ещё и требовать поиска:
+	## это две разные концовки, и вторая просто не наступит.
+	if not lvl.cleanup.is_empty() and not lvl.hidden_object.targets.is_empty():
+		_err("%s: заданы и цели поиска, и шаги уборки — фаза может быть только одна" % lvl.id)
+
+## Такой уровень двигает историю самим фактом прохождения.
+## Уровни, без которых не сработает мета-действие. Такой уровень двигает сюжет,
+## даже если сам ничего не выдаёт: «пазл собран» и есть условие. Действие ждёт
+## последний уровень цепочки — значит открывает её вся цепочка задачи целиком.
+func _levels_required_by_actions() -> Dictionary:
+	var out := {}
+	for a in actions.values():
+		for r in a.requirements:
+			if r.kind == Requirement.Kind.LEVEL:
+				out[r.id] = a.id
+	for t in tasks.values():
+		var act: MetaActionDefinition = actions.get(t.action_id)
+		if act == null:
+			continue
+		for r in act.requirements:
+			if r.kind == Requirement.Kind.LEVEL and t.level_ids.has(r.id):
+				for lid in t.level_ids:
+					out[String(lid)] = act.id
+				break
+	return out
+
+
 ## Все флаги, которые кто-то в контенте вообще может выставить.
 func _flags_set_anywhere() -> Dictionary:
 	var out := {}
@@ -398,8 +529,13 @@ func _check_tasks() -> void:
 		for lid in t.level_ids:
 			if not levels.has(String(lid)):
 				_err("task %s: неизвестный уровень '%s'" % [t.id, lid])
-		if t.level_ids.is_empty() and t.location != "shop":
-			_warn("task %s: нет уровней и не в магазине" % t.id)
+		## Задача без уровней вне магазина — либо указатель («сходи туда»,
+		## закрывается сама), либо дырка в контенте: строка, по которой игроку
+		## нечего нажать и нечего сделать.
+		var act: MetaActionDefinition = actions.get(t.action_id)
+		if t.level_ids.is_empty() and t.location != "shop" \
+				and (act == null or not act.auto_apply):
+			_warn("task %s: нет уровней, не в магазине и не закрывается сама" % t.id)
 
 
 ## Симуляция линейного прохождения. Проверяет два инварианта:
@@ -407,15 +543,24 @@ func _check_tasks() -> void:
 ##  2) в момент старта cooldown есть хотя бы одна параллельная задача.
 func _simulate_progression() -> void:
 	var inv := {}
-	var flags := {}
+	## Флаги, которые поднимают сцены (знакомство с хозяйкой ставит диалог, а не
+	## действие), считаем достижимыми сразу. Собственных условий у сцен нет — до
+	## них доводит цепочка on_finish, а её целостность проверяют _check_intros и
+	## _check_dialogs. Моделировать здесь ещё и порядок сцен значило бы держать
+	## вторую копию маршрутизации Game.
+	var flags := _scene_flags()
 	var done_levels := {}
+	var slot_states := {}
 	var done_tasks := {}
 	var coins := 100000
 	var guard := 0
 
 	while done_tasks.size() < tasks.size() and guard < 200:
 		guard += 1
-		var acted := false
+		## Тап по объекту локации — такая же часть прогресса, как мета-действие:
+		## ключ из-под коврика и открытая им дверь не описаны ни одним action,
+		## и без их эмуляции всё, что стоит за флагом двери, выглядит мёртвым.
+		var acted := _point_and_click(inv, flags, slot_states)
 
 		for t in tasks.values():
 			if done_tasks.has(t.id):
@@ -474,6 +619,49 @@ func _simulate_progression() -> void:
 	for lvl in levels.values():
 		if not done_levels.has(lvl.id):
 			_warn("Уровень %s недостижим при линейном прохождении" % lvl.id)
+
+
+## Прогон всех тапов по объектам локаций: пустой рукой и каждым предметом из
+## сумки. Правила берутся те же и в том же порядке, что и в MetaService.interact,
+## поэтому симуляция не расходится с игрой.
+##
+## Возвращает true, только если мир реально сдвинулся — иначе цикл симуляции
+## считал бы «осмотрел дверь» бесконечным прогрессом.
+func _point_and_click(inv: Dictionary, flags: Dictionary, slot_states: Dictionary) -> bool:
+	var changed := false
+	for shop in shops.values():
+		for slot in shop.slots:
+			var key := "%s/%s" % [shop.id, slot.id]
+			if not slot_states.has(key):
+				slot_states[key] = slot.default_state
+
+			var hands := PackedStringArray([""])
+			for item_id in inv:
+				if int(inv[item_id]) > 0:
+					hands.append(String(item_id))
+
+			for hand in hands:
+				for rule in slot.interactions:
+					if not rule.matches(String(slot_states[key]), hand, flags):
+						continue
+					# Первое подошедшее правило — единственное сработавшее.
+					if not rule.use_item.is_empty() and rule.consume:
+						inv[rule.use_item] = maxi(0, int(inv.get(rule.use_item, 0)) - 1)
+						changed = true
+					if not rule.grant_item.is_empty():
+						inv[rule.grant_item] = int(inv.get(rule.grant_item, 0)) + 1
+						changed = true
+					if not rule.once_flag.is_empty():
+						flags[rule.once_flag] = true
+						changed = true
+					if not rule.set_state.is_empty():
+						slot_states[key] = rule.set_state
+						changed = true
+					if not rule.set_flag.is_empty() and not bool(flags.get(rule.set_flag, false)):
+						flags[rule.set_flag] = true
+						changed = true
+					break
+	return changed
 
 
 func _unlocked(t: MetaTaskDefinition, flags, done_levels, done_tasks, inv) -> bool:

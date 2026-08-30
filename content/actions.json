@@ -4,33 +4,80 @@
     "title": "Выбрать пекарню",
     "description": "Отметить пекарню первым объектом восстановления.",
     "button_label": "Выбрать пекарню",
-    "requirements": [{ "type": "item", "item_id": "district_plan", "amount": 1 }],
+    "_auto_note": "Выбора у игрока здесь нет — мэр уже назвал пекарню в диалоге. Задача закрывается сама, как только план собран.",
+    "auto_apply": true,
+    "requirements": [{ "type": "level", "level_id": "bakery_01" }],
     "costs": [],
     "duration_sec": 0,
     "effects": [
-      { "type": "consume", "id": "district_plan", "amount": 1 },
       { "type": "set_shop_state", "shop_id": "bakery", "state": "in_restoration" },
-      { "type": "set_flag", "flag": "bakery_chosen" },
-      { "type": "narrative", "text": "Мэр: начинай с пекарни. Когда-то за её хлебом стояла очередь через весь квартал." }
+      { "type": "set_flag", "flag": "bakery_chosen" }
+    ]
+  },
+  {
+    "id": "visit_bakery",
+    "title": "Осмотреть пекарню",
+    "description": "Познакомиться с хозяйкой пекарни.",
+    "button_label": "Осмотреть пекарню",
+    "_auto_note": "Закрывается знакомством с хозяйкой: флаг met_baker ставит диалог bakery_owner.",
+    "auto_apply": true,
+    "requirements": [{ "type": "flag", "flag": "met_baker" }],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "set_flag", "flag": "bakery_visited" }
     ]
   },
   {
     "id": "clear_hall",
-    "title": "Вынести мусор из зала",
-    "description": "Метла и мешок уже в инвентаре — можно браться за пол.",
-    "button_label": "Убрать зал",
+    "title": "Прибраться в торговом зале",
+    "description": "Пол вымыт, витрина обметена, мусор собран.",
+    "button_label": "Прибраться в зале",
+    "_auto_note": "Уборка целиком происходит внутри уровня: игрок нажимает на пол, витрину и зал. Задача закрывается сама по факту пройденного уровня — кнопки, дублирующей уже сделанное, быть не должно.",
+    "auto_apply": true,
+    "requirements": [{ "type": "level", "level_id": "bakery_02" }],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "set_flag", "flag": "hall_clean" }
+    ]
+  },
+  {
+    "id": "clean_storeroom",
+    "title": "Убрать кладовую",
+    "description": "Кладовая собрана, шкаф на месте — пора за уборку.",
+    "button_label": "Убрать кладовую",
+    "requirements": [{ "type": "level", "level_id": "storeroom_02" }],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "set_shop_state", "shop_id": "bakery_storeroom", "state": "in_restoration" },
+      { "type": "set_flag", "flag": "storeroom_ready" },
+      { "type": "narrative", "text": "Шкаф встал у правой стены. Теперь видно, во что кладовую превратили: полки в паутине, муке и мусоре." }
+    ]
+  },
+  {
+    "id": "haul_out_trash",
+    "title": "Вынести мусор",
+    "description": "Всё, что валялось в кладовой, собрано — осталось вынести.",
+    "button_label": "Вынести мусор",
     "requirements": [
-      { "type": "item", "item_id": "broom", "amount": 1 },
-      { "type": "item", "item_id": "trash_bag", "amount": 1 }
+      { "type": "item", "item_id": "spiderweb",   "amount": 1 },
+      { "type": "item", "item_id": "flour_spill", "amount": 1 },
+      { "type": "item", "item_id": "bootprints",  "amount": 1 },
+      { "type": "item", "item_id": "scrap_paper", "amount": 1 },
+      { "type": "item", "item_id": "puddle",      "amount": 1 }
     ],
     "costs": [],
     "duration_sec": 0,
     "effects": [
-      { "type": "consume", "id": "trash_bag", "amount": 1 },
-      { "type": "set_visual_state", "shop_id": "bakery", "slot_id": "floor_litter", "state_id": "cleaned" },
-      { "type": "grant", "id": "rag", "amount": 1 },
-      { "type": "set_flag", "flag": "hall_clean" },
-      { "type": "narrative", "text": "Листья выметены, мешок завязан. Под завалом нашлась старая ветошь — ей можно отмыть витрину." }
+      { "type": "consume", "id": "spiderweb",   "amount": 1 },
+      { "type": "consume", "id": "flour_spill", "amount": 1 },
+      { "type": "consume", "id": "bootprints",  "amount": 1 },
+      { "type": "consume", "id": "scrap_paper", "amount": 1 },
+      { "type": "consume", "id": "puddle",      "amount": 1 },
+      { "type": "set_flag", "flag": "storeroom_clean" },
+      { "type": "narrative", "text": "Кладовая убрана: пол вымыт, полки протёрты, паутины нет. Пахнет деревом, а не подвалом." }
     ]
   }
 ]

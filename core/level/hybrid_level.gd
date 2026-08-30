@@ -9,11 +9,22 @@ extends Node2D
 signal finished(result: LevelResult)
 signal abandoned
 
-enum Phase { INTRO, PUZZLE, REVEAL, HIDDEN_OBJECT, OUTRO, RESULT }
+enum Phase { INTRO, PUZZLE, REVEAL, HIDDEN_OBJECT, CLEANUP, OUTRO, RESULT }
 
 const IMAGE_RECT := Rect2(0, 250, 1080, 1300)
 const TRAY_RECT := Rect2(30, 1595, 1020, 290)
 const SCREEN := Vector2(1080, 1920)
+
+## Уход в мету без экрана результата: сколько держим собранную картинку и за
+## сколько гасим экран.
+const HOLD_BEFORE_FADE := 1.0
+const FADE_OUT_SEC := 0.45
+
+## За сколько проявляется слой предметов поиска после сборки пазла.
+const OBJECTS_FADE_IN_SEC := 0.5
+
+## Сколько предметы «доезжают» в нижнюю полосу перед фазой уборки.
+const COLLECT_SEC := 0.55
 
 ## Подложка уровня. Тёплый casual-градиент вместо пустоты движка: доска и лоток
 ## должны читаться как предметы НА чём-то, иначе экран выглядит недорисованным.
@@ -32,7 +43,9 @@ var definition: LevelDefinition
 var phase: int = Phase.INTRO
 
 var _puzzle: PuzzleModule
-var _hand: TutorialHand = null
+var _hand: TutorialHand = null        ## обучающий ход в пазле
+var _find_hand: TutorialHand = null   ## бустер-подсказка в поиске
+var _cleanup: CleanupPhase = null
 var _hint_active: bool = false
 var _tray_slot: Panel = null
 var _boosters_left: int = 0
@@ -127,7 +140,7 @@ func _start_puzzle() -> void:
 	_puzzle_host.add_child(_puzzle)
 	## Не IMAGE_RECT, а то, что SceneView реально занял: картинка вписана в
 	## отведённую область по своему формату, и резать пазл надо по ней.
-	_puzzle.setup(definition.puzzle, _view.texture, _view.rect, TRAY_RECT)
+	_puzzle.setup(definition.puzzle, _view.texture, _view.rect, TRAY_RECT, _view.uv_scale())
 	_puzzle.progress_changed.connect(_hud.set_progress)
 	_puzzle.solved.connect(_reveal)
 	_puzzle.begin()
@@ -155,22 +168,46 @@ func _start_drag_hint() -> void:
 	_hint_active = true
 
 
+## --- подсказка в поиске -----------------------------------------------------
+
+## Бустер в фазе поиска показывает пальцем, куда нажать, а не обводит предмет
+## рамкой. Обводка отвечает на вопрос «где он», палец — на вопрос «что делать»,
+## и второй ответ здесь единственный нужный: предмет уже нарисован в сцене,
+## игроку остаётся по нему попасть.
+func _show_find_hint(t: HOTarget) -> void:
+	_stop_find_hint()
+	_find_hand = TutorialHand.new()
+	$FX.add_child(_find_hand)
+	_find_hand.play_tap(_view.norm_to_world(t.centroid()))
+
+
+## Палец держится, пока предмет не найден: промах — это повод показывать
+## дальше, а не прятать подсказку, за которую заплатили бустером.
+func _stop_find_hint() -> void:
+	if _find_hand == null:
+		return
+	_find_hand.stop()
+	_find_hand = null
+
+
 ## Любое касание означает «я понял» — подсказка молча уходит.
-func _stop_drag_hint() -> void:
+func _stop_hint() -> void:
 	if not _hint_active:
 		return
 	_hint_active = false
 	if _hand != null:
 		_hand.stop()
 		_hand = null
-	if _puzzle != null:
+	## Призрак части живёт только в фазе сборки: в фазе поиска пазла на экране
+	## уже нет, и чистить в нём нечего.
+	if _puzzle != null and phase == Phase.PUZZLE:
 		_puzzle.clear_demo_hint()
 
 
 ## --- REVEAL: бесшовный переход ---------------------------------------------
 
 func _reveal() -> void:
-	_stop_drag_hint()
+	_stop_hint()
 	phase = Phase.REVEAL
 	_hud.set_phase("…")
 	_puzzle.fade_seams(0.35)
@@ -185,10 +222,25 @@ func _reveal() -> void:
 	tw.tween_property(_camera, "zoom", Vector2(1.05, 1.05), 0.55).set_trans(Tween.TRANS_SINE)
 	await tw.finished
 
-	if _has_hidden_object():
-		_start_hidden_object()
-	else:
+	if not _has_hidden_object() and not _has_cleanup():
 		_finish_after_puzzle()
+		return
+
+	await _reveal_objects()
+	if _has_cleanup():
+		await _start_cleanup()
+	else:
+		_start_hidden_object()
+
+
+## Комната собрана — и в ней проявляется то, что предстоит найти. Пазл шёл по
+## пустому кадру, поэтому опознать предметы заранее по частям в лотке было
+## нельзя, и их появление читается как событие, а не как смена подписи в HUD.
+func _reveal_objects() -> void:
+	if not _view.has_objects_layer():
+		return
+	_view.reveal_objects(OBJECTS_FADE_IN_SEC)
+	await get_tree().create_timer(OBJECTS_FADE_IN_SEC).timeout
 
 
 ## --- HIDDEN OBJECT ----------------------------------------------------------
@@ -203,9 +255,79 @@ func _has_hidden_object() -> bool:
 
 func _finish_after_puzzle() -> void:
 	phase = Phase.OUTRO
+	if not definition.show_result:
+		await _slip_into_meta()
+		return
 	_hud.set_phase("Готово")
 	await get_tree().create_timer(0.6).timeout
 	_show_result()
+
+
+## Конец уровня без экрана результата. Собранная картинка держится секунду —
+## это и есть награда, — потом экран гаснет, и игрок оказывается там, куда его
+## ведёт история. Никакой строки «Монеты: +60» между двумя кадрами сюжета.
+func _slip_into_meta() -> void:
+	_hud.set_phase("")
+	await get_tree().create_timer(HOLD_BEFORE_FADE).timeout
+	if not is_inside_tree():
+		return
+
+	var veil := ColorRect.new()
+	veil.color = Color(0, 0, 0, 0)
+	veil.set_anchors_preset(Control.PRESET_FULL_RECT)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	## Последним ребёнком слоя — поверх HUD: гаснуть должен весь экран, иначе
+	## заголовок и счётчик частей висят над чернотой.
+	$UI.add_child(veil)
+
+	var tw := create_tween()
+	tw.tween_property(veil, "color:a", 1.0, FADE_OUT_SEC)
+	await tw.finished
+	if is_inside_tree():
+		_emit_result()
+
+
+## --- CLEANUP: нажать туда, где найденное нужно применить -------------------
+
+func _has_cleanup() -> bool:
+	return not definition.cleanup.is_empty()
+
+
+## Предметы, только что проявившиеся в кадре, перелетают в нижнюю полосу. Искать
+## их не нужно: их не искали — их показали. Кадр на это время глухой, и
+## единственное, что игрок может сделать дальше, — нажать туда, где предмет
+## нужен.
+func _start_cleanup() -> void:
+	phase = Phase.CLEANUP
+	_hud.show_progress(false)
+
+	var ids := PackedStringArray()
+	for step in definition.cleanup:
+		ids.append(step.item_id)
+	_hud.show_item_row(ids, context.items)
+	await get_tree().create_timer(COLLECT_SEC).timeout
+	if not is_inside_tree():
+		return
+
+	_cleanup = CleanupPhase.new()
+	_cleanup.name = "CleanupPhase"
+	add_child(_cleanup)
+	_cleanup.setup(definition.cleanup, _view, _hud, context.items,
+		func(world: Vector2) -> Vector2: return get_canvas_transform() * world)
+	_cleanup.completed.connect(_on_cleanup_completed)
+	_cleanup.begin()
+
+
+func _on_cleanup_completed() -> void:
+	phase = Phase.OUTRO
+	_hud.set_phase("")
+	_hud.hide_items()
+	if not definition.show_result:
+		await _slip_into_meta()
+		return
+	await get_tree().create_timer(0.6).timeout
+	_show_result()
+
 
 func _start_hidden_object() -> void:
 	phase = Phase.HIDDEN_OBJECT
@@ -215,17 +337,48 @@ func _start_hidden_object() -> void:
 	_hud.set_progress(0, definition.hidden_object.targets.size())
 	_ho.begin()
 
+	if context.show_tap_hint:
+		_start_tap_hint()
+
+
+## Рука показывает жест поиска: предметы находятся НАЖАТИЕМ. Без этого хода
+## единственное, чему игрока научили, — перетаскивание частей пазла, и тот же
+## жест он переносит сюда.
+func _start_tap_hint() -> void:
+	var t := _ho.hint_target()
+	if t == null:
+		return
+	_hand = TutorialHand.new()
+	$FX.add_child(_hand)
+	_hand.play_tap(_view.norm_to_world(t.bounds().get_center()))
+	_hint_active = true
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch and event.pressed and _hint_active:
-		_stop_drag_hint()
+		_stop_hint()
+
+	if phase == Phase.CLEANUP:
+		_cleanup_input(event)
+		return
 	if phase != Phase.HIDDEN_OBJECT:
 		return
 	if event is InputEventScreenTouch and event.pressed:
 		_ho.handle_tap(get_canvas_transform().affine_inverse() * event.position)
 
 
+## Ввод фазы уборки приходит сюда, а не в саму фазу: нажатие приходит в
+## экранных координатах, а место шага размечено по кадру, и перевод между этими
+## системами координат знает уровень.
+func _cleanup_input(event: InputEvent) -> void:
+	if _cleanup == null:
+		return
+	if event is InputEventScreenTouch and event.pressed:
+		_cleanup.handle_tap(get_canvas_transform().affine_inverse() * event.position)
+
+
 func _on_target_found(target: HOTarget, item: ItemDefinition) -> void:
+	_stop_find_hint()
 	_hud.mark_found(target.id)
 	var found := definition.hidden_object.targets.size() - _ho.remaining().size()
 	_hud.set_progress(found, definition.hidden_object.targets.size())
@@ -239,8 +392,11 @@ func _on_miss(_world: Vector2) -> void:
 
 func _on_ho_completed() -> void:
 	phase = Phase.OUTRO
-	_hud.set_phase("Готово")
 	_hud.hide_items()
+	if not definition.show_result:
+		await _slip_into_meta()
+		return
+	_hud.set_phase("Готово")
 	await get_tree().create_timer(0.5).timeout
 	_show_result()
 
@@ -285,7 +441,11 @@ func _on_booster() -> void:
 		Phase.HIDDEN_OBJECT:
 			var t := _ho.hint_target()
 			if t != null:
-				_ho.highlight(t)
+				_show_find_hint(t)
+				used = true
+		Phase.CLEANUP:
+			if _cleanup != null and _cleanup.current() != null:
+				_cleanup.show_hint()
 				used = true
 	if used:
 		_boosters_left -= 1
@@ -316,9 +476,43 @@ func debug_autoplay() -> void:
 		_start_puzzle()
 	if _puzzle != null:
 		_puzzle.force_solve()
-	await get_tree().create_timer(1.4).timeout
+	await _settle_playable()
+	if not is_inside_tree():
+		return
 	if phase == Phase.HIDDEN_OBJECT:
 		_ho.force_complete()
-	await get_tree().create_timer(0.8).timeout
+	elif phase == Phase.CLEANUP and _cleanup != null:
+		_cleanup.force_complete()
+
+	## Уровень без экрана результата доигрывает переход и уходит в мету сам.
+	## Дожидаться его здесь нельзя: нода освободится посреди этой корутины, и
+	## тот, кто её ждёт, не дождётся никогда. Прогон ждёт смены экрана снаружи.
+	if not definition.show_result:
+		return
+	await _settle(Phase.RESULT)
+	if not is_inside_tree():
+		return
 	if phase == Phase.RESULT:
 		_emit_result()
+
+
+## Ждём фазу, а не фиксированные секунды: длительность раскрытия зависит от
+## того, есть ли у сцены отдельный слой предметов, и захардкоженный таймер
+## начинает врать ровно при добавлении такого слоя.
+## Ждём фазу, в которой прогону есть что доиграть за игрока. Фаза уборки
+## доступна не сразу: предметы сперва «доезжают» в полосу, и до этого момента
+## форсировать в ней нечего.
+func _settle_playable(timeout_sec: float = 8.0) -> void:
+	var deadline := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
+	while is_inside_tree() and Time.get_ticks_msec() < deadline:
+		if phase == Phase.HIDDEN_OBJECT or phase == Phase.OUTRO or phase == Phase.RESULT:
+			return
+		if phase == Phase.CLEANUP and _cleanup != null:
+			return
+		await get_tree().process_frame
+
+
+func _settle(target: int, timeout_sec: float = 8.0) -> void:
+	var deadline := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
+	while is_inside_tree() and phase != target and Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame

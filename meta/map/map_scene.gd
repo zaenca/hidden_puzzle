@@ -12,6 +12,7 @@ var _focus: MetaFocus = null
 var _hit_areas: Array = []      ## [{rect: Rect2, shop_id: String}]
 var _task_list: VBoxContainer
 var _margin: MarginContainer
+var _hand: TutorialHand = null
 
 ## Прямоугольник, к которому нормализованы координаты зданий. С реальным артом
 ## это область самой картинки, без него — условная MAP_RECT.
@@ -34,9 +35,54 @@ func _build() -> void:
 
 	_build_ui()
 	_rebuild_tasks()
+	_refresh_hint()
 
 	EventBus.task_state_changed.connect(func(_t, _s): call_deferred("_rebuild_tasks"))
 	_show_pending_narrative()
+
+
+## --- «тебе сюда» ------------------------------------------------------------
+
+## Задача-указатель — это задача без уровней, привязанная к открытой локации:
+## играть в ней нечего, от игрока нужен ровно один тап по зданию. Рука
+## показывает именно его — тем же способом, что и в диалогах.
+##
+## Карта при этом не знает ни одного здания по имени: куда показывать, решает
+## контент через shop_id задачи.
+func _refresh_hint() -> void:
+	_stop_hint()
+	var shop_id := _hint_shop_id()
+	if shop_id.is_empty():
+		return
+	for area in _hit_areas:
+		if String(area["shop_id"]) != shop_id:
+			continue
+		_hand = TutorialHand.new()
+		## В мир, а не в UI-слой: подсказка обязана стоять на здании, а здания
+		## живут в мировых координатах.
+		$Visuals.add_child(_hand)
+		_hand.play_tap((area["rect"] as Rect2).get_center())
+		return
+
+
+func _hint_shop_id() -> String:
+	for task in Game.meta.tasks_at("map"):
+		if not task.level_ids.is_empty() or task.shop_id.is_empty():
+			continue
+		if not Game.meta.is_shop_open(task.shop_id):
+			continue
+		match Game.meta.task_state(task.id):
+			MetaService.TaskState.AVAILABLE, MetaService.TaskState.IN_PROGRESS:
+				return task.shop_id
+	return ""
+
+
+## Любой тап означает «я понял» — дальше подсказка только мешает.
+func _stop_hint() -> void:
+	if _hand == null:
+		return
+	_hand.stop()
+	_hand = null
 
 
 ## Реальный арт кладётся «по обрезке»: картинка накрывает экран целиком, лишнее
@@ -136,6 +182,7 @@ func _draw_over_art(rect: Rect2, corners: PackedVector2Array, clickable: bool, o
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventScreenTouch and event.pressed):
 		return
+	_stop_hint()
 	var world: Vector2 = get_canvas_transform().affine_inverse() * event.position
 	for area in _hit_areas:
 		if (area["rect"] as Rect2).has_point(world):
@@ -206,20 +253,32 @@ func _rebuild_tasks() -> void:
 	for c in _task_list.get_children():
 		c.queue_free()
 
+	## Панель показывает то, чем игрок может заняться прямо сейчас. Выполненные
+	## задачи из неё уходят: «✓ выполнено» вечным списком — это не прогресс,
+	## а мусор поверх карты, и на нём теряется единственная строка, которая
+	## сейчас важна. Вход в открытые локации тоже не дублируется кнопкой:
+	## по зданию можно тапнуть, и рука показывает, по какому.
 	for task in Game.meta.tasks_at("map"):
+		var state: int = Game.meta.task_state(task.id)
+		if state == MetaService.TaskState.COMPLETED:
+			continue
+
 		var panel := UIKit.panel()
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", 8)
 		panel.add_child(box)
 		box.add_child(UIKit.label(task.title, 30, UIKit.ACCENT))
-		var state: int = Game.meta.task_state(task.id)
+
 		match state:
 			MetaService.TaskState.AVAILABLE, MetaService.TaskState.IN_PROGRESS:
 				if not task.hint.is_empty():
 					box.add_child(UIKit.label(task.hint, 24))
-				var play := UIKit.button("Играть", 32)
-				play.pressed.connect(func(): Game.play_task(task.id))
-				box.add_child(play)
+				## Задача без уровней — указатель: играть в ней нечего, идти
+				## надо в локацию, и кнопка «Играть» тут врала бы.
+				if not task.level_ids.is_empty():
+					var play := UIKit.button("Играть", 32)
+					play.pressed.connect(func(): Game.play_task(task.id))
+					box.add_child(play)
 			MetaService.TaskState.READY_TO_APPLY:
 				var action: MetaActionDefinition = Game.meta.action_for_task(task.id)
 				var apply := UIKit.button(action.button_label if action != null else "Применить", 32)
@@ -228,16 +287,7 @@ func _rebuild_tasks() -> void:
 						SaveService.save_game()
 						_refresh_all())
 				box.add_child(apply)
-			MetaService.TaskState.COMPLETED:
-				box.add_child(UIKit.label("✓ выполнено", 26, Color(0.55, 0.9, 0.6)))
 		_task_list.add_child(panel)
-
-	# Быстрый вход в открытые магазины — тап по зданию тоже работает.
-	for shop in ContentDB.shops.values():
-		if Game.meta.is_shop_open(shop.id):
-			var enter := UIKit.button("Войти: " + shop.display_name, 30)
-			enter.pressed.connect(func(): Game.enter_shop(shop.id))
-			_task_list.add_child(enter)
 
 
 func _refresh_all() -> void:
@@ -247,6 +297,7 @@ func _refresh_all() -> void:
 	for entry in ContentDB.map_data.get("buildings", []):
 		_add_building(entry)
 	_rebuild_tasks()
+	_refresh_hint()
 	_show_pending_narrative()
 
 

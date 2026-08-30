@@ -3,7 +3,9 @@ extends Node2D
 ## Сцена не знает слова «пекарня».
 
 const VISUAL_RECT := Rect2(30, 210, 1020, 940)
+const CELL := Vector2(120, 108)   ## ячейка полоски «что здесь надо собрать»
 const SCREEN := Vector2(1080, 1920)
+const LETTERBOX := Color(0.06, 0.05, 0.05, 1.0)
 
 @onready var _bg: Sprite2D = $Visuals/Background
 @onready var _slots_root: Node2D = $Visuals/Slots
@@ -27,6 +29,10 @@ var _timers: Dictionary = {}         ## task_id -> Label
 var _rows: Dictionary = {}           ## task_id -> Control
 var _refresh_acc: float = 0.0
 var _rebuilding: bool = false
+var _hint_button: Button = null
+var _collection_panel: PanelContainer = null
+var _collection_row: HBoxContainer = null
+var _hand: TutorialHand = null
 
 
 func setup(payload: Dictionary) -> void:
@@ -60,9 +66,12 @@ func _build() -> void:
 	EventBus.task_state_changed.connect(func(_t, _s): _queue_rebuild())
 	EventBus.cooldown_finished.connect(func(_a): _queue_rebuild())
 	EventBus.currency_changed.connect(func(_i, _v): _update_wallet())
-	EventBus.inventory_changed.connect(func(_i, _v): call_deferred("_apply_margins"))
+	EventBus.inventory_changed.connect(func(_i, _v):
+		call_deferred("_apply_margins")
+		call_deferred("_refresh_collection"))
 
 	_show_pending_narrative()
+	_maybe_start_search_hint()
 
 
 ## Арт кладётся «по обрезке»: картинка накрывает экран целиком, лишнее уходит за
@@ -71,11 +80,29 @@ func _build() -> void:
 func _setup_background() -> void:
 	var tex := Backdrop.load_texture(shop.background_path)
 	_has_art = tex != null
-	if _has_art:
-		_visual_rect = Backdrop.cover(_bg, tex, SCREEN)
-	else:
+	if not _has_art:
 		Backdrop.gradient(_bg, shop.palette, SCREEN)
 		_visual_rect = VISUAL_RECT
+		return
+
+	## Локация вписывается целиком, а не кроется по экрану. Комната здесь —
+	## игровое поле: обрезка по бокам уносит за край её объекты вместе с
+	## хитбоксами, и игрок ищет дверь, которой на экране нет.
+	_fill_letterbox()
+	_visual_rect = Backdrop.fit(_bg, tex, SCREEN)
+
+
+## Полосы над и под вписанным артом. Пустота движка за краем комнаты читается
+## как обрыв; тёмная подложка — как рамка вокруг сцены.
+func _fill_letterbox() -> void:
+	var pad := ColorRect.new()
+	pad.color = LETTERBOX
+	pad.position = Vector2.ZERO
+	pad.size = SCREEN
+	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pad.z_index = -1
+	_bg.get_parent().add_child(pad)
+	_bg.get_parent().move_child(pad, 0)
 
 
 ## --- визуальные состояния ---------------------------------------------------
@@ -97,6 +124,8 @@ func _on_visual_changed(changed_shop: String, slot_id: String, state_id: String)
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventScreenTouch and event.pressed):
 		return
+	## Любое касание означает «я понял»: рука уходит, даже если игрок промахнулся.
+	_stop_search_hint()
 	var world: Vector2 = get_canvas_transform().affine_inverse() * event.position
 
 	# С конца: слоты объявлены снизу вверх по слоям, верхний должен побеждать.
@@ -114,10 +143,15 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _interact(slot_id: String) -> void:
+	var def: ShopSlotDefinition = _slot_defs.get(slot_id)
 	var result := Game.meta.interact(shop_id, slot_id, Game.selected_item)
 	if bool(result.get("ok", false)):
 		if not String(result.get("consumed", "")).is_empty():
 			Game.clear_selection()
+		## Первый найденный предмет и есть доказательство, что жест понят —
+		## отдельного «нажми ОК» для обучения не нужно.
+		if def != null and def.is_searchable():
+			Game.meta.set_flag(Game.SEARCH_FLAG, true)
 		SaveService.save_game()
 
 	if bool(result.get("narrative", false)):
@@ -129,13 +163,154 @@ func _interact(slot_id: String) -> void:
 	_rebuild_tasks()
 
 
-## Подсвечены те объекты, с которыми прямо сейчас есть что сделать.
+## Подсвечены те объекты, с которыми прямо сейчас есть что сделать, — и те, кому
+## подсветка назначена контентом. Второе нужно объектам, которые кликабельны, но
+## прогресс пока не двигают: без рамки они неотличимы от нарисованного фона.
 func _refresh_highlights() -> void:
 	for slot_id in _slot_defs:
 		var def: ShopSlotDefinition = _slot_defs[slot_id]
 		var slot: StateSlot = _slots[slot_id]
 		var state := Game.meta.current_slot_state(shop_id, String(slot_id))
-		slot.set_highlight(def.has_progress_in(state, Game.meta.flags))
+		slot.set_highlight(def.highlight_on(state, Game.meta.flags))
+
+
+## --- поиск: ячейки, лампочка, обучающий тап ---------------------------------
+
+## Полоска ячеек «что здесь надо собрать». Пусто — иконка тёмным силуэтом,
+## предмет в сумке — иконка целиком. Список требований в задаче говорит то же
+## самое текстом, но пересчитывать «Паутина 0/1, Лужа 0/1» глазами игрок не
+## должен: сколько ещё искать, видно по ячейкам.
+func _build_collection(parent: VBoxContainer) -> void:
+	if shop.collection.is_empty():
+		return
+	_collection_panel = UIKit.panel()
+	parent.add_child(_collection_panel)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	_collection_panel.add_child(box)
+	box.add_child(UIKit.label(String(shop.collection.get("title", "Собрать")), 24,
+		Color(0.82, 0.80, 0.76)))
+
+	_collection_row = HBoxContainer.new()
+	_collection_row.add_theme_constant_override("separation", 10)
+	box.add_child(_collection_row)
+	_refresh_collection()
+
+
+func _refresh_collection() -> void:
+	if _collection_panel == null or not _collection_panel.is_inside_tree():
+		return
+	## Полоска исчезает, когда работа закрыта: пустые ячейки в убранной кладовой
+	## читались бы как «ты что-то пропустил».
+	var done_flag := String(shop.collection.get("done_flag", ""))
+	_collection_panel.visible = done_flag.is_empty() \
+		or not bool(Game.meta.flags.get(done_flag, false))
+	if not _collection_panel.visible:
+		return
+	for c in _collection_row.get_children():
+		_collection_row.remove_child(c)
+		c.queue_free()
+	for raw in shop.collection.get("items", []):
+		_collection_row.add_child(_collection_cell(String(raw)))
+
+
+func _collection_cell(item_id: String) -> Control:
+	var have := PlayerState.amount_of(item_id) > 0
+	var cell := PanelContainer.new()
+	cell.custom_minimum_size = CELL
+	cell.tooltip_text = ContentDB.item_name(item_id)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.10, 0.10, 0.13, 0.85)
+	sb.border_color = UIKit.ACCENT if have else Color(0.45, 0.43, 0.40, 0.9)
+	sb.set_border_width_all(3)
+	sb.set_corner_radius_all(14)
+	sb.set_content_margin_all(8)
+	cell.add_theme_stylebox_override("panel", sb)
+
+	var icon := TextureRect.new()
+	icon.texture = PlaceholderArt.item_icon(ContentDB.item(item_id), 84)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	## Не найденный предмет показан силуэтом: форму видно, деталей нет —
+	## подсказка «что искать», а не ответ «вот оно».
+	icon.modulate = Color(1, 1, 1, 1) if have else Color(0, 0, 0, 0.6)
+	cell.add_child(icon)
+	return cell
+
+
+## Лампочка появляется только там, где есть что искать. В обычной локации все
+## объекты и так обведены рамкой, и подсказывать нечего.
+##
+## Висит у правого борта по центру высоты, а не в общей колонке: сверху
+## заголовок, снизу панели задач и инвентарь — правый край единственное место,
+## где кнопка не накрывает сцену поиска.
+func _build_hint_button(parent: Control) -> void:
+	if not _has_searchables():
+		return
+	_hint_button = UIKit.button("💡", 44)
+	_hint_button.custom_minimum_size = Vector2(120, 120)
+	_hint_button.tooltip_text = "Показать, где лежит"
+	parent.add_child(_hint_button)
+	_hint_button.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	_hint_button.offset_left = -140
+	_hint_button.offset_right = -20
+	_hint_button.offset_top = -60
+	_hint_button.offset_bottom = 60
+	_hint_button.pressed.connect(_on_hint)
+
+
+
+func _has_searchables() -> bool:
+	for slot_id in _slot_defs:
+		if (_slot_defs[slot_id] as ShopSlotDefinition).is_searchable():
+			return true
+	return false
+
+
+## Первый ещё не убранный объект из тех, что игрок должен найти сам.
+func _next_searchable() -> String:
+	for slot_id in _slot_defs:
+		var def: ShopSlotDefinition = _slot_defs[slot_id]
+		if not def.is_searchable():
+			continue
+		if def.has_progress_in(Game.meta.current_slot_state(shop_id, String(slot_id)),
+				Game.meta.flags):
+			return String(slot_id)
+	return ""
+
+
+## Подсказка бесплатная и без счётчика. Локация-уборка — про внимательность, а
+## не про ресурс: платная лампочка здесь была бы ловушкой, а не помощью.
+func _on_hint() -> void:
+	var target := _next_searchable()
+	if target.is_empty():
+		EventBus.toast.emit("Здесь всё убрано")
+		return
+	_stop_search_hint()
+	(_slots[target] as StateSlot).flash_hint()
+
+
+## Первый раз в сцене поиска игроку показывают жест рукой. До этого его учили
+## только тащить части пазла — и без этого хода он тащит и здесь, хотя предметы
+## находятся нажатием.
+func _maybe_start_search_hint() -> void:
+	if bool(Game.meta.flags.get(Game.SEARCH_FLAG, false)):
+		return
+	var target := _next_searchable()
+	if target.is_empty():
+		return
+	_hand = TutorialHand.new()
+	$Visuals.add_child(_hand)
+	_hand.play_tap((_slots[target] as StateSlot).world_rect.get_center())
+
+
+func _stop_search_hint() -> void:
+	if _hand == null:
+		return
+	_hand.stop()
+	_hand = null
 
 
 ## --- UI ---------------------------------------------------------------------
@@ -160,9 +335,15 @@ func _build_ui() -> void:
 	var header := HBoxContainer.new()
 	col.add_child(header)
 
-	var back := UIKit.button("‹ Район", 30)
+	## Куда ведёт «назад» — из данных: кладовая лежит внутри пекарни, и с неё
+	## правильный выход в пекарню, а не сразу на площадь.
+	var back_shop := String(shop.back.get("shop_id", ""))
+	var back := UIKit.button(String(shop.back.get("label", "‹ Район")), 30)
 	back.custom_minimum_size = Vector2(210, 96)
-	back.pressed.connect(func(): Game.open_map())
+	if back_shop.is_empty():
+		back.pressed.connect(func(): Game.open_map())
+	else:
+		back.pressed.connect(func(): Game.open_shop(back_shop))
 	header.add_child(back)
 
 	var title := UIKit.label(shop.display_name, 36)
@@ -175,6 +356,12 @@ func _build_ui() -> void:
 	_wallet.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(_wallet)
 	_update_wallet()
+
+	## Полоска «что собрать» стоит СРАЗУ под заголовком, а не над списком задач:
+	## внизу и так две панели, и третья накрыла бы ту самую сцену, в которой
+	## игрок ищет предметы.
+	_build_collection(col)
+	_build_hint_button(root)
 
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -222,7 +409,12 @@ func _rebuild_tasks() -> void:
 	_timers.clear()
 	_rows.clear()
 
+	## Панель показывает только то, чем можно заняться. «✓ выполнено» вечным
+	## списком — не прогресс, а мусор поверх локации, и на нём теряется строка,
+	## которая сейчас важна.
 	for task in Game.meta.tasks_at("shop", shop_id):
+		if Game.meta.task_state(task.id) == MetaService.TaskState.COMPLETED:
+			continue
 		_task_list.add_child(_task_row(task))
 
 	var enter_row := _enter_row()
@@ -256,7 +448,15 @@ func _enter_row() -> Control:
 
 	var button := UIKit.button(label, 32)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.pressed.connect(func(): EventBus.toast.emit(String(shop.enter.get("text", ""))))
+	## Куда именно ведёт вход, решает контент: есть open_shop — переходим в ту
+	## локацию, нет — показываем текст-заглушку. Сцена по-прежнему не знает,
+	## что за дверью.
+	var target_shop := String(shop.enter.get("open_shop", ""))
+	var enter_text := String(shop.enter.get("text", ""))
+	if target_shop.is_empty():
+		button.pressed.connect(func(): EventBus.toast.emit(enter_text))
+	else:
+		button.pressed.connect(func(): Game.open_shop(target_shop))
 	col.add_child(button)
 	return panel
 

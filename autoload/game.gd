@@ -20,6 +20,10 @@ const BOOSTER_ID := "booster_hint"
 ## Ставится только В КОНЦЕ всей завязки: выход посреди диалога с мэром не должен
 ## оставлять игрока без объяснения, зачем он тут.
 const INTRO_FLAG := "intro_seen"
+## «Игрок уже находил предметы нажатием». Пока флага нет, обучающая рука
+## показывает тап — и в фазе поиска уровня, и в локации-уборке: жест один и тот
+## же, а единственное, чему игрока научили до этого, — тащить части пазла.
+const SEARCH_FLAG := "search_taught"
 const INTRO_ID := "opening"
 
 signal screen_changed(screen: int)
@@ -278,6 +282,7 @@ func play_level(level_id: String, replay: bool = false) -> void:
 	ctx.booster_id = BOOSTER_ID
 	ctx.boosters_available = PlayerState.amount_of(BOOSTER_ID)
 	ctx.show_drag_hint = is_first_time_player()
+	ctx.show_tap_hint = not bool(meta.flags.get(SEARCH_FLAG, false))
 	goto(Screen.LEVEL, {"context": ctx})
 
 
@@ -298,12 +303,25 @@ func items_for_level(def: LevelDefinition) -> Dictionary:
 		var item: ItemDefinition = ContentDB.item(String(id))
 		if item != null:
 			out[String(id)] = item
+	## Предметы уборки не ищут и не выдают — их показывают и тут же тащат.
+	## В инвентарь игрока они не попадают, но уровню нужны их иконки и названия.
+	for step in def.cleanup:
+		var item: ItemDefinition = ContentDB.item(step.item_id)
+		if item != null:
+			out[step.item_id] = item
 	return out
 
 
 ## --- возврат из уровня ------------------------------------------------------
 
 func _on_level_finished(result: LevelResult) -> void:
+	## Найденный тапом предмет — доказательство, что жест понят. Обучающую руку
+	## в сценах поиска больше не показываем.
+	if result != null:
+		var found := int(result.stats.get("quest_found", 0)) \
+			+ int(result.stats.get("normal_found", 0))
+		if found > 0:
+			meta.set_flag(SEARCH_FLAG, true)
 	var focus := meta.apply_level_result(result)
 	SaveService.save_game()
 	if focus.location == "map":

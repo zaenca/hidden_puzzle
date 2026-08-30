@@ -1,0 +1,147 @@
+{
+  "_note": "Кладовая — вложенная локация пекарни. На карте её нет: попасть сюда можно только из торгового зала через открытую дверь. rect слотов нормализованы к bakery_storeroom.png (1122x1402); локация вписывается в экран целиком (Backdrop.fit), поэтому видна вся комната и мусор можно раскладывать по полу.",
+  "id": "bakery_storeroom",
+  "display_name": "Кладовая пекарни",
+  "palette": "bakery",
+  "background": "res://art/bakery_storeroom.png",
+  "map_rect": [0.0, 0.0, 0.0, 0.0],
+  "back": { "label": "‹ В пекарню", "shop_id": "bakery" },
+  "rooms": [
+    { "id": "storeroom", "title": "Кладовая" }
+  ],
+  "collection": {
+    "title": "Мусор в кладовой",
+    "done_flag": "storeroom_clean",
+    "items": ["spiderweb", "flour_spill", "bootprints", "scrap_paper", "puddle"]
+  },
+  "slots": [
+    {
+      "_note": "Шкаф из второго пазла. Стоит у правой стены; rect подобран под формат shelf.png (1086x1448), поэтому картинка ложится в него без полей.",
+      "id": "shelf",
+      "rect": [0.46, 0.3231, 0.40, 0.4269],
+      "default": "assembled",
+      "states": [
+        {
+          "id": "assembled",
+          "label": "шкаф",
+          "color": "#7a5c3c",
+          "shape": "rect",
+          "texture": "res://art/shelf.png"
+        }
+      ],
+      "interactions": [
+        {
+          "state": "assembled",
+          "once_flag": "shelf_checked",
+          "narrative": "toast",
+          "text": "Шкаф собран и стоит у правой стены. Полки пустые — сперва бы прибраться вокруг."
+        },
+        {
+          "state": "assembled",
+          "text": "Шкаф на месте. Полки ждут товар."
+        }
+      ]
+    },
+    {
+      "_note": "Мусор разложен по комнате: паутина под потолком, мука на верстаке, остальное на полу. highlight=never: рамка выдала бы его сразу, а его надо найти глазами — на это и работает лампочка-подсказка.",
+      "id": "spiderweb",
+      "rect": [0.72, 0.08, 0.16, 0.12],
+      "default": "present",
+      "highlight": "never",
+      "states": [
+        { "id": "present", "label": "паутина", "color": "#d8d8e0", "shape": "triangle", "texture": "res://art/garbage/spiderweb.png" },
+        { "id": "taken",   "label": "", "hidden": true }
+      ],
+      "interactions": [
+        {
+          "state": "present",
+          "grant_item": "spiderweb",
+          "set_state": "taken",
+          "narrative": "toast",
+          "text": "Паутина из-под балок снята."
+        },
+        { "state": "taken", "text": "Здесь уже чисто." }
+      ]
+    },
+    {
+      "id": "flour_spill",
+      "rect": [0.02, 0.48, 0.18, 0.095],
+      "default": "present",
+      "highlight": "never",
+      "states": [
+        { "id": "present", "label": "мука", "color": "#f0e6d2", "shape": "triangle", "texture": "res://art/garbage/flour_spill.png" },
+        { "id": "taken",   "label": "", "hidden": true }
+      ],
+      "interactions": [
+        {
+          "state": "present",
+          "grant_item": "flour_spill",
+          "set_state": "taken",
+          "narrative": "toast",
+          "text": "Рассыпанная мука с верстака собрана."
+        },
+        { "state": "taken", "text": "Здесь чисто." }
+      ]
+    },
+    {
+      "id": "bootprints",
+      "rect": [0.26, 0.68, 0.21, 0.105],
+      "default": "present",
+      "highlight": "never",
+      "states": [
+        { "id": "present", "label": "следы", "color": "#6b5a44", "shape": "rect", "texture": "res://art/garbage/bootprints.png" },
+        { "id": "taken",   "label": "", "hidden": true }
+      ],
+      "interactions": [
+        {
+          "state": "present",
+          "grant_item": "bootprints",
+          "set_state": "taken",
+          "narrative": "toast",
+          "text": "Грязные следы с пола затёрты."
+        },
+        { "state": "taken", "text": "Здесь чисто." }
+      ]
+    },
+    {
+      "id": "scrap_paper",
+      "rect": [0.02, 0.70, 0.22, 0.115],
+      "default": "present",
+      "highlight": "never",
+      "states": [
+        { "id": "present", "label": "бумага", "color": "#e6ddc8", "shape": "rect", "texture": "res://art/garbage/scrap_paper.png" },
+        { "id": "taken",   "label": "", "hidden": true }
+      ],
+      "interactions": [
+        {
+          "state": "present",
+          "grant_item": "scrap_paper",
+          "set_state": "taken",
+          "narrative": "toast",
+          "text": "Обрывки бумаги собраны."
+        },
+        { "state": "taken", "text": "Здесь чисто." }
+      ]
+    },
+    {
+      "id": "puddle",
+      "rect": [0.56, 0.70, 0.24, 0.115],
+      "default": "present",
+      "highlight": "never",
+      "states": [
+        { "id": "present", "label": "лужа", "color": "#7fb3d5", "shape": "circle", "texture": "res://art/garbage/puddle.png" },
+        { "id": "taken",   "label": "", "hidden": true }
+      ],
+      "interactions": [
+        {
+          "state": "present",
+          "grant_item": "puddle",
+          "set_state": "taken",
+          "narrative": "toast",
+          "text": "Лужа вытерта."
+        },
+        { "state": "taken", "text": "Пол здесь сухой." }
+      ]
+    }
+  ]
+}

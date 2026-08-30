@@ -2,11 +2,18 @@ class_name SceneView
 extends Node2D
 ## Общий визуал ОБЕИХ фаз уровня. Не пересоздаётся между фазами — именно
 ## поэтому переход puzzle → hidden object не является сменой сцены.
+##
+## Слоёв два: Background — пустая комната, её игрок собирает как пазл; Objects —
+## тот же кадр с предметами поиска, он проявляется на reveal. Разделены
+## намеренно: пока предметы запечены в ту же картинку, их видно по частям
+## в лотке ещё до того, как пазл собран.
 
 var background: Sprite2D
+var objects: Sprite2D
 var markers: Node2D
 var rect: Rect2 = Rect2()
 var texture: Texture2D
+var objects_texture: Texture2D
 
 
 func _ensure_nodes() -> void:
@@ -15,6 +22,13 @@ func _ensure_nodes() -> void:
 		background.name = "Background"
 		background.centered = false
 		add_child(background)
+	if objects == null:
+		objects = Sprite2D.new()
+		objects.name = "Objects"
+		objects.centered = false
+		objects.modulate.a = 0.0
+		objects.visible = false
+		add_child(objects)
 	if markers == null:
 		markers = Node2D.new()
 		markers.name = "Markers"
@@ -29,13 +43,82 @@ func _ensure_nodes() -> void:
 func setup(art: SceneArt, targets: Array[HOTarget], items: Dictionary, area: Rect2) -> void:
 	_ensure_nodes()
 	texture = PlaceholderArt.build_scene_texture(art, targets, items)
-	background.texture = texture
+	objects_texture = Backdrop.load_texture(art.objects_background_path)
+
 	var tex_size := Vector2(texture.get_size())
 	var s: float = minf(area.size.x / tex_size.x, area.size.y / tex_size.y)
 	var fitted := tex_size * s
 	rect = Rect2(area.position + (area.size - fitted) * 0.5, fitted)
-	background.position = rect.position
-	background.scale = Vector2(s, s)
+
+	_place(background, texture)
+	_place(objects, objects_texture)
+
+
+## Оба слоя ложатся в один и тот же rect: они снимки одной комнаты, и любое
+## расхождение между ними читалось бы как рывок на переходе.
+func _place(sprite: Sprite2D, tex: Texture2D) -> void:
+	sprite.texture = tex
+	if tex == null:
+		sprite.visible = false
+		return
+	var tex_size := Vector2(tex.get_size())
+	sprite.position = rect.position
+	sprite.scale = Vector2(rect.size.x / tex_size.x, rect.size.y / tex_size.y)
+
+
+func has_objects_layer() -> bool:
+	return objects_texture != null
+
+
+## Сменить кадр комнаты на следующее состояние. Новый кадр проявляется поверх
+## старого и только потом становится фоном: подмена «в лоб» читается как
+## моргание, а не как результат действия игрока.
+##
+## rect не пересчитывается: состояния одной комнаты — это один и тот же кадр,
+## и любое смещение между ними выглядело бы прыжком камеры.
+func swap_background(path: String, duration: float) -> void:
+	var tex := Backdrop.load_texture(path)
+	if tex == null:
+		return
+	var layer := Sprite2D.new()
+	layer.centered = false
+	layer.texture = tex
+	layer.position = rect.position
+	var tex_size := Vector2(tex.get_size())
+	layer.scale = Vector2(rect.size.x / tex_size.x, rect.size.y / tex_size.y)
+	layer.modulate.a = 0.0
+	add_child(layer)
+	move_child(layer, objects.get_index() + 1)
+
+	var tw := create_tween()
+	tw.tween_property(layer, "modulate:a", 1.0, duration)
+	tw.tween_callback(func():
+		texture = tex
+		_place(background, tex)
+		background.modulate = Color.WHITE
+		objects.visible = false
+		layer.queue_free())
+
+
+## Проявление предметов — вторая половина бесшовного раскрытия: комната собрана,
+## и в ней «обнаруживается» то, что предстоит найти.
+func reveal_objects(duration: float) -> void:
+	if objects_texture == null:
+		return
+	objects.visible = true
+	var tw := create_tween()
+	tw.tween_property(objects, "modulate:a", 1.0, duration)
+
+
+## Во сколько раз пиксели текстуры плотнее экранных. Пазл режет изображение в
+## координатах rect, а сэмплирует в пиксельных — без этого множителя части
+## сходятся со сдвигом ровно там, где картинка не 1:1 к своей области, и
+## собранный пазл остаётся разлинованным швами.
+func uv_scale() -> Vector2:
+	if texture == null or rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return Vector2.ONE
+	var tex_size := Vector2(texture.get_size())
+	return Vector2(tex_size.x / rect.size.x, tex_size.y / rect.size.y)
 
 
 func norm_to_world(p: Vector2) -> Vector2:
@@ -55,10 +138,16 @@ func norm_polygon_to_world(poly: PackedVector2Array) -> PackedVector2Array:
 
 ## Во время puzzle-фазы фон приглушён: игрок собирает изображение, а не видит
 ## готовый ответ. При reveal возвращается в норму — это часть перехода.
+##
+## Глубина зависит от того, есть ли отдельный слой предметов: если есть, в фоне
+## прятать уже нечего, и гасить его сильно значит только мешать собирать —
+## особенно на тёмном интерьере.
 func set_dim(amount: float) -> void:
-	if background != null:
-		var c := lerpf(1.0, 0.28, clampf(amount, 0.0, 1.0))
-		background.modulate = Color(c, c, c * 1.05, 1.0)
+	if background == null:
+		return
+	var floor_value := 0.6 if has_objects_layer() else 0.28
+	var c := lerpf(1.0, floor_value, clampf(amount, 0.0, 1.0))
+	background.modulate = Color(c, c, c * 1.05, 1.0)
 
 
 func clear_markers() -> void:

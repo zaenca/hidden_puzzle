@@ -3,6 +3,8 @@ extends Control
 ## HUD гибридного уровня. Одна панель на обе фазы: меняется только содержимое
 ## нижней полосы (лоток пазла живёт в мире, список предметов — здесь).
 
+const HINT_ICON := "res://art/ui_hand.png"
+
 signal abandon_pressed
 signal booster_pressed
 signal narrative_finished
@@ -78,8 +80,12 @@ func _build() -> void:
 	root.add_child(_toast)
 
 	# --- нижняя полоса: список искомых предметов + бустер ---
-	_item_panel = UIKit.panel()
+	## Полоса предметов стоит на нарисованной плашке — той же, что у уведомлений.
+	_item_panel = UIKit.plate("res://art/ui/taskbar_notification.png")
 	_item_panel.visible = false
+	## Панель — подложка, а не кнопка: касание по ней должно доходить до уровня,
+	## иначе перетащить предмет из полосы невозможно в принципе.
+	_item_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_item_panel)
 
 	var bottom := HBoxContainer.new()
@@ -90,14 +96,19 @@ func _build() -> void:
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.custom_minimum_size = Vector2(0, 150)
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bottom.add_child(scroll)
 
 	_item_bar = HBoxContainer.new()
 	_item_bar.add_theme_constant_override("separation", 10)
 	scroll.add_child(_item_bar)
 
-	_booster = UIKit.button("💡", 40)
-	_booster.custom_minimum_size = Vector2(110, 110)
+	## Подсказка в этой игре — курсор, который показывает, что делать. Кнопка
+	## носит его же, а не лампочку: иначе иконка обещает одно, а даёт другое.
+	_booster = UIKit.button("", 32)
+	_booster.icon = Backdrop.load_texture(HINT_ICON)
+	_booster.expand_icon = true
+	_booster.custom_minimum_size = Vector2(120, 120)
 	_booster.pressed.connect(func(): booster_pressed.emit())
 	bottom.add_child(_booster)
 
@@ -182,7 +193,7 @@ func show_progress(on: bool) -> void:
 
 
 func set_booster_count(n: int) -> void:
-	_booster.text = "💡 %d" % n
+	_booster.text = "%d" % n
 	_booster.disabled = n <= 0
 
 
@@ -195,6 +206,38 @@ func show_items(targets: Array[HOTarget], items: Dictionary) -> void:
 		_item_bar.add_child(chip)
 		_chips[t.id] = chip
 	_item_panel.visible = true
+
+
+## Полоса предметов по item_id — для фазы уборки, где предмет не «цель поиска»,
+## а то, что игрок тащит. Ключ здесь item_id: целей в этой фазе нет.
+func show_item_row(item_ids: PackedStringArray, items: Dictionary) -> void:
+	for c in _item_bar.get_children():
+		c.queue_free()
+	_chips.clear()
+	for id in item_ids:
+		var chip := UIKit.item_chip(items.get(String(id)), String(id))
+		_item_bar.add_child(chip)
+		_chips[String(id)] = chip
+	_item_panel.visible = true
+
+
+## Экранный прямоугольник чипа — по нему фаза уборки понимает, что потянули.
+func chip_rect(key: String) -> Rect2:
+	var chip: Control = _chips.get(key)
+	return chip.get_global_rect() if chip != null else Rect2()
+
+
+## Предмет использован: чип сжимается и уходит.
+func take_chip(key: String) -> void:
+	var chip: Control = _chips.get(key)
+	if chip == null:
+		return
+	_chips.erase(key)
+	chip.pivot_offset = chip.size * 0.5
+	var tw := chip.create_tween().set_parallel(true)
+	tw.tween_property(chip, "modulate:a", 0.0, 0.22)
+	tw.tween_property(chip, "scale", Vector2(0.55, 0.55), 0.22)
+	tw.chain().tween_callback(chip.queue_free)
 
 
 func hide_items() -> void:

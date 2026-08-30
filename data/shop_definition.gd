@@ -15,12 +15,20 @@ extends Resource
 @export var visual_scene: PackedScene = null   ## финальный арт; пока null
 @export var rooms: Array = []                  ## [{id, title}]
 @export var slots: Array[ShopSlotDefinition] = []
-## Вход внутрь: {label, requires_flag, locked_text, text}. Пока это заглушка
-## под комнату — сцена торгового зала появится отдельным этапом.
+## Вход внутрь: {label, requires_flag, locked_text, text, open_shop}. С
+## open_shop кнопка ведёт в другую локацию, без него — просто показывает text.
 @export var enter: Dictionary = {}
+## Куда ведёт кнопка «назад»: {label, shop_id}. Пусто — на карту района.
+## Нужно вложенным локациям (кладовая внутри пекарни): выкидывать из них сразу
+## на площадь значит заставлять игрока заходить в пекарню заново.
+@export var back: Dictionary = {}
 ## Чем обставлен первый приход игрока: {intro, flag}. Пока флаг не поднят, вход
 ## ведёт в заставку, а не сразу в локацию. Карта об этом не знает.
 @export var first_visit: Dictionary = {}
+## Полоска ячеек «что здесь надо собрать»: {title, items, done_flag}. Игрок
+## должен видеть, сколько ещё искать, — список требований в задаче это говорит
+## текстом, а ячейки показывают. Пусто — полоски нет.
+@export var collection: Dictionary = {}
 
 func slot(slot_id: String) -> ShopSlotDefinition:
 	for s in slots:

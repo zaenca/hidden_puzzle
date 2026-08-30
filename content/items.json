@@ -7,7 +7,6 @@
   { "id": "bench",           "name": "Скамейка",          "color": "#c07a3e", "shape": "rect" },
   { "id": "postbox",         "name": "Почтовый ящик",     "color": "#d1495b", "shape": "rect" },
   { "id": "bakery_building", "name": "Пекарня",           "color": "#e8a33d", "shape": "triangle" },
-  { "id": "district_plan",   "name": "План района",       "kind": "quest", "color": "#7ee081", "shape": "rect" },
   { "id": "bakery_key",      "name": "Ключ от пекарни",   "kind": "quest", "color": "#e8c25a", "shape": "cross" },
 
   { "id": "trash_pile",  "name": "Куча мусора", "color": "#7a6a4f", "shape": "circle" },
@@ -16,8 +15,8 @@
   { "id": "newspaper",   "name": "Газета",      "color": "#e6e2d3", "shape": "rect" },
   { "id": "can",         "name": "Банка",       "color": "#b5b5c2", "shape": "circle" },
   { "id": "leaf_pile",   "name": "Листья",      "color": "#8f9e4a", "shape": "triangle" },
-  { "id": "broom",       "name": "Метла",       "kind": "quest", "color": "#d98f3a", "shape": "cross" },
-  { "id": "trash_bag",   "name": "Мешок для мусора", "kind": "quest", "color": "#4a4a55", "shape": "circle" },
+  { "id": "broom",       "name": "Метла",  "kind": "quest", "icon": "res://art/items/broom.png",     "color": "#d98f3a", "shape": "cross" },
+  { "id": "trash_bag",   "name": "Мешок", "kind": "quest", "icon": "res://art/items/trash_bag.png", "color": "#4a4a55", "shape": "circle" },
 
   { "id": "hammer",       "name": "Молоток",     "color": "#9b7653", "shape": "cross" },
   { "id": "nail",         "name": "Гвозди",      "color": "#c9ccd1", "shape": "rect" },
@@ -44,7 +43,13 @@
   { "id": "squeegee",    "name": "Сгонка",      "color": "#4f9bd1", "shape": "cross" },
   { "id": "bucket",      "name": "Ведро",       "color": "#d15f4f", "shape": "rect" },
   { "id": "cloth",       "name": "Тряпка",      "color": "#cfc2a8", "shape": "rect" },
-  { "id": "brush",       "name": "Щётка",       "color": "#b07a3e", "shape": "cross" },
+  { "id": "brush",       "name": "Щётка", "kind": "quest", "icon": "res://art/items/brush.png",     "color": "#4f9bd1", "shape": "cross" },
   { "id": "door_handle", "name": "Дверная ручка", "kind": "quest", "color": "#e0b04f", "shape": "rect" },
-  { "id": "glass_pane",  "name": "Стекло витрины", "kind": "quest", "color": "#a8e0f0", "shape": "rect" }
+  { "id": "glass_pane",  "name": "Стекло витрины", "kind": "quest", "color": "#a8e0f0", "shape": "rect" },
+
+  { "id": "spiderweb",   "name": "Паутина",           "kind": "quest", "icon": "res://art/garbage/spiderweb.png",   "color": "#d8d8e0", "shape": "triangle" },
+  { "id": "flour_spill", "name": "Рассыпанная мука",  "kind": "quest", "icon": "res://art/garbage/flour_spill.png", "color": "#f0e6d2", "shape": "triangle" },
+  { "id": "scrap_paper", "name": "Обрывки бумаги",    "kind": "quest", "icon": "res://art/garbage/scrap_paper.png", "color": "#e6ddc8", "shape": "rect" },
+  { "id": "puddle",      "name": "Лужа",              "kind": "quest", "icon": "res://art/garbage/puddle.png",      "color": "#7fb3d5", "shape": "circle" },
+  { "id": "bootprints",  "name": "Следы обуви",       "kind": "quest", "icon": "res://art/garbage/bootprints.png",  "color": "#6b5a44", "shape": "rect" }
 ]

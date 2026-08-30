@@ -8,6 +8,8 @@ const MIN_TOUCH := 96
 const BG_DARK := Color(0.09, 0.09, 0.12, 0.86)
 const BG_PANEL := Color(0.14, 0.13, 0.16, 0.94)
 const ACCENT := Color(0.98, 0.73, 0.25)
+## Текст поверх нарисованной кремовой плашки.
+const PLATE_TEXT := Color(0.24, 0.16, 0.07)
 
 
 static func label(text: String, size: int = 34, color: Color = Color(0.95, 0.94, 0.92)) -> Label:
@@ -45,6 +47,28 @@ static func panel(color: Color = BG_PANEL) -> PanelContainer:
 	return p
 
 
+## Панель на нарисованной плашке. StyleBoxTexture растягивает её по 9-slice,
+## поэтому одна картинка обслуживает и короткую строку, и полосу предметов —
+## рамка и скругления при этом не плывут.
+static func plate(texture_path: String, margin: int = 36) -> PanelContainer:
+	var p := PanelContainer.new()
+	var tex := Backdrop.load_texture(texture_path)
+	if tex == null:
+		return panel()
+	var sb := StyleBoxTexture.new()
+	sb.texture = tex
+	sb.texture_margin_left = margin
+	sb.texture_margin_right = margin
+	sb.texture_margin_top = margin
+	sb.texture_margin_bottom = margin
+	sb.content_margin_left = 26
+	sb.content_margin_right = 26
+	sb.content_margin_top = 18
+	sb.content_margin_bottom = 18
+	p.add_theme_stylebox_override("panel", sb)
+	return p
+
+
 static func full_screen_dim(alpha: float = 0.72) -> ColorRect:
 	var r := ColorRect.new()
 	r.color = Color(0.04, 0.04, 0.06, alpha)
@@ -55,6 +79,9 @@ static func full_screen_dim(alpha: float = 0.72) -> ColorRect:
 
 static func item_chip(item: ItemDefinition, item_id: String) -> Control:
 	var box := VBoxContainer.new()
+	## Полоса предметов не реагирует на тап сама: и в поиске, и в уборке решение
+	## принимает уровень, а Control со STOP просто съел бы касание.
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.custom_minimum_size = Vector2(120, 0)
 
@@ -65,9 +92,15 @@ static func item_chip(item: ItemDefinition, item_id: String) -> Control:
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	box.add_child(icon)
 
-	var name_label := label(item.display_name if item != null else item_id, 22)
+	## Подпись тёмная и без обводки: полоса стоит на кремовой плашке, а светлый
+	## текст с чёрным контуром рассчитан на арт под ним, не на бумагу.
+	var name_label := Label.new()
+	name_label.text = item.display_name if item != null else item_id
+	name_label.add_theme_font_size_override("font_size", 22)
+	name_label.add_theme_color_override("font_color", PLATE_TEXT)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_label.custom_minimum_size = Vector2(120, 0)
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(name_label)
 	return box

@@ -50,6 +50,12 @@ static func item(d: Dictionary) -> ItemDefinition:
 	it.display_name = String(d.get("name", it.id))
 	it.color = to_color(d.get("color", "#cccccc"))
 	it.shape = String(d.get("shape", "rect"))
+	## Есть иконка — она и рисуется; нет — цвет с формой, как раньше. Смешивать
+	## не нужно: PlaceholderArt сам предпочитает icon, когда тот заполнен.
+	## Путь хранится и отдельно: валидатор должен уметь сказать «файла нет»,
+	## не загружая ресурс.
+	it.icon_path = String(d.get("icon", ""))
+	it.icon = Backdrop.load_texture(it.icon_path)
 	match String(d.get("kind", "normal")):
 		"quest": it.kind = ItemDefinition.Kind.QUEST
 		"themed": it.kind = ItemDefinition.Kind.THEMED
@@ -82,6 +88,7 @@ static func scene_art(d: Dictionary) -> SceneArt:
 	var size = d.get("reference_size", [1080, 1350])
 	a.reference_size = Vector2i(int(size[0]), int(size[1]))
 	a.background_path = String(d.get("background", ""))
+	a.objects_background_path = String(d.get("objects_background", ""))
 	a.palette = String(d.get("palette", "street"))
 	a.seed = int(d.get("seed", 0))
 	a.clutter = int(d.get("clutter", 26))
@@ -129,6 +136,15 @@ static func rewards(d: Dictionary) -> RewardTable:
 	return r
 
 
+static func cleanup_step(d: Dictionary) -> CleanupStep:
+	var s := CleanupStep.new()
+	s.item_id = String(d.get("item_id", ""))
+	s.rect = to_rect(d.get("rect", [0, 0, 1, 1]))
+	s.art_path = String(d.get("art", ""))
+	s.hint = String(d.get("hint", ""))
+	return s
+
+
 static func level(d: Dictionary) -> LevelDefinition:
 	var l := LevelDefinition.new()
 	l.id = String(d.get("id", ""))
@@ -143,6 +159,11 @@ static func level(d: Dictionary) -> LevelDefinition:
 	l.hidden_object = ho_config(d.get("hidden_object", {}))
 	l.rewards = rewards(d.get("rewards", {}))
 	l.quest_grants = PackedStringArray(d.get("quest_grants", []))
+	l.show_result = bool(d.get("show_result", true))
+	var steps: Array[CleanupStep] = []
+	for raw in d.get("cleanup", []):
+		steps.append(cleanup_step(raw))
+	l.cleanup = steps
 	return l
 
 
@@ -219,6 +240,7 @@ static func action(d: Dictionary) -> MetaActionDefinition:
 	for raw in d.get("costs", []):
 		costs.append(cost(raw))
 	a.costs = costs
+	a.auto_apply = bool(d.get("auto_apply", false))
 	a.duration_sec = int(d.get("duration_sec", 0))
 	a.reduce_per_level_sec = int(d.get("reduce_per_level_sec", 0))
 	a.speedup_hard_cost = int(d.get("speedup_hard_cost", 0))
@@ -256,6 +278,7 @@ static func shop_slot_state(d: Dictionary) -> ShopSlotState:
 	s.shape = String(d.get("shape", "rect"))
 	s.hidden = bool(d.get("hidden", false))
 	s.overlay = to_color(d.get("overlay", ""), Color(0, 0, 0, 0))
+	s.texture_path = String(d.get("texture", ""))
 	return s
 
 
@@ -269,6 +292,7 @@ static func slot_interaction(d: Dictionary) -> SlotInteraction:
 	i.set_flag = String(d.get("set_flag", ""))
 	i.once_flag = String(d.get("once_flag", ""))
 	i.text = String(d.get("text", ""))
+	i.narrative = String(d.get("narrative", "auto"))
 	return i
 
 
@@ -281,6 +305,7 @@ static func shop_slot(d: Dictionary) -> ShopSlotDefinition:
 		states.append(shop_slot_state(raw))
 	s.states = states
 	s.default_state = String(d.get("default", states[0].id if not states.is_empty() else ""))
+	s.highlight = String(d.get("highlight", "auto"))
 	var acts: Array[SlotInteraction] = []
 	for raw in d.get("interactions", []):
 		acts.append(slot_interaction(raw))
@@ -297,6 +322,8 @@ static func shop(d: Dictionary) -> ShopDefinition:
 	s.map_rect = to_rect(d.get("map_rect", [0.1, 0.4, 0.3, 0.2]))
 	s.rooms = d.get("rooms", [])
 	s.enter = d.get("enter", {})
+	s.back = d.get("back", {})
+	s.collection = d.get("collection", {})
 	s.first_visit = d.get("first_visit", {})
 	var slots: Array[ShopSlotDefinition] = []
 	for raw in d.get("slots", []):

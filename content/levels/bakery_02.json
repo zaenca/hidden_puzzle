@@ -4,37 +4,43 @@
   "task_id": "task_clear_hall",
   "order": 2,
   "difficulty": 1,
-  "title": "Завал в торговом зале",
+  "title": "Торговый зал",
   "narrative": [
-    "Дверь в цех не открыть: зал завален листьями и мусором.",
-    "Сначала разберём, что тут вообще лежит — и чем это убирать."
+    "Витрина пустая, полки в пыли, под ногами хрустит сухая листва.",
+    "Начнём с того, что здесь вообще можно найти."
   ],
+  "_art_note": "background — пустая комната, её собирает пазл. objects_background — тот же кадр с метлой, щёткой и мешком: они проявляются после сборки. Дальше кадр переключают шаги уборки.",
   "art": {
-    "reference_size": [1080, 1350],
-    "palette": "facade",
-    "seed": 2022,
-    "clutter": 26,
-    "decor": [
-      { "rect": [0.04, 0.08, 0.92, 0.62], "color": "#7a6754", "shape": "rect" },
-      { "rect": [0.42, 0.30, 0.24, 0.40], "color": "#4b3d30", "shape": "rect" },
-      { "rect": [0.10, 0.30, 0.26, 0.24], "color": "#5d5344", "shape": "rect" },
-      { "rect": [0.0, 0.70, 1.0, 0.30], "color": "#6a5f4c", "shape": "rect" }
-    ]
+    "reference_size": [720, 1280],
+    "background": "res://art/bakery_interior.jpg",
+    "objects_background": "res://art/bakery_interior_objects.png",
+    "palette": "bakery",
+    "seed": 2022
   },
-  "puzzle": { "module_id": "jigsaw", "cols": 3, "rows": 4, "seed": 2201, "tab_ratio": 0.2, "snap_distance_px": 95 },
-  "hidden_object": {
-    "required_normal": 5,
-    "targets": [
-      { "id": "t01", "item_id": "trash_pile", "rect": [0.12, 0.70, 0.12, 0.09] },
-      { "id": "t02", "item_id": "box",        "rect": [0.36, 0.74, 0.10, 0.07] },
-      { "id": "t03", "item_id": "bottle",     "rect": [0.56, 0.76, 0.06, 0.075] },
-      { "id": "t04", "item_id": "newspaper",  "rect": [0.70, 0.70, 0.10, 0.055] },
-      { "id": "t05", "item_id": "can",        "rect": [0.84, 0.78, 0.06, 0.06] },
-      { "id": "t06", "item_id": "leaf_pile",  "rect": [0.24, 0.58, 0.10, 0.07] },
-      { "id": "q01", "item_id": "broom",      "kind": "quest", "rect": [0.46, 0.52, 0.06, 0.14] },
-      { "id": "q02", "item_id": "trash_bag",  "kind": "quest", "rect": [0.62, 0.58, 0.09, 0.09] }
-    ]
-  },
-  "rewards": { "coins": 60, "xp": 10 },
-  "quest_grants": ["broom", "trash_bag"]
+  "puzzle": { "module_id": "jigsaw", "cols": 3, "rows": 3, "seed": 2201, "tab_ratio": 0.2, "snap_distance_px": 95 },
+  "hidden_object": { "targets": [] },
+  "_cleanup_note": "Предметы не ищут, а получают: они проявляются в кадре и переезжают в полосу. Дальше игрок нажимает на место, где предмет нужен, и комната переходит в следующее нарисованное состояние. Нажатие, а не перетаскивание: тот же жест, что и в поиске предметов и в локациях.",
+  "cleanup": [
+    {
+      "item_id": "broom",
+      "rect": [0.350, 0.700, 0.630, 0.290],
+      "art": "res://art/bakery_interior_floor.jpg",
+      "hint": "Нажми на пол — подметём его метлой"
+    },
+    {
+      "item_id": "brush",
+      "rect": [0.020, 0.470, 0.420, 0.300],
+      "art": "res://art/bakery_interior_showcase.png",
+      "hint": "Нажми на витрину — обметём её щёткой"
+    },
+    {
+      "item_id": "trash_bag",
+      "rect": [0.010, 0.010, 0.980, 0.980],
+      "art": "res://art/bakery_interior_clean.jpg",
+      "hint": "Нажми на зал — соберём мусор в мешок"
+    }
+  ],
+  "show_result": false,
+  "rewards": { "coins": 70, "xp": 12 },
+  "quest_grants": []
 }
