@@ -293,10 +293,9 @@ func _has_cleanup() -> bool:
 	return not definition.cleanup.is_empty()
 
 
-## Предметы, только что проявившиеся в кадре, перелетают в нижнюю полосу. Искать
-## их не нужно: их не искали — их показали. Кадр на это время глухой, и
-## единственное, что игрок может сделать дальше, — нажать туда, где предмет
-## нужен.
+## Что предстоит убрать, показано сразу: три силуэта в нижней полосе. Это не
+## «предметы уже твои», а список — каждый загорается в тот момент, когда игрок
+## нашёл его в кадре. Только после этого предмет можно применить.
 func _start_cleanup() -> void:
 	phase = Phase.CLEANUP
 	_hud.show_progress(false)
@@ -315,7 +314,13 @@ func _start_cleanup() -> void:
 	_cleanup.setup(definition.cleanup, _view, _hud, context.items,
 		func(world: Vector2) -> Vector2: return get_canvas_transform() * world)
 	_cleanup.completed.connect(_on_cleanup_completed)
+	_cleanup.item_found.connect(_on_cleanup_item_found)
 	_cleanup.begin()
+
+
+func _on_cleanup_item_found(item_id: String) -> void:
+	var item: ItemDefinition = context.items.get(item_id)
+	_hud.toast("Нашлось: %s" % (item.display_name if item != null else item_id))
 
 
 func _on_cleanup_completed() -> void:
@@ -444,9 +449,9 @@ func _on_booster() -> void:
 				_show_find_hint(t)
 				used = true
 		Phase.CLEANUP:
-			if _cleanup != null and _cleanup.current() != null:
-				_cleanup.show_hint()
-				used = true
+			## Подсказка нужна в обоих заходах: в поиске она показывает предмет,
+			## в применении — место. Шага при этом может ещё не быть.
+			used = _cleanup != null and _cleanup.show_hint()
 	if used:
 		_boosters_left -= 1
 		_boosters_spent += 1

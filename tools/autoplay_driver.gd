@@ -284,35 +284,71 @@ func _check_hall_scene() -> void:
 	_check("зал: предметы лежат отдельным слоем, а не запечены в пазл",
 		def.art.objects_background_path == "res://art/bakery_interior_objects.png")
 
+	## Каждый предмет надо сперва найти. Шаг без find_rect молча превратился бы
+	## в «предмет выдали», и поиска в уровне бы не осталось.
+	var findable := 0
+	for s in steps:
+		if s.needs_finding():
+			findable += 1
+	_check("зал: у каждого шага размечено, где искать предмет", findable == steps.size())
 
 
-## Уборка засчитывается НАЖАТИЕМ по месту, а не перетаскиванием предмета.
-## Прогон делает это руками игрока: тап мимо не должен ничего менять, тап по
-## месту — переключать кадр и забирать предмет из полосы.
+
+## Уборка идёт в два захода и целиком на нажатии: сперва найти предмет в кадре,
+## потом нажать туда, где он нужен. Прогон делает это руками игрока — иначе
+## проверка «уборка на нажатии» осталась бы проверкой сигнатуры метода.
 func _check_hall_cleanup_is_tap() -> void:
 	var level: Node = Game.current()
 	if level == null or not ("_cleanup" in level):
 		_check("зал: фаза уборки доступна прогону", false)
 		return
 	var cleanup = level._cleanup
-	if cleanup == null or cleanup.current() == null:
+	var view = level._view
+	if cleanup == null or view == null:
 		_check("зал: фаза уборки началась", false)
+		return
+	var steps: Array = ContentDB.level("bakery_02").cleanup
+	if steps.size() < 3:
+		_check("зал: шаги уборки загрузились", false)
 		return
 
 	_check("зал: уборка на нажатии, а не на перетаскивании",
 		cleanup.has_method("handle_tap") and not cleanup.has_method("handle_release"))
+	_check("зал: фаза начинается с поиска, а не с применения",
+		cleanup.current() == null)
 
-	var step = cleanup.current()
-	var view = level._view
-	var before := String(step.item_id)
+	## Подсказку игрок вызывает сам, кнопкой, и она тратит бустер. Рука по
+	## таймеру отвечала бы на вопрос, которого игрок ещё не задал.
+	_check("зал: рука сама по себе не выскакивает", cleanup._hand == null)
+	var boosters: int = level._boosters_left
+	level._on_booster()
+	_check("зал: кнопка подсказки показывает палец", cleanup._hand != null)
+	_check("зал: подсказка потратила один бустер",
+		int(level._boosters_left) == boosters - 1)
 
-	## Тап мимо: место шага — не весь кадр, и промах обязан остаться промахом.
-	var outside: Vector2 = view.norm_to_world(_point_outside(step.rect))
-	cleanup.handle_tap(outside)
-	_check("зал: тап мимо места ничего не меняет",
+	## Применить то, чего ещё не нашли, нельзя — иначе поиск был бы декорацией.
+	var use_spot: Vector2 = view.norm_to_world(steps[0].centroid())
+	cleanup.handle_tap(use_spot)
+	_check("зал: ненайденный предмет применить нельзя", cleanup.current() == null)
+
+	var missed: Vector2 = view.norm_to_world(_point_outside(steps[0].find_rect))
+	cleanup.handle_tap(missed)
+	_check("зал: тап мимо предмета ничего не находит", cleanup.current() == null)
+
+	for step in steps:
+		var spot: Vector2 = view.norm_to_world(step.find_centroid())
+		cleanup.handle_tap(spot)
+	_check("зал: все три предмета находятся тапом", cleanup.current() != null)
+	_check("зал: найденное стёрто из кадра",
+		view.patches != null and view.patches.get_child_count() == steps.size())
+
+	var before := String(steps[0].item_id)
+	var off_target: Vector2 = view.norm_to_world(_point_outside(steps[0].rect))
+	cleanup.handle_tap(off_target)
+	_check("зал: тап мимо места применения ничего не меняет",
 		cleanup.current() != null and String(cleanup.current().item_id) == before)
 
-	cleanup.handle_tap(view.norm_to_world(step.centroid()))
+	cleanup.handle_tap(use_spot)
 	_check("зал: тап по месту засчитывает шаг «%s»" % before,
 		cleanup.current() == null or String(cleanup.current().item_id) != before)
 	_check("зал: применённый предмет ушёл из полосы",

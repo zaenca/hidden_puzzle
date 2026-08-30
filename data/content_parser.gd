@@ -139,9 +139,11 @@ static func rewards(d: Dictionary) -> RewardTable:
 static func cleanup_step(d: Dictionary) -> CleanupStep:
 	var s := CleanupStep.new()
 	s.item_id = String(d.get("item_id", ""))
+	s.find_rect = to_rect(d.get("find", [0, 0, 0, 0]))
 	s.rect = to_rect(d.get("rect", [0, 0, 1, 1]))
 	s.art_path = String(d.get("art", ""))
 	s.hint = String(d.get("hint", ""))
+	s.find_hint = String(d.get("find_hint", ""))
 	return s
 
 
