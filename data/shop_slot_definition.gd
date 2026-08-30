@@ -8,6 +8,12 @@ extends Resource
 @export var states: Array[ShopSlotState] = []
 @export var default_state: String = ""
 @export var interactions: Array[SlotInteraction] = []   ## реакции на тап игрока
+## Когда рисовать рамку «сюда можно нажать»:
+##   auto   — когда с объектом прямо сейчас есть что сделать (по умолчанию);
+##   always — всегда: объект кликабелен, но прогресс не двигает, и без рамки
+##            неотличим от нарисованного фона;
+##   never  — никогда: объект нужно найти глазами, рамка выдала бы его сразу.
+@export var highlight: String = "auto"
 
 func state(state_id: String) -> ShopSlotState:
 	for s in states:
@@ -33,3 +39,19 @@ func has_progress_in(state_id: String, flags: Dictionary) -> bool:
 			continue
 		return true
 	return false
+
+## Рамку рисуем по режиму из данных, а не по одному лишь наличию дела: сцена
+## поиска обязана уметь молчать про объект, который игрок ещё не нашёл.
+func highlight_on(state_id: String, flags: Dictionary) -> bool:
+	match highlight:
+		"always":
+			return true
+		"never":
+			return false
+		_:
+			return has_progress_in(state_id, flags)
+
+
+## Объект, который игрок должен найти сам. По таким же работает лампочка-подсказка.
+func is_searchable() -> bool:
+	return highlight == "never"

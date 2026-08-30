@@ -34,5 +34,29 @@
     "level_ids": ["bakery_02"],
     "action_id": "clear_hall",
     "hotspot": ""
+  },
+  {
+    "id": "task_open_storeroom",
+    "shop_id": "bakery",
+    "room_id": "storeroom",
+    "location": "shop",
+    "title": "Разобрать кладовую",
+    "hint": "Дверь открыта. Сперва собери саму кладовую, потом — шкаф у правой стены.",
+    "unlock": [{ "type": "flag", "flag": "door_open" }],
+    "level_ids": ["storeroom_01", "storeroom_02"],
+    "action_id": "clean_storeroom",
+    "hotspot": "door"
+  },
+  {
+    "id": "task_clear_storeroom",
+    "shop_id": "bakery_storeroom",
+    "room_id": "storeroom",
+    "location": "shop",
+    "title": "Вынести мусор",
+    "hint": "Найди в кладовой всё, что валяется, и нажми на это. Не видно — жми лампочку.",
+    "unlock": [{ "type": "flag", "flag": "storeroom_ready" }],
+    "level_ids": [],
+    "action_id": "haul_out_trash",
+    "hotspot": "shelf"
   }
 ]

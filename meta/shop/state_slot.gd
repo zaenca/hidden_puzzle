@@ -10,6 +10,7 @@ var world_rect: Rect2 = Rect2()   ## область слота на экране
 var art_mode: bool = false        ## поверх настоящего арта рисуем только плёнку
 
 var _variants: Dictionary = {}   ## state_id -> Node2D
+var _textured: Dictionary = {}   ## state_id -> bool, у состояния своя картинка
 var _highlight: Line2D = null
 
 
@@ -31,7 +32,13 @@ static func create(def: ShopSlotDefinition, area: Rect2, art_mode: bool = false)
 		var variant := Node2D.new()
 		variant.name = state.id
 		variant.visible = false
-		if art_mode:
+		## Своя картинка объекта важнее и плёнки, и заглушечной заливки: если
+		## художник прислал PNG шкафа, рисуем шкаф, а не прямоугольник вместо него.
+		var tex := Backdrop.load_texture(state.texture_path)
+		if tex != null:
+			variant.add_child(_sprite(tex, rect))
+			slot._textured[state.id] = true
+		elif art_mode:
 			if state.has_overlay():
 				var film := Polygon2D.new()
 				film.polygon = _shape_polygon(rect, state.shape)
@@ -77,9 +84,10 @@ func set_state(state_id: String, animate: bool = true) -> void:
 	if not (animate and is_inside_tree()):
 		return
 	variant.modulate.a = 0.0
-	# Точки плёнки заданы в мировых координатах, поэтому scale тянул бы её от
-	# начала координат сцены, а не от самого объекта. Поверх арта — только альфа.
-	if art_mode:
+	# Точки плёнки и позиция картинки заданы в мировых координатах, поэтому scale
+	# тянул бы их от начала координат сцены, а не от самого объекта. Поверх арта
+	# и для собственных картинок объекта — только альфа.
+	if art_mode or bool(_textured.get(state_id, false)):
 		variant.create_tween().tween_property(variant, "modulate:a", 1.0, 0.35)
 		return
 	variant.scale = Vector2(0.86, 0.86)
@@ -98,23 +106,59 @@ func set_highlight(on: bool) -> void:
 		_highlight = null
 		return
 
+	_highlight = _ring(UIKit.ACCENT, 5.0)
+	add_child(_highlight)
+
+	var tw := _highlight.create_tween().set_loops()
+	tw.tween_property(_highlight, "modulate:a", 0.35, 0.7)
+	tw.tween_property(_highlight, "modulate:a", 1.0, 0.7)
+
+
+## Разовая вспышка «вот он» — по кнопке-подсказке. Живёт отдельно от постоянной
+## подсветки: та держится, пока с объектом есть что делать, а эта гаснет сама и
+## не должна оставлять найденный объект помеченным навсегда.
+func flash_hint() -> void:
+	var ring := _ring(Color(1.0, 0.92, 0.35, 0.95), 8.0)
+	add_child(ring)
+	## Пульсы разворачиваются в один твин, а не в set_loops: зацикленный твин
+	## выполнял бы и хвост с queue_free на каждом обороте.
+	var tw := ring.create_tween()
+	for _i in 3:
+		tw.tween_property(ring, "modulate:a", 0.15, 0.28)
+		tw.tween_property(ring, "modulate:a", 1.0, 0.28)
+	tw.tween_property(ring, "modulate:a", 0.0, 0.25)
+	tw.tween_callback(ring.queue_free)
+
+
+func _ring(color: Color, width: float) -> Line2D:
 	var inset := world_rect.grow(-4.0)
-	_highlight = Line2D.new()
-	_highlight.points = PackedVector2Array([
+	var line := Line2D.new()
+	line.points = PackedVector2Array([
 		inset.position,
 		inset.position + Vector2(inset.size.x, 0),
 		inset.position + inset.size,
 		inset.position + Vector2(0, inset.size.y),
 		inset.position,
 	])
-	_highlight.width = 5.0
-	_highlight.default_color = UIKit.ACCENT
-	_highlight.joint_mode = Line2D.LINE_JOINT_ROUND
-	add_child(_highlight)
+	line.width = width
+	line.default_color = color
+	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	return line
 
-	var tw := _highlight.create_tween().set_loops()
-	tw.tween_property(_highlight, "modulate:a", 0.35, 0.7)
-	tw.tween_property(_highlight, "modulate:a", 1.0, 0.7)
+
+## Картинка объекта вписывается в свой rect по формату, а не растягивается на
+## него: шкаф, присланный в другом соотношении сторон, иначе поедет. Хитбоксом
+## остаётся весь rect — прозрачные поля по краям PNG игрок всё равно считает
+## частью объекта и жмёт по ним.
+static func _sprite(tex: Texture2D, rect: Rect2) -> Sprite2D:
+	var sp := Sprite2D.new()
+	sp.centered = false
+	sp.texture = tex
+	var tex_size := Vector2(tex.get_size())
+	var s: float = minf(rect.size.x / tex_size.x, rect.size.y / tex_size.y)
+	sp.scale = Vector2(s, s)
+	sp.position = rect.position + (rect.size - tex_size * s) * 0.5
+	return sp
 
 
 static func _shape_polygon(rect: Rect2, shape: String) -> PackedVector2Array:

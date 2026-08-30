@@ -1,12 +1,16 @@
 class_name CleanupPhase
 extends CanvasLayer
-## Фаза уборки: предмет из нижней полосы перетаскивается в область кадра, кадр
-## меняется на следующее состояние комнаты, предмет уходит из полосы.
+## Фаза уборки: игрок нажимает на место, которое надо привести в порядок, — и
+## кадр меняется на следующее состояние комнаты, а предмет уходит из полосы.
 ##
-## Живёт в экранных координатах: тащат от чипа в панели (это UI) к месту в
-## сцене (это мир), и держать одну систему координат на оба конца дешевле, чем
-## переводить туда-сюда на каждый кадр перетаскивания. Мир приходит снаружи —
-## уровень отдаёт готовые экранные точки.
+## Нажатие, а не перетаскивание. Предметы в этой игре находят и применяют одним
+## тапом — и в фазе поиска, и в локациях. Отдельный жест ровно в одном месте
+## игрок не выучивает, а спотыкается о него: тянет там, где надо нажать, и
+## наоборот.
+##
+## Живёт в экранных координатах: рука-подсказка и полоса предметов — это UI, и
+## держать одну систему координат на них дешевле, чем переводить туда-сюда.
+## Мир приходит снаружи — уровень отдаёт готовые экранные точки.
 ##
 ## Активен ровно один шаг. Всё остальное — и другие предметы, и остальной
 ## кадр — не реагирует: это обучение, а не свободная песочница, и промах по
@@ -15,8 +19,6 @@ extends CanvasLayer
 signal step_done(index: int)
 signal completed
 
-const DRAG_ICON_PX := 132.0
-const RETURN_SEC := 0.18
 const HINT_DELAY := 1.2      ## сколько ждём игрока, прежде чем показать руку
 
 var _steps: Array[CleanupStep] = []
@@ -29,8 +31,6 @@ var _index: int = -1
 var _active: bool = false
 
 var _root: Control
-var _drag_icon: TextureRect
-var _dragging: bool = false
 var _hand: TutorialHand = null
 var _hint_timer: float = 0.0
 
@@ -51,15 +51,6 @@ func _build() -> void:
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
-
-	_drag_icon = TextureRect.new()
-	_drag_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_drag_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_drag_icon.size = Vector2(DRAG_ICON_PX, DRAG_ICON_PX)
-	_drag_icon.pivot_offset = Vector2(DRAG_ICON_PX, DRAG_ICON_PX) * 0.5
-	_drag_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_drag_icon.visible = false
-	_root.add_child(_drag_icon)
 
 
 ## --- ход фазы ---------------------------------------------------------------
@@ -94,10 +85,10 @@ func _next_step() -> void:
 		_hud.set_phase(step.hint)
 
 
-## Рука ждёт, а не выскакивает сразу: если игрок уже потянул предмет, подсказка
-## ему только мешает.
+## Рука ждёт, а не выскакивает сразу: если игрок уже понял, куда нажимать,
+## подсказка ему только мешает.
 func _process(delta: float) -> void:
-	if not _active or _dragging or _hand != null:
+	if not _active or _hand != null:
 		return
 	_hint_timer += delta
 	if _hint_timer >= HINT_DELAY:
@@ -106,17 +97,14 @@ func _process(delta: float) -> void:
 
 ## --- подсказка --------------------------------------------------------------
 
+## Показывает, КУДА нажать. По ней же работает лампочка в HUD.
 func show_hint() -> void:
 	var step := current()
 	if step == null or not _active or _hand != null:
 		return
-	var from := _hud.chip_rect(step.item_id).get_center()
-	var to := _target_screen(step)
-	if from == Vector2.ZERO:
-		return
 	_hand = TutorialHand.new()
 	_root.add_child(_hand)
-	_hand.play_drag(from, to)
+	_hand.play_tap(_target_screen(step))
 
 
 func _stop_hint() -> void:
@@ -132,48 +120,21 @@ func _target_screen(step: CleanupStep) -> Vector2:
 	return _to_screen.call(world) if _to_screen.is_valid() else world
 
 
-## --- перетаскивание ---------------------------------------------------------
+## --- нажатие ----------------------------------------------------------------
 
-## Тащить можно только предмет текущего шага. Остальные чипы и весь кадр глухие.
-func handle_press(screen_pos: Vector2) -> bool:
+## Нажимать можно только по месту текущего шага. Остальной кадр глухой.
+## Промах молча ничего не делает: ругаться на игрока, которому только что
+## показали пальцем, не за что — рука просто вернётся.
+func handle_tap(world_pos: Vector2) -> bool:
 	var step := current()
 	if not _active or step == null:
 		return false
-	if not _hud.chip_rect(step.item_id).has_point(screen_pos):
+	if not step.rect.has_point(_view.world_to_norm(world_pos)):
+		_hint_timer = HINT_DELAY
 		return false
 	_stop_hint()
-	_dragging = true
-	var item: ItemDefinition = _items.get(step.item_id)
-	_drag_icon.texture = PlaceholderArt.item_icon(item, int(DRAG_ICON_PX))
-	_drag_icon.visible = true
-	_move_icon(screen_pos)
-	return true
-
-
-func handle_drag(screen_pos: Vector2) -> void:
-	if _dragging:
-		_move_icon(screen_pos)
-
-
-func handle_release(world_pos: Vector2) -> void:
-	if not _dragging:
-		return
-	_dragging = false
-	_drag_icon.visible = false
-
-	var step := current()
-	if step == null:
-		return
-	if not step.rect.has_point(_view.world_to_norm(world_pos)):
-		## Промах молча возвращает предмет: ругаться на игрока, которому только
-		## что показали пальцем, не за что.
-		_hint_timer = HINT_DELAY - RETURN_SEC
-		return
 	_apply(step)
-
-
-func _move_icon(screen_pos: Vector2) -> void:
-	_drag_icon.position = screen_pos - _drag_icon.size * 0.5
+	return true
 
 
 ## Шаг засчитан: кадр переключается на следующее состояние комнаты, предмет

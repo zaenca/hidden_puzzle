@@ -9,6 +9,9 @@ extends RefCounted
 ## буферизуется, и до завершения процесса ничего не видно.
 const REPORT_PATH := "res://autoplay_report.txt"
 
+## Мусор в кладовой. Порядок как в content/shops/bakery_storeroom.json.
+const TRASH_IDS := ["spiderweb", "flour_spill", "bootprints", "scrap_paper", "puddle"]
+
 var _tree: SceneTree
 var _checks: Array = []
 var _log: PackedStringArray = PackedStringArray()
@@ -95,9 +98,9 @@ func run(tree: SceneTree) -> void:
 	_check("задача «Осмотреть пекарню» закрылась знакомством",
 		Game.meta.task_state("task_visit_bakery") == MetaService.TaskState.COMPLETED)
 
-	# --- уровень 2: пазл зала и уборка перетаскиванием ----------------------
+	# --- уровень 2: пазл зала и уборка нажатием ----------------------------
 	_check_hall_scene()
-	await _finish_current_level()
+	await _play_hall_to_cleanup()
 	_check("после уборки — локация пекарни", Game.screen == Game.Screen.SHOP)
 	_check("зал: задача уборки закрылась сама",
 		Game.meta.task_state("task_clear_hall") == MetaService.TaskState.COMPLETED)
@@ -135,6 +138,56 @@ func run(tree: SceneTree) -> void:
 	_check("открытая дверь больше не выдаёт ключ", PlayerState.amount_of("bakery_key") == 0)
 	_check("открытая дверь отвечает текстом", not String(closed.get("text", "")).is_empty())
 
+	# --- кладовая: два пазла, уборка, мусор кликом в инвентарь -------------
+	_check("кладовая: задача открылась после открытия двери",
+		Game.meta.task_state("task_open_storeroom") == MetaService.TaskState.AVAILABLE)
+	_check("кладовая: вход внутрь пока закрыт",
+		not bool(Game.meta.flags.get("storeroom_ready", false)))
+
+	_check("L3: кладовая собирается из 9 частей",
+		ContentDB.level("storeroom_01").puzzle.piece_count() == 9)
+	await _play("task_open_storeroom")
+	_check("L3: кладовая собрана", Game.meta.completed_levels.has("storeroom_01"))
+	_check("после первого пазла задача ещё не готова к применению",
+		Game.meta.task_state("task_open_storeroom") == MetaService.TaskState.IN_PROGRESS)
+
+	_check("L4: шкаф собирается из 9 частей",
+		ContentDB.level("storeroom_02").puzzle.piece_count() == 9)
+	await _play("task_open_storeroom")
+	_check("L4: шкаф собран", Game.meta.completed_levels.has("storeroom_02"))
+	_check("собраны оба предмета — задачу можно применить",
+		Game.meta.task_state("task_open_storeroom") == MetaService.TaskState.READY_TO_APPLY)
+
+	_apply("task_open_storeroom")
+	_check("флаг storeroom_ready выставлен",
+		bool(Game.meta.flags.get("storeroom_ready", false)))
+	_check("мета: кладовая перешла в восстановление",
+		Game.meta.shop_state("bakery_storeroom") == "in_restoration")
+
+	Game.open_shop("bakery_storeroom")
+	await tree.create_timer(0.4).timeout
+	_check("кладовая открывается своей сценой", Game.screen == Game.Screen.SHOP)
+	_check_storeroom_scene()
+
+	var shelf_tap := Game.meta.interact("bakery_storeroom", "shelf", "")
+	_check("шкаф отвечает на тап: %s" % shelf_tap.get("text", ""), bool(shelf_tap.get("ok", false)))
+
+	_check("кладовая: задача уборки открылась",
+		Game.meta.task_state("task_clear_storeroom") == MetaService.TaskState.AVAILABLE)
+	_check_trash_pickup()
+	await tree.create_timer(0.4).timeout
+	_check_inventory_shows(TRASH_IDS)
+	_check("весь мусор собран — задачу можно применить",
+		Game.meta.task_state("task_clear_storeroom") == MetaService.TaskState.READY_TO_APPLY)
+
+	_apply("task_clear_storeroom")
+	var left := 0
+	for id in TRASH_IDS:
+		left += PlayerState.amount_of(String(id))
+	_check("мусор вынесен из инвентаря", left == 0)
+	_check("флаг storeroom_clean выставлен",
+		bool(Game.meta.flags.get("storeroom_clean", false)))
+
 	# --- сохранение / загрузка ---------------------------------------------
 	SaveService.save_game()
 	var levels_done: int = Game.meta.levels_completed_total
@@ -147,6 +200,7 @@ func run(tree: SceneTree) -> void:
 	Game.meta.refresh()
 	_check("сейв: дверь осталась открытой", Game.meta.current_slot_state("bakery", "door") == "open")
 	_check("сейв: флаг door_open на месте", bool(Game.meta.flags.get("door_open", false)))
+	_check("сейв: кладовая осталась разобранной", bool(Game.meta.flags.get("storeroom_ready", false)))
 	_check("сейв: ключ не воскрес", PlayerState.amount_of("bakery_key") == 0)
 	_check("сейв: пройдено уровней = %d" % levels_done, Game.meta.levels_completed_total == levels_done)
 	_check("сейв: пройдено разных уровней = %d" % distinct_levels,
@@ -203,7 +257,6 @@ func _check_hall_scene() -> void:
 	_check("зал: пазл собирается из 9 частей", def.puzzle.piece_count() == 9)
 	_check("зал: предметы не ищут — фазы поиска нет",
 		def.hidden_object.targets.is_empty())
-
 	var steps := def.cleanup
 	_check("зал: три шага уборки", steps.size() == 3)
 	var order := PackedStringArray()
@@ -230,6 +283,78 @@ func _check_hall_scene() -> void:
 		def.art.background_path == "res://art/bakery_interior.jpg")
 	_check("зал: предметы лежат отдельным слоем, а не запечены в пазл",
 		def.art.objects_background_path == "res://art/bakery_interior_objects.png")
+
+
+
+## Уборка засчитывается НАЖАТИЕМ по месту, а не перетаскиванием предмета.
+## Прогон делает это руками игрока: тап мимо не должен ничего менять, тап по
+## месту — переключать кадр и забирать предмет из полосы.
+func _check_hall_cleanup_is_tap() -> void:
+	var level: Node = Game.current()
+	if level == null or not ("_cleanup" in level):
+		_check("зал: фаза уборки доступна прогону", false)
+		return
+	var cleanup = level._cleanup
+	if cleanup == null or cleanup.current() == null:
+		_check("зал: фаза уборки началась", false)
+		return
+
+	_check("зал: уборка на нажатии, а не на перетаскивании",
+		cleanup.has_method("handle_tap") and not cleanup.has_method("handle_release"))
+
+	var step = cleanup.current()
+	var view = level._view
+	var before := String(step.item_id)
+
+	## Тап мимо: место шага — не весь кадр, и промах обязан остаться промахом.
+	var outside: Vector2 = view.norm_to_world(_point_outside(step.rect))
+	cleanup.handle_tap(outside)
+	_check("зал: тап мимо места ничего не меняет",
+		cleanup.current() != null and String(cleanup.current().item_id) == before)
+
+	cleanup.handle_tap(view.norm_to_world(step.centroid()))
+	_check("зал: тап по месту засчитывает шаг «%s»" % before,
+		cleanup.current() == null or String(cleanup.current().item_id) != before)
+	_check("зал: применённый предмет ушёл из полосы",
+		Rect2(level._hud.chip_rect(before)) == Rect2())
+
+
+## Точка заведомо вне области шага — по той стороне кадра, где её нет.
+func _point_outside(rect: Rect2) -> Vector2:
+	if rect.position.x > 0.1:
+		return Vector2(rect.position.x * 0.5, rect.get_center().y)
+	if rect.end.x < 0.9:
+		return Vector2((rect.end.x + 1.0) * 0.5, rect.get_center().y)
+	if rect.position.y > 0.1:
+		return Vector2(rect.get_center().x, rect.position.y * 0.5)
+	return Vector2(rect.get_center().x, (rect.end.y + 1.0) * 0.5)
+
+
+## Зал прогон проходит не одним force'ом: до фазы уборки доводит пазл, а сами
+## шаги делает нажатием, как игрок. Иначе проверка «уборка на нажатии» осталась
+## бы проверкой сигнатуры метода, а не поведения.
+func _play_hall_to_cleanup() -> void:
+	var level: Node = Game.current()
+	if level == null or not level.has_method("debug_autoplay"):
+		_check("зал: уровень доступен и управляем", false)
+		return
+	if level._puzzle == null:
+		level._start_puzzle()
+		await _tree.create_timer(0.3).timeout
+	if level._puzzle != null:
+		level._puzzle.force_solve()
+
+	var deadline := Time.get_ticks_msec() + 8000
+	while Time.get_ticks_msec() < deadline:
+		if level._cleanup != null and level._cleanup.current() != null:
+			break
+		await _tree.process_frame
+	_check_hall_cleanup_is_tap()
+
+	if level._cleanup != null:
+		level._cleanup.force_complete()
+	await _await_left_level()
+
 
 
 ## «Задача закрыта» и «игрок про это узнал» — разные утверждения. Плашка живёт
@@ -290,6 +415,80 @@ func _check_map_hint_points_at(shop_id: String) -> void:
 			rect = area["rect"]
 	_check("площадь: рука стоит именно на пекарне",
 		rect.size.x > 0.0 and rect.has_point(map._hand.position))
+
+
+## Кладовая: собранная сцена из двух картинок плюс то, ради чего она собрана.
+## Проверяем не «красиво», а то, что ломает игру молча: шкаф справа, мусор
+## попадает под палец и НЕ обведён рамкой заранее — иначе искать нечего.
+func _check_storeroom_scene() -> void:
+	var scene: Node = Game.current()
+	if scene == null or not ("_slots" in scene):
+		_check("кладовая: сцена локации доступна", false)
+		return
+	var slot = scene._slots.get("shelf")
+	if slot == null:
+		_check("кладовая: слот шкафа построен", false)
+		return
+	_check("кладовая: шкаф стоит справа",
+		slot.world_rect.get_center().x > 540.0)
+	_check("кладовая: у шкафа есть площадь под палец",
+		slot.world_rect.size.x > 100.0 and slot.world_rect.size.y > 100.0)
+
+	var built := 0
+	var ringed := 0
+	var small := 0
+	for id in TRASH_IDS:
+		var s = scene._slots.get(String(id))
+		if s == null:
+			continue
+		built += 1
+		if s._highlight != null:
+			ringed += 1
+		if s.world_rect.size.x < 96.0 or s.world_rect.size.y < 96.0:
+			small += 1
+	_check("кладовая: весь мусор построен на сцене — %d/%d" % [built, TRASH_IDS.size()],
+		built == TRASH_IDS.size())
+	_check("кладовая: мусор не обведён рамкой заранее", ringed == 0)
+	_check("кладовая: по каждому предмету можно попасть пальцем", small == 0)
+
+	var with_art := 0
+	for id in TRASH_IDS:
+		if ContentDB.item(String(id)) != null and ContentDB.item(String(id)).icon != null:
+			with_art += 1
+	_check("кладовая: у мусора настоящие иконки, а не заглушки",
+		with_art == TRASH_IDS.size())
+
+	_check("кладовая: лампочка-подсказка на экране", scene._hint_button != null)
+	_check("кладовая: подсказка знает, что показывать",
+		not String(scene._next_searchable()).is_empty())
+	_check("кладовая: полоска ячеек показана",
+		scene._collection_panel != null and scene._collection_panel.visible)
+	if scene._collection_row != null:
+		_check("кладовая: ячеек ровно %d" % TRASH_IDS.size(),
+			scene._collection_row.get_child_count() == TRASH_IDS.size())
+
+
+## Каждый предмет мусора убирается ОДНИМ тапом пустой рукой и оказывается в
+## инвентаре. Перетаскивания здесь нет и быть не должно.
+func _check_trash_pickup() -> void:
+	var scene: Node = Game.current()
+	for id in TRASH_IDS:
+		var item_id := String(id)
+		var before := PlayerState.amount_of(item_id)
+		var take := Game.meta.interact("bakery_storeroom", item_id, "")
+		_check("мусор '%s' убирается тапом" % ContentDB.item_name(item_id),
+			bool(take.get("ok", false)) and PlayerState.amount_of(item_id) == before + 1)
+		_check("мусор '%s' пропал со сцены" % ContentDB.item_name(item_id),
+			Game.meta.current_slot_state("bakery_storeroom", item_id) == "taken")
+		var again := Game.meta.interact("bakery_storeroom", item_id, "")
+		## Убранное место отвечает текстом — это нормально; не нормально было бы
+		## выдать второй такой же предмет.
+		_check("повторный тап по '%s' не выдаёт второй" % ContentDB.item_name(item_id),
+			PlayerState.amount_of(item_id) == before + 1
+				and String(again.get("granted", "")).is_empty())
+	if scene != null and scene.has_method("_next_searchable"):
+		_check("подсказке больше нечего показывать",
+			String(scene._next_searchable()).is_empty())
 
 
 ## Мэрия и другие «пока закрытые» здания обязаны попадать в хит-тест: игрок

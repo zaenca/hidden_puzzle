@@ -191,21 +191,23 @@ func _stop_find_hint() -> void:
 
 
 ## Любое касание означает «я понял» — подсказка молча уходит.
-func _stop_drag_hint() -> void:
+func _stop_hint() -> void:
 	if not _hint_active:
 		return
 	_hint_active = false
 	if _hand != null:
 		_hand.stop()
 		_hand = null
-	if _puzzle != null:
+	## Призрак части живёт только в фазе сборки: в фазе поиска пазла на экране
+	## уже нет, и чистить в нём нечего.
+	if _puzzle != null and phase == Phase.PUZZLE:
 		_puzzle.clear_demo_hint()
 
 
 ## --- REVEAL: бесшовный переход ---------------------------------------------
 
 func _reveal() -> void:
-	_stop_drag_hint()
+	_stop_hint()
 	phase = Phase.REVEAL
 	_hud.set_phase("…")
 	_puzzle.fade_seams(0.35)
@@ -285,15 +287,16 @@ func _slip_into_meta() -> void:
 		_emit_result()
 
 
-## --- CLEANUP: перетащить найденное туда, где оно нужно ----------------------
+## --- CLEANUP: нажать туда, где найденное нужно применить -------------------
 
 func _has_cleanup() -> bool:
 	return not definition.cleanup.is_empty()
 
 
-## Предметы, только что проявившиеся в кадре, перелетают в нижнюю полосу. Тапать
-## по ним не нужно: их не искали — их показали. Кадр на это время глухой, и
-## единственное, что игрок может сделать дальше, — потянуть предмет.
+## Предметы, только что проявившиеся в кадре, перелетают в нижнюю полосу. Искать
+## их не нужно: их не искали — их показали. Кадр на это время глухой, и
+## единственное, что игрок может сделать дальше, — нажать туда, где предмет
+## нужен.
 func _start_cleanup() -> void:
 	phase = Phase.CLEANUP
 	_hud.show_progress(false)
@@ -334,10 +337,26 @@ func _start_hidden_object() -> void:
 	_hud.set_progress(0, definition.hidden_object.targets.size())
 	_ho.begin()
 
+	if context.show_tap_hint:
+		_start_tap_hint()
+
+
+## Рука показывает жест поиска: предметы находятся НАЖАТИЕМ. Без этого хода
+## единственное, чему игрока научили, — перетаскивание частей пазла, и тот же
+## жест он переносит сюда.
+func _start_tap_hint() -> void:
+	var t := _ho.hint_target()
+	if t == null:
+		return
+	_hand = TutorialHand.new()
+	$FX.add_child(_hand)
+	_hand.play_tap(_view.norm_to_world(t.bounds().get_center()))
+	_hint_active = true
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch and event.pressed and _hint_active:
-		_stop_drag_hint()
+		_stop_hint()
 
 	if phase == Phase.CLEANUP:
 		_cleanup_input(event)
@@ -348,19 +367,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		_ho.handle_tap(get_canvas_transform().affine_inverse() * event.position)
 
 
-## Ввод фазы уборки приходит сюда, а не в саму фазу: нажатие начинается на
-## интерфейсе (чип в полосе), а заканчивается в мире (место в кадре), и перевод
-## между этими системами координат знает уровень.
+## Ввод фазы уборки приходит сюда, а не в саму фазу: нажатие приходит в
+## экранных координатах, а место шага размечено по кадру, и перевод между этими
+## системами координат знает уровень.
 func _cleanup_input(event: InputEvent) -> void:
 	if _cleanup == null:
 		return
-	if event is InputEventScreenTouch:
-		if event.pressed:
-			_cleanup.handle_press(event.position)
-		else:
-			_cleanup.handle_release(get_canvas_transform().affine_inverse() * event.position)
-	elif event is InputEventScreenDrag:
-		_cleanup.handle_drag(event.position)
+	if event is InputEventScreenTouch and event.pressed:
+		_cleanup.handle_tap(get_canvas_transform().affine_inverse() * event.position)
 
 
 func _on_target_found(target: HOTarget, item: ItemDefinition) -> void:

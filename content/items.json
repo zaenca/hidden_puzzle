@@ -45,5 +45,11 @@
   { "id": "cloth",       "name": "Тряпка",      "color": "#cfc2a8", "shape": "rect" },
   { "id": "brush",       "name": "Щётка", "kind": "quest", "icon": "res://art/items/brush.png",     "color": "#4f9bd1", "shape": "cross" },
   { "id": "door_handle", "name": "Дверная ручка", "kind": "quest", "color": "#e0b04f", "shape": "rect" },
-  { "id": "glass_pane",  "name": "Стекло витрины", "kind": "quest", "color": "#a8e0f0", "shape": "rect" }
+  { "id": "glass_pane",  "name": "Стекло витрины", "kind": "quest", "color": "#a8e0f0", "shape": "rect" },
+
+  { "id": "spiderweb",   "name": "Паутина",           "kind": "quest", "icon": "res://art/garbage/spiderweb.png",   "color": "#d8d8e0", "shape": "triangle" },
+  { "id": "flour_spill", "name": "Рассыпанная мука",  "kind": "quest", "icon": "res://art/garbage/flour_spill.png", "color": "#f0e6d2", "shape": "triangle" },
+  { "id": "scrap_paper", "name": "Обрывки бумаги",    "kind": "quest", "icon": "res://art/garbage/scrap_paper.png", "color": "#e6ddc8", "shape": "rect" },
+  { "id": "puddle",      "name": "Лужа",              "kind": "quest", "icon": "res://art/garbage/puddle.png",      "color": "#7fb3d5", "shape": "circle" },
+  { "id": "bootprints",  "name": "Следы обуви",       "kind": "quest", "icon": "res://art/garbage/bootprints.png",  "color": "#6b5a44", "shape": "rect" }
 ]

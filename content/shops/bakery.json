@@ -7,14 +7,14 @@
   "map_rect": [0.0, 0.293, 0.347, 0.25],
   "rooms": [
     { "id": "hall", "title": "Торговый зал" },
-    { "id": "bakers_room", "title": "Пекарский цех" }
+    { "id": "storeroom", "title": "Кладовая" }
   ],
   "first_visit": { "intro": "bakery_facade", "flag": "met_baker" },
   "enter": {
-    "label": "Зайти в пекарский цех",
-    "requires_flag": "door_open",
-    "locked_text": "Дверь в цех заперта — сначала нужно её открыть.",
-    "text": "Пекарский цех ждёт: следующий этап разработки."
+    "label": "Зайти в кладовую",
+    "requires_flag": "storeroom_ready",
+    "locked_text": "Кладовая за дверью ещё не разобрана.",
+    "open_shop": "bakery_storeroom"
   },
   "slots": [
     {
@@ -32,7 +32,7 @@
           "consume": true,
           "set_state": "open",
           "set_flag": "door_open",
-          "text": "Ключ со скрипом провернулся в замке. Дверь в цех открыта."
+          "text": "Ключ со скрипом провернулся в замке. Дверь в кладовую открыта."
         },
         {
           "state": "locked",
@@ -46,7 +46,7 @@
         },
         {
           "state": "open",
-          "text": "Дверь в цех открыта — можно входить."
+          "text": "Дверь в кладовую открыта — можно входить."
         }
       ]
     }

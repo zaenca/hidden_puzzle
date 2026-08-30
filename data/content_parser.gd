@@ -52,7 +52,10 @@ static func item(d: Dictionary) -> ItemDefinition:
 	it.shape = String(d.get("shape", "rect"))
 	## Есть иконка — она и рисуется; нет — цвет с формой, как раньше. Смешивать
 	## не нужно: PlaceholderArt сам предпочитает icon, когда тот заполнен.
-	it.icon = Backdrop.load_texture(String(d.get("icon", "")))
+	## Путь хранится и отдельно: валидатор должен уметь сказать «файла нет»,
+	## не загружая ресурс.
+	it.icon_path = String(d.get("icon", ""))
+	it.icon = Backdrop.load_texture(it.icon_path)
 	match String(d.get("kind", "normal")):
 		"quest": it.kind = ItemDefinition.Kind.QUEST
 		"themed": it.kind = ItemDefinition.Kind.THEMED
@@ -275,6 +278,7 @@ static func shop_slot_state(d: Dictionary) -> ShopSlotState:
 	s.shape = String(d.get("shape", "rect"))
 	s.hidden = bool(d.get("hidden", false))
 	s.overlay = to_color(d.get("overlay", ""), Color(0, 0, 0, 0))
+	s.texture_path = String(d.get("texture", ""))
 	return s
 
 
@@ -288,6 +292,7 @@ static func slot_interaction(d: Dictionary) -> SlotInteraction:
 	i.set_flag = String(d.get("set_flag", ""))
 	i.once_flag = String(d.get("once_flag", ""))
 	i.text = String(d.get("text", ""))
+	i.narrative = String(d.get("narrative", "auto"))
 	return i
 
 
@@ -300,6 +305,7 @@ static func shop_slot(d: Dictionary) -> ShopSlotDefinition:
 		states.append(shop_slot_state(raw))
 	s.states = states
 	s.default_state = String(d.get("default", states[0].id if not states.is_empty() else ""))
+	s.highlight = String(d.get("highlight", "auto"))
 	var acts: Array[SlotInteraction] = []
 	for raw in d.get("interactions", []):
 		acts.append(slot_interaction(raw))
@@ -316,6 +322,8 @@ static func shop(d: Dictionary) -> ShopDefinition:
 	s.map_rect = to_rect(d.get("map_rect", [0.1, 0.4, 0.3, 0.2]))
 	s.rooms = d.get("rooms", [])
 	s.enter = d.get("enter", {})
+	s.back = d.get("back", {})
+	s.collection = d.get("collection", {})
 	s.first_visit = d.get("first_visit", {})
 	var slots: Array[ShopSlotDefinition] = []
 	for raw in d.get("slots", []):

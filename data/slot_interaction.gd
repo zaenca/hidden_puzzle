@@ -14,6 +14,11 @@ extends Resource
 @export var set_flag: String = ""     ## флаг мира
 @export var once_flag: String = ""    ## правило одноразовое; флаг ставится сам
 @export var text: String = ""
+## Как показать текст правила:
+##   auto  — по-крупному, если правило двигает мир, иначе тостом (по умолчанию);
+##   toast — всегда тостом: подбор пятого фантика подряд не стоит модального окна;
+##   modal — всегда крупно.
+@export var narrative: String = "auto"
 
 
 ## Пустой use_item намеренно требует пустой руки: тап предметом, который здесь
@@ -30,3 +35,15 @@ func matches(current_state: String, selected_item: String, flags: Dictionary) ->
 ## слот ради них не нужно.
 func is_progress() -> bool:
 	return not set_state.is_empty() or not grant_item.is_empty()
+
+
+## Показывать ли текст крупно, с остановкой игры. Осмотр и мелкие подборы —
+## нет: пять модальных окон подряд превращают уборку в чтение.
+func shows_narrative() -> bool:
+	match narrative:
+		"toast":
+			return false
+		"modal":
+			return true
+		_:
+			return is_progress()

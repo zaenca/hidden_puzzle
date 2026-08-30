@@ -33,13 +33,51 @@
     "title": "Прибраться в торговом зале",
     "description": "Пол вымыт, витрина обметена, мусор собран.",
     "button_label": "Прибраться в зале",
-    "_auto_note": "Уборка целиком происходит внутри уровня: игрок перетаскивает метлу, щётку и мешок. Задача закрывается сама по факту пройденного уровня — кнопки, дублирующей уже сделанное, быть не должно.",
+    "_auto_note": "Уборка целиком происходит внутри уровня: игрок нажимает на пол, витрину и зал. Задача закрывается сама по факту пройденного уровня — кнопки, дублирующей уже сделанное, быть не должно.",
     "auto_apply": true,
     "requirements": [{ "type": "level", "level_id": "bakery_02" }],
     "costs": [],
     "duration_sec": 0,
     "effects": [
       { "type": "set_flag", "flag": "hall_clean" }
+    ]
+  },
+  {
+    "id": "clean_storeroom",
+    "title": "Убрать кладовую",
+    "description": "Кладовая собрана, шкаф на месте — пора за уборку.",
+    "button_label": "Убрать кладовую",
+    "requirements": [{ "type": "level", "level_id": "storeroom_02" }],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "set_shop_state", "shop_id": "bakery_storeroom", "state": "in_restoration" },
+      { "type": "set_flag", "flag": "storeroom_ready" },
+      { "type": "narrative", "text": "Шкаф встал у правой стены. Теперь видно, во что кладовую превратили: полки в паутине, муке и мусоре." }
+    ]
+  },
+  {
+    "id": "haul_out_trash",
+    "title": "Вынести мусор",
+    "description": "Всё, что валялось в кладовой, собрано — осталось вынести.",
+    "button_label": "Вынести мусор",
+    "requirements": [
+      { "type": "item", "item_id": "spiderweb",   "amount": 1 },
+      { "type": "item", "item_id": "flour_spill", "amount": 1 },
+      { "type": "item", "item_id": "bootprints",  "amount": 1 },
+      { "type": "item", "item_id": "scrap_paper", "amount": 1 },
+      { "type": "item", "item_id": "puddle",      "amount": 1 }
+    ],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "consume", "id": "spiderweb",   "amount": 1 },
+      { "type": "consume", "id": "flour_spill", "amount": 1 },
+      { "type": "consume", "id": "bootprints",  "amount": 1 },
+      { "type": "consume", "id": "scrap_paper", "amount": 1 },
+      { "type": "consume", "id": "puddle",      "amount": 1 },
+      { "type": "set_flag", "flag": "storeroom_clean" },
+      { "type": "narrative", "text": "Кладовая убрана: пол вымыт, полки протёрты, паутины нет. Пахнет деревом, а не подвалом." }
     ]
   }
 ]

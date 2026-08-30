@@ -245,8 +245,8 @@ func interact(shop_id: String, slot_id: String, selected_item: String = "") -> D
 
 		out["ok"] = true
 		out["text"] = rule.text
-		out["narrative"] = rule.is_progress()
-		if rule.is_progress() and not rule.text.is_empty():
+		out["narrative"] = rule.shows_narrative()
+		if rule.shows_narrative() and not rule.text.is_empty():
 			pending_narrative.append(rule.text)
 		refresh()
 		return out
