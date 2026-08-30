@@ -10,6 +10,7 @@ extends Node2D
 
 var background: Sprite2D
 var objects: Sprite2D
+var patches: Node2D
 var markers: Node2D
 var rect: Rect2 = Rect2()
 var texture: Texture2D
@@ -29,6 +30,13 @@ func _ensure_nodes() -> void:
 		objects.modulate.a = 0.0
 		objects.visible = false
 		add_child(objects)
+	## Заплатки поверх слоя предметов: сюда попадает то, что игрок уже нашёл.
+	## Отдельным узлом, а не россыпью детей, — чтобы смена кадра комнаты сносила
+	## их одним движением и ни одна не пережила состояние, к которому нарисована.
+	if patches == null:
+		patches = Node2D.new()
+		patches.name = "Patches"
+		add_child(patches)
 	if markers == null:
 		markers = Node2D.new()
 		markers.name = "Markers"
@@ -66,6 +74,33 @@ func _place(sprite: Sprite2D, tex: Texture2D) -> void:
 	sprite.scale = Vector2(rect.size.x / tex_size.x, rect.size.y / tex_size.y)
 
 
+## Стереть из кадра то, что игрок уже нашёл. Поверх области кладётся тот же
+## участок ТОЙ ЖЕ картинки пустой комнаты — не «заплатка похожего цвета», а тот
+## же самый кадр, поэтому шва не видно и подбирать ничего не нужно.
+func hide_region(norm_rect: Rect2, duration: float = 0.25) -> void:
+	if texture == null:
+		return
+	_ensure_nodes()
+	var tex_size := Vector2(texture.get_size())
+	var patch := Sprite2D.new()
+	patch.centered = false
+	patch.texture = texture
+	patch.region_enabled = true
+	patch.region_rect = Rect2(norm_rect.position * tex_size, norm_rect.size * tex_size)
+	patch.position = rect.position + norm_rect.position * rect.size
+	patch.scale = rect.size / tex_size
+	patch.modulate.a = 0.0
+	patches.add_child(patch)
+	patch.create_tween().tween_property(patch, "modulate:a", 1.0, duration)
+
+
+func clear_patches() -> void:
+	if patches == null:
+		return
+	for child in patches.get_children():
+		child.queue_free()
+
+
 func has_objects_layer() -> bool:
 	return objects_texture != null
 
@@ -88,7 +123,9 @@ func swap_background(path: String, duration: float) -> void:
 	layer.scale = Vector2(rect.size.x / tex_size.x, rect.size.y / tex_size.y)
 	layer.modulate.a = 0.0
 	add_child(layer)
-	move_child(layer, objects.get_index() + 1)
+	## Над заплатками: они нарисованы к УХОДЯЩЕМУ состоянию комнаты, и остаться
+	## поверх нового кадра не должны.
+	move_child(layer, patches.get_index() + 1)
 
 	var tw := create_tween()
 	tw.tween_property(layer, "modulate:a", 1.0, duration)
@@ -97,6 +134,7 @@ func swap_background(path: String, duration: float) -> void:
 		_place(background, tex)
 		background.modulate = Color.WHITE
 		objects.visible = false
+		clear_patches()
 		layer.queue_free())
 
 

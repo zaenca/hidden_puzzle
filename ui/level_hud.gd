@@ -221,7 +221,24 @@ func show_item_row(item_ids: PackedStringArray, items: Dictionary) -> void:
 	_item_panel.visible = true
 
 
-## Экранный прямоугольник чипа — по нему фаза уборки понимает, что потянули.
+## Чип «ещё не найден»: предмет виден силуэтом, чтобы игрок знал, что искать,
+## но не считал его уже своим. Загорается в тот момент, когда найден.
+func set_chip_dim(key: String, dim: bool) -> void:
+	var chip: Control = _chips.get(key)
+	if chip == null:
+		return
+	if not dim:
+		chip.pivot_offset = chip.size * 0.5
+		chip.modulate = Color.WHITE
+		chip.scale = Vector2(1.35, 1.35)
+		chip.create_tween().tween_property(chip, "scale", Vector2.ONE, 0.3) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		return
+	chip.modulate = Color(0.28, 0.28, 0.30, 0.75)
+
+
+## Экранный прямоугольник чипа. Нужен подсказкам и прогону, чтобы понять, что
+## предмет действительно ушёл из полосы.
 func chip_rect(key: String) -> Rect2:
 	var chip: Control = _chips.get(key)
 	return chip.get_global_rect() if chip != null else Rect2()
