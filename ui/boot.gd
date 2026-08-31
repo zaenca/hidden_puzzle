@@ -88,6 +88,7 @@ func _build_overlay() -> void:
 	_journal.name = "TaskJournal"
 	root.add_child(_journal)
 	_journal.set_active(false)
+	Game.attach_journal(_journal)
 
 	## Кошелёк — тоже в оверлее: деньги не принадлежат экрану, и собранный в
 	## сцене счёт пришлось бы повторять в карте, локации и магазине.

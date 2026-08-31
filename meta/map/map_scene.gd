@@ -13,6 +13,7 @@ var _hit_areas: Array = []      ## [{rect: Rect2, shop_id: String}]
 var _task_list: VBoxContainer
 var _margin: MarginContainer
 var _hand: TutorialHand = null
+var _journal_hint_tries: int = 0
 
 ## Прямоугольник, к которому нормализованы координаты зданий. С реальным артом
 ## это область самой картинки, без него — условная MAP_RECT.
@@ -38,6 +39,8 @@ func _build() -> void:
 	_refresh_hint()
 
 	EventBus.task_state_changed.connect(func(_t, _s): call_deferred("_rebuild_tasks"))
+	## Указатель после обучения ведёт уже не к журналу, а к зданию.
+	EventBus.tutorial_finished.connect(func(_id): call_deferred("_refresh_hint"))
 	_show_pending_narrative()
 
 
@@ -51,6 +54,12 @@ func _build() -> void:
 ## контент через shop_id задачи.
 func _refresh_hint() -> void:
 	_stop_hint()
+	## Пока игрок не открывал журнал, рука ведёт к нему, а не к зданию: список
+	## заданий объясняет, зачем вообще идти в пекарню, и без него первый же
+	## переход выглядит как «ткнул наугад и что-то произошло».
+	if not bool(Game.meta.flags.get(Game.JOURNAL_FLAG, false)):
+		_point_at_journal()
+		return
 	var shop_id := _hint_shop_id()
 	if shop_id.is_empty():
 		return
@@ -65,6 +74,26 @@ func _refresh_hint() -> void:
 		return
 
 
+## Рука на кнопку журнала. Кнопка живёт в оверлее, поэтому и рука кладётся туда
+## же: в мировых координатах карты её место — пустое небо над площадью.
+func _point_at_journal() -> void:
+	if Game.journal == null or not Game.journal.has_method("button_center"):
+		return
+	var center: Vector2 = Game.journal.call("button_center")
+	if center == Vector2.ZERO:
+		## Кнопки ещё нет на экране: оверлей узнаёт о смене экрана после того,
+		## как сцена построилась, и в этот момент журнал ещё скрыт. Пробуем на
+		## следующем кадре, но не бесконечно — на экране без журнала указателю
+		## всё равно некуда встать.
+		if _journal_hint_tries >= 5:
+			return
+		_journal_hint_tries += 1
+		call_deferred("_point_at_journal")
+		return
+	_journal_hint_tries = 0
+	_hand = TutorialHand.new()
+	Game.journal.add_child(_hand)
+	_hand.play_tap(center)
 func _hint_shop_id() -> String:
 	for task in Game.meta.tasks_at("map"):
 		if not task.level_ids.is_empty() or task.shop_id.is_empty():

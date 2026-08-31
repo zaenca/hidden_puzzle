@@ -19,6 +19,7 @@ var _level_cache: Dictionary = {}
 var _cache_order: Array[String] = []
 var _dialog_cache: Dictionary = {}
 var _intro_cache: Dictionary = {}
+var _tutorial_cache: Dictionary = {}
 
 
 func load_all() -> void:
@@ -72,6 +73,13 @@ func dialog(id: String) -> Dictionary:
 
 func intro(id: String) -> Dictionary:
 	return _cutscene(_intro_cache, "intros", id)
+
+
+## Обучающие подсказки — тоже сырой словарь: это текст и ссылка на элемент
+## экрана, типизировать в нём нечего. Читается один раз и кэшируется вместе с
+## остальным контентом.
+func tutorial(id: String) -> Dictionary:
+	return _cutscene(_tutorial_cache, "tutorial", id)
 
 
 func _cutscene(cache: Dictionary, folder: String, id: String) -> Dictionary:

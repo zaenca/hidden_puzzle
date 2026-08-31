@@ -26,6 +26,9 @@ const INTRO_FLAG := "intro_seen"
 ## показывает тап — и в фазе поиска уровня, и в локации-уборке: жест один и тот
 ## же, а единственное, чему игрока научили до этого, — тащить части пазла.
 const SEARCH_FLAG := "search_taught"
+## «Игрок уже видел журнал заданий». Пока флага нет, указатель на карте ведёт к
+## кнопке журнала, а первое его открытие объясняет, как список устроен.
+const JOURNAL_FLAG := "journal_seen"
 const INTRO_ID := "opening"
 
 signal screen_changed(screen: int)
@@ -43,6 +46,11 @@ var selected_item: String = ""
 ## автолоад на UI-скрипт.
 var inventory: Control = null
 
+## Журнал заданий из оверлея. Тип широкий по той же причине, что у inventory:
+## виджет сам обращается к Game, и назвать его здесь по классу значит замкнуть
+## автолоад на UI-скрипт.
+var journal: Control = null
+
 var _root: Node = null
 var _current: Node = null
 var _current_dialog: String = ""
@@ -57,6 +65,10 @@ func _ready() -> void:
 
 func attach(root: Node) -> void:
 	_root = root
+
+
+func attach_journal(widget: Control) -> void:
+	journal = widget
 
 
 func attach_inventory(bar: Control) -> void:

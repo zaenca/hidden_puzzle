@@ -12,4 +12,7 @@ signal cooldown_started(action_id: String)
 signal cooldown_finished(action_id: String)
 signal shop_visual_changed(shop_id: String, slot_id: String, state_id: String)
 signal narrative_requested(text: String)
+## Обучающая последовательность доиграна. Слушает карта: её указатель вёл к
+## кнопке журнала, а после объяснения должен вести к зданию.
+signal tutorial_finished(id: String)
 signal toast(text: String)

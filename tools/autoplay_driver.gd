@@ -82,6 +82,10 @@ func run(tree: SceneTree) -> void:
 	_check("площадь: задача «Осмотреть пекарню» открыта",
 		Game.meta.task_state("task_visit_bakery") == MetaService.TaskState.AVAILABLE)
 	_check_map_task_bar(["task_visit_bakery"])
+	## До обучения рука ведёт к журналу, а не к зданию: список объясняет, зачем
+	## вообще идти в пекарню. К зданию она переезжает, когда объяснение доиграно.
+	_check_hint_points_at_journal()
+	await _play_journal_coach()
 	_check_map_hint_points_at("bakery")
 
 	# --- карта: закрытые объекты тоже кликабельны --------------------------
@@ -554,6 +558,56 @@ func _check_map_task_bar(expected_ids: PackedStringArray) -> void:
 			titles.append(t.title)
 	_check("площадь: в панели ровно %d задача — %s" % [expected_ids.size(), ", ".join(titles)],
 		rows == expected_ids.size())
+
+
+## Указатель на кнопку журнала. Кнопка живёт в оверлее, поэтому и рука там же —
+## проверяем, что она рядом с кнопкой, а не «где-то на экране».
+func _check_hint_points_at_journal() -> void:
+	var map: Node = Game.current()
+	var journal: Node = Game.journal
+	if map == null or not ("_hand" in map) or journal == null:
+		_check("площадь: указатель доступен", false)
+		return
+	_check("площадь: рука показывает на журнал", map._hand != null)
+	if map._hand == null:
+		return
+	var center: Vector2 = journal.call("button_center")
+	_check("площадь: рука стоит на кнопке журнала",
+		center.distance_to(map._hand.position) < 4.0)
+
+
+## Обучение журналу: игрок открывает список и прощёлкивает объяснение. Прогон
+## делает ровно то же — кнопкой, а не вызовом _finish_coach: сцена, у которой
+## объяснение доигрывается только изнутри, для игрока ничем не отличается от
+## сцены без объяснения.
+func _play_journal_coach() -> void:
+	var journal: Node = Game.journal
+	if journal == null:
+		_check("журнал: виджет на месте", false)
+		return
+	_check("обучение: до открытия журнала флаг не стоит",
+		not bool(Game.meta.flags.get(Game.JOURNAL_FLAG, false)))
+
+	journal.call("open")
+	await _tree.process_frame
+	await _tree.create_timer(0.3).timeout
+	_check("обучение: подсказка появилась вместе со списком",
+		bool(journal.call("coach_running")))
+
+	## Список из json, и шагов в нём столько, сколько написано в контенте.
+	var steps: int = ContentDB.tutorial("journal").get("steps", []).size()
+	_check("обучение: шаги прочитаны из контента — %d" % steps, steps >= 4)
+
+	var guard := 0
+	while bool(journal.call("coach_running")) and guard <= steps + 2:
+		guard += 1
+		journal.call("_next_step")
+		await _tree.create_timer(0.05).timeout
+	_check("обучение: пролистано до конца кнопкой", not bool(journal.call("coach_running")))
+	_check("обучение: флаг выставлен",
+		bool(Game.meta.flags.get(Game.JOURNAL_FLAG, false)))
+	journal.call("close")
+	await _tree.create_timer(0.3).timeout
 
 
 ## Указатель обязан стоять на здании, а не «где-то на карте».

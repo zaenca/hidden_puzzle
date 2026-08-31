@@ -16,6 +16,9 @@ const CHECKBOX_DONE := "res://art/ui/checkboxdone.png"
 const COIN_ICON := "res://art/ui/coin.png"
 const CHECKBOX_SIZE := Vector2(64, 64)
 const COIN_SIZE := Vector2(52, 52)
+const TUTORIAL_ID := "journal"
+const COACH_WIDTH := 820.0
+const COACH_HEIGHT := 220.0
 const BUTTON_SIZE := Vector2(124, 124)
 const EDGE := 24.0          ## отступ от края экрана, поверх safe area
 const PANEL_WIDTH := 900.0
@@ -30,6 +33,19 @@ const LATER := Color(0.58, 0.50, 0.40)
 var _button: TextureButton
 var _sheet: Control
 var _list: VBoxContainer
+## Строки, на которые указывает обучение. Держим ссылками, а не поиском по
+## индексу: список пересобирается, и индекс в нём значит разное в разное время.
+var _done_row: Control = null
+var _current_row: Control = null
+var _locked_row: Control = null
+var _panel: Control = null
+var _coach: Control = null
+var _coach_panel: Control = null
+var _coach_text: Label = null
+var _coach_next: Button = null
+var _hand: TutorialHand = null
+var _steps: Array = []
+var _step_index: int = 0
 var _active: bool = false
 
 
@@ -38,6 +54,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build_button()
 	_build_sheet()
+	_build_coach()
 	_fit_to_screen()
 	## Задача закрывается в мете, часто ещё на уровне. Журнал, собранный один
 	## раз при старте, показывал бы вчерашний список.
@@ -92,7 +109,8 @@ func _build_sheet() -> void:
 	## список читается поверх незатемнённой карты.
 	_sheet.set_anchors_preset(Control.PRESET_FULL_RECT)
 
-	var panel := UIKit.plate(UIKit.PLATE)
+	_panel = UIKit.plate(UIKit.PLATE)
+	var panel := _panel
 	panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_sheet.add_child(panel)
 	panel.position = Vector2((get_viewport_rect().size.x - PANEL_WIDTH) * 0.5, PANEL_TOP)
@@ -112,6 +130,36 @@ func _build_sheet() -> void:
 	col.add_child(_list)
 
 
+
+
+## Слой обучения: своё затемнение поверх списка и панель с текстом. Отдельно от
+## _sheet, потому что у них разное поведение по тапу — список закрывается, а
+## объяснение листается кнопкой и промахом не сбивается.
+func _build_coach() -> void:
+	_coach = UIKit.full_screen_dim(0.45)
+	_coach.visible = false
+	_coach.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_coach)
+	_coach.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	_coach_panel = UIKit.plate(UIKit.PLATE)
+	_coach_panel.custom_minimum_size = Vector2(COACH_WIDTH, COACH_HEIGHT)
+	_coach.add_child(_coach_panel)
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 14)
+	_coach_panel.add_child(col)
+
+	_coach_text = UIKit.plate_label(28)
+	col.add_child(_coach_text)
+
+	var center := CenterContainer.new()
+	col.add_child(center)
+	_coach_next = UIKit.plate_button("Далее", 28)
+	_coach_next.pressed.connect(_next_step)
+	center.add_child(_coach_next)
+
+
 ## --- содержимое -------------------------------------------------------------
 
 func _rebuild() -> void:
@@ -129,13 +177,44 @@ func _rebuild() -> void:
 	## игра пока не выполняет, а нумерация всё равно остаётся сквозной, и по ней
 	## видно, что путь продолжается.
 	var n := 0
+	_done_row = null
+	_current_row = null
+	_locked_row = null
+	var locked := 0
 	for task in Game.meta.all_tasks():
 		n += 1
 		var state: int = Game.meta.task_state(task.id)
 		if state == MetaService.TaskState.LOCKED:
+			locked += 1
 			continue
-		_list.add_child(_row(n, task, state))
+		var row := _row(n, task, state)
+		_list.add_child(row)
+		if state == MetaService.TaskState.COMPLETED:
+			_done_row = row
+		else:
+			_current_row = row
 
+	## Место закрытых заданий видно, даже когда их не видно: пустой хвост списка
+	## иначе читается как «это всё, что есть в игре».
+	if locked > 0:
+		_locked_row = _locked_hint()
+		_list.add_child(_locked_row)
+
+
+
+
+## Хвост списка: место, где появятся следующие задания. Без него короткий список
+## читается как «в игре больше ничего нет», а с перечислением закрытых задач он
+## превращается в спойлер — поэтому здесь обещание, а не оглавление.
+func _locked_hint() -> Control:
+	var panel := UIKit.plate(UIKit.PLATE)
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.modulate.a = 0.75
+	var text := _line(
+		"Следующие задания откроются, когда выполните текущее.\nЗа все задания — награда.",
+		24, LATER)
+	panel.add_child(text)
+	return panel
 
 ## Строка журнала — отдельная плашка: задания читают по одному, и общий список
 ## внутри одной рамки склеивает их в абзац. Слева чекбокс, справа награда —
@@ -257,9 +336,26 @@ func open() -> void:
 	_fit_to_screen()
 	_rebuild()
 	_sheet.visible = true
+	## Указатель на кнопку журнала больше не нужен: кнопку уже нажали. Ставит его
+	## карта, но живёт он здесь, рядом с кнопкой, — и снять его проще тому, кто
+	## знает, что кнопка сработала.
+	for child in get_children():
+		if child is TutorialHand:
+			(child as TutorialHand).stop()
+	## Первое открытие журнала объясняет, как он устроен. Позже — только список:
+	## объяснение, которое повторяется, читается как поломка.
+	if not bool(Game.meta.flags.get(Game.JOURNAL_FLAG, false)):
+		## Кадром позже: подсказка встаёт под своей строкой, а размеры строк
+		## контейнер посчитает только после раскладки, и сейчас они нулевые.
+		await get_tree().process_frame
+		_start_coach()
 
 
 func close() -> void:
+	## Пока идёт объяснение, журнал не закрывается: игрок ещё не знает, что́ он
+	## закрывает, и промах мимо панели стоил бы ему всего обучения.
+	if coach_running():
+		return
 	if _sheet != null:
 		_sheet.visible = false
 
@@ -269,6 +365,16 @@ func _on_sheet_input(event: InputEvent) -> void:
 	var click: bool = event is InputEventMouseButton and (event as InputEventMouseButton).pressed
 	if tap or click:
 		close()
+
+
+
+
+## Центр кнопки. Нужен карте: указатель на журнал ставит она, а где именно
+## стоит кнопка, знает только сам журнал.
+func button_center() -> Vector2:
+	if _button == null or not _button.visible:
+		return Vector2.ZERO
+	return _button.global_position + _button.size * 0.5
 
 
 ## --- для headless-прогона ---------------------------------------------------
@@ -320,3 +426,95 @@ func _has_done_mark(node: Node) -> bool:
 		if _has_done_mark(child):
 			return true
 	return false
+
+
+## --- обучение ---------------------------------------------------------------
+
+## Первое открытие журнала объясняет, как он устроен: зачем список, что в нём
+## уже сделано, что делать сейчас и что будет дальше. Шаги и тексты лежат в
+## content/tutorial/journal.json — порядок объяснения это контент, а не код.
+##
+## Обучение показывается один раз за партию: флаг живёт в мете, поэтому «Сброс
+## прогресса» возвращает и его.
+func _start_coach() -> void:
+	_steps = ContentDB.tutorial(TUTORIAL_ID).get("steps", [])
+	if _steps.is_empty():
+		Game.meta.set_flag(Game.JOURNAL_FLAG, true)
+		return
+	_step_index = -1
+	_coach.visible = true
+	_next_step()
+
+
+func _next_step() -> void:
+	_step_index += 1
+	if _step_index >= _steps.size():
+		_finish_coach()
+		return
+
+	var step: Dictionary = _steps[_step_index]
+	_coach_text.text = String(step.get("text", ""))
+	_coach_next.text = "Понятно" if _step_index == _steps.size() - 1 else "Далее"
+
+	## Подсказка всегда стоит ПОД журналом, а не под своей строкой: под строкой
+	## она накрывает остаток списка — ровно то, про что рассказывает, — и текст
+	## прыгает по экрану от шага к шагу. Показывает рука, объясняет панель.
+	var target: Control = _target_row(String(step.get("target", "")))
+	var screen := get_viewport_rect().size
+	var below := PANEL_TOP + 200.0
+	if _panel != null and _panel.size.y > 0.0:
+		below = _panel.global_position.y + _panel.size.y + 26.0
+	_coach_panel.position = Vector2(
+		(screen.x - COACH_WIDTH) * 0.5,
+		minf(below, screen.y - COACH_HEIGHT - 40.0))
+
+	_aim_hand(target)
+	_aim_hand(target)
+
+
+## На что смотрит шаг. Пустой или неизвестный target — подсказка просто стоит
+## под списком: обучение не должно падать из-за опечатки в контенте.
+func _target_row(id: String) -> Control:
+	match id:
+		"done":
+			return _done_row
+		"current":
+			return _current_row
+		"locked":
+			return _locked_row
+		"list":
+			return _list
+	return null
+
+
+func _aim_hand(target: Control) -> void:
+	if _hand != null:
+		_hand.stop()
+		_hand = null
+	if target == null or target.size.y <= 0.0:
+		return
+	_hand = TutorialHand.new()
+	_coach.add_child(_hand)
+	_hand.play_tap(target.global_position + target.size * 0.5)
+	## Под панель: рука показывает на строку, а не на текст объяснения, и
+	## перекрывать его ладонью — значит прятать то, ради чего всё затеяно.
+	_coach.move_child(_hand, 0)
+
+
+func _finish_coach() -> void:
+	if _hand != null:
+		_hand.stop()
+		_hand = null
+	_coach.visible = false
+	Game.meta.set_flag(Game.JOURNAL_FLAG, true)
+	## Карта перерисует свой указатель: он вёл сюда, а теперь должен вести в
+	## пекарню. Событие общее — сцена сама решает, что с ним делать.
+	EventBus.tutorial_finished.emit(TUTORIAL_ID)
+	SaveService.save_game()
+
+
+## Идёт ли обучение прямо сейчас. Нужно прогону и самому журналу: пока оно идёт,
+## тап мимо списка не закрывает журнал — иначе объяснение обрывается на первом
+## же промахе.
+func coach_running() -> bool:
+	return _coach != null and _coach.visible
