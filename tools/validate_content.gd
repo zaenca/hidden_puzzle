@@ -111,7 +111,9 @@ func _check_levels() -> void:
 		var lvl: LevelDefinition = lvl_v
 		if not tasks.has(lvl.task_id):
 			_err("%s: неизвестная задача '%s'" % [lvl.id, lvl.task_id])
-		if not PuzzleRegistry.is_known(lvl.puzzle.module_id):
+		## Пустой модуль — это «уровень без сборки», а не опечатка: в зале игрок
+		## убирается, и пазла там нет по замыслу.
+		if not lvl.puzzle.module_id.is_empty() and not PuzzleRegistry.is_known(lvl.puzzle.module_id):
 			_err("%s: неизвестный puzzle-модуль '%s'" % [lvl.id, lvl.puzzle.module_id])
 		## Арт часто приезжает позже контента, и уровень остаётся играбельным на
 		## заглушке — но молча собирать не ту картинку игрок не должен.

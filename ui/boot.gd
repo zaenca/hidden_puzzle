@@ -124,8 +124,6 @@ func _build_overlay() -> void:
 	col.add_child(_debug_button("Пекарня: фасад + хозяйка", func():
 		_debug_panel.visible = false
 		Game.open_intro("bakery_facade")))
-	col.add_child(_debug_button("+50 ◆ hard", func(): MockServices.purchase("debug_pack", 50)))
-	col.add_child(_debug_button("+3 💡 бустера", func(): PlayerState.grant("booster_hint", 3)))
 	col.add_child(_debug_button("Перемотать 10 мин", func():
 		TimeService.fast_forward(600)
 		EventBus.toast.emit("Время +10 минут")))

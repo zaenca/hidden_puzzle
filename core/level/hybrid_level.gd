@@ -126,6 +126,9 @@ func _build_backdrop() -> void:
 
 	## Лоток — нарисованная плашка, та же, что под текстом в игре: части лежат на
 	## столе, а не в служебном прямоугольнике, дорисованном движком.
+	## Лоток нужен только под части. Без пазла это пустая полка на пол-экрана.
+	if not _has_puzzle():
+		return
 	_tray_slot = _plate_slot(tray_rect())
 	_backdrop.add_child(_tray_slot)
 
@@ -181,7 +184,19 @@ func _slot(rect: Rect2, bg: Color, border: Color, radius: int) -> Panel:
 
 ## --- PUZZLE -----------------------------------------------------------------
 
+## Есть ли на этом уровне сборка. Уровень без пазла — не поломка: в зале игрок
+## убирается, и заставлять его перед этим собирать ту же комнату из кусков
+## значит показывать одну и ту же картинку дважды.
+func _has_puzzle() -> bool:
+	return not definition.puzzle.module_id.is_empty()
+
+
 func _start_puzzle() -> void:
+	## Уровня без сборки фаза PUZZLE просто не касается: сцена открывается
+	## сразу, и уровень начинается с того, ради чего сделан.
+	if not _has_puzzle():
+		_reveal()
+		return
 	phase = Phase.PUZZLE
 	_puzzle = PuzzleRegistry.create(definition.puzzle.module_id)
 	if _puzzle == null:
@@ -262,10 +277,12 @@ func _reveal() -> void:
 	_stop_hint()
 	phase = Phase.REVEAL
 	_hud.set_phase("…")
-	_puzzle.fade_seams(0.35)
+	if _puzzle != null:
+		_puzzle.fade_seams(0.35)
 	await get_tree().create_timer(0.35).timeout
 
-	_puzzle.fade_out(0.3)
+	if _puzzle != null:
+		_puzzle.fade_out(0.3)
 	var tw := create_tween().set_parallel(true)
 	## Пустая полка под собранной картинкой — просто тёмный прямоугольник.
 	if _tray_slot != null:

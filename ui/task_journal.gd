@@ -19,6 +19,8 @@ const COIN_SIZE := Vector2(52, 52)
 const TUTORIAL_ID := "journal"
 const COACH_WIDTH := 820.0
 const COACH_HEIGHT := 220.0
+## Отступ пальца от правого края строки: под ним должна быть награда, а не рамка.
+const HAND_INSET := 56.0
 const BUTTON_SIZE := Vector2(124, 124)
 const EDGE := 24.0          ## отступ от края экрана, поверх safe area
 const PANEL_WIDTH := 900.0
@@ -487,6 +489,10 @@ func _target_row(id: String) -> Control:
 	return null
 
 
+## Рука целится в правый край строки — туда, где стоит награда. С неё и начинается
+## объяснение («за каждое начисляется награда»), а по центру строки палец
+## накрывает как раз её название. Один и тот же край для всех шагов держит руку
+## на одной вертикали: три подсказки подряд не должны прыгать по экрану.
 func _aim_hand(target: Control) -> void:
 	if _hand != null:
 		_hand.stop()
@@ -495,7 +501,9 @@ func _aim_hand(target: Control) -> void:
 		return
 	_hand = TutorialHand.new()
 	_coach.add_child(_hand)
-	_hand.play_tap(target.global_position + target.size * 0.5)
+	_hand.play_tap(Vector2(
+		target.global_position.x + target.size.x - HAND_INSET,
+		target.global_position.y + target.size.y * 0.5))
 	## Под панель: рука показывает на строку, а не на текст объяснения, и
 	## перекрывать его ладонью — значит прятать то, ради чего всё затеяно.
 	_coach.move_child(_hand, 0)
@@ -507,11 +515,12 @@ func _finish_coach() -> void:
 		_hand = null
 	_coach.visible = false
 	Game.meta.set_flag(Game.JOURNAL_FLAG, true)
-	## Карта перерисует свой указатель: он вёл сюда, а теперь должен вести в
-	## пекарню. Событие общее — сцена сама решает, что с ним делать.
-	EventBus.tutorial_finished.emit(TUTORIAL_ID)
 	SaveService.save_game()
-
+	## Журнал закрывается сам: объяснение кончилось указанием, что делать дальше,
+	## и оставлять игрока перед списком, который он только что дочитал, значит
+	## заставлять его закрывать окно, чтобы увидеть ответ на «а теперь куда».
+	_sheet.visible = false
+	EventBus.tutorial_finished.emit(TUTORIAL_ID)
 
 ## Идёт ли обучение прямо сейчас. Нужно прогону и самому журналу: пока оно идёт,
 ## тап мимо списка не закрывает журнал — иначе объяснение обрывается на первом

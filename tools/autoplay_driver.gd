@@ -314,7 +314,8 @@ func _check_hall_scene() -> void:
 		_check("зал: уровень bakery_02 загружается", false)
 		return
 
-	_check("зал: пазл собирается из 9 частей", def.puzzle.piece_count() == 9)
+	## В зале пазла нет: игрок пришёл убираться, а не собирать ту же комнату.
+	_check("зал: сборки перед уборкой нет", def.puzzle.module_id.is_empty())
 	_check("зал: предметы не ищут — фазы поиска нет",
 		def.hidden_object.targets.is_empty())
 	var steps := def.cleanup
