@@ -11,6 +11,11 @@ extends Control
 ## строки этого не говорит, а она и так висит на карте.
 
 const BUTTON_ICON := "res://art/ui/taskbarbutton.png"
+const CHECKBOX_EMPTY := "res://art/ui/checkbox.png"
+const CHECKBOX_DONE := "res://art/ui/checkboxdone.png"
+const COIN_ICON := "res://art/ui/coin.png"
+const CHECKBOX_SIZE := Vector2(64, 64)
+const COIN_SIZE := Vector2(52, 52)
 const BUTTON_SIZE := Vector2(124, 124)
 const EDGE := 24.0          ## отступ от края экрана, поверх safe area
 const PANEL_WIDTH := 900.0
@@ -103,6 +108,7 @@ func _build_sheet() -> void:
 
 	_list = VBoxContainer.new()
 	_list.add_theme_constant_override("separation", 16)
+	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_child(_list)
 
 
@@ -124,35 +130,80 @@ func _rebuild() -> void:
 		_list.add_child(_row(n, task, Game.meta.task_state(task.id)))
 
 
-## Строка журнала. Номер стоит всегда: список без нумерации читается как набор
-## дел, а не как путь, и «что после чего» из него не видно.
+## Строка журнала — отдельная плашка: задания читают по одному, и общий список
+## внутри одной рамки склеивает их в абзац. Слева чекбокс, справа награда —
+## «сделано» и «за что» стоят по краям и находятся глазом без чтения.
 func _row(number: int, task: MetaTaskDefinition, state: int) -> Control:
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 2)
+	var done := state == MetaService.TaskState.COMPLETED
+	var locked := state == MetaService.TaskState.LOCKED
 
-	var mark := "•"
-	var color := LATER
-	var size := 28
-	match state:
-		MetaService.TaskState.COMPLETED:
-			mark = "✓"
-			color = DONE
-		MetaService.TaskState.LOCKED:
-			mark = "•"
-			color = LATER
-		_:
-			## Текущее — крупнее остальных: ради него журнал и открывают.
-			mark = "▶"
-			color = CURRENT
-			size = 32
+	var panel := UIKit.plate(UIKit.PLATE)
+	## Ширину строка берёт у списка, а не задаёт сама: у внешней плашки свои
+	## поля, и строка шириной «панель минус глазомер» вылезала за них — у
+	## награды справа отрезало половину числа.
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	panel.add_child(row)
 
-	box.add_child(_line("%d.  %s  %s" % [number, mark, task.title], size, color))
+	row.add_child(_checkbox(done))
+
+	var text := VBoxContainer.new()
+	text.add_theme_constant_override("separation", 2)
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(text)
+
+	## Номер стоит всегда: список без нумерации читается как набор дел, а не как
+	## путь, и «что после чего» из него не видно.
+	var color := DONE if done else (LATER if locked else CURRENT)
+	var size := 32 if not done and not locked else 28
+	text.add_child(_line("%d.  %s" % [number, task.title], size, color))
 	## Подсказка только у текущего: у пройденного она уже не нужна, у закрытого
 	## — это спойлер.
-	if state != MetaService.TaskState.COMPLETED and state != MetaService.TaskState.LOCKED \
-			and not task.hint.is_empty():
-		box.add_child(_line("     %s" % task.hint, 24, LATER))
+	if not done and not locked and not task.hint.is_empty():
+		text.add_child(_line(task.hint, 24, LATER))
+
+	if task.reward_coins > 0:
+		row.add_child(_reward(task.reward_coins, done))
+	return panel
+
+
+## Чекбокс — картинка, а не значок в тексте: он стоит в своей колонке и его
+## состояние должно читаться раньше, чем игрок начал читать строку.
+func _checkbox(done: bool) -> Control:
+	var box := TextureRect.new()
+	box.texture = Backdrop.load_texture(CHECKBOX_DONE if done else CHECKBOX_EMPTY)
+	box.custom_minimum_size = CHECKBOX_SIZE
+	box.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	box.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return box
+
+
+## Награда за задачу: монета и число. У пройденной приглушена — это уже не
+## обещание, а запись о том, что заплачено.
+func _reward(coins: int, done: bool) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+	var icon := TextureRect.new()
+	icon.texture = Backdrop.load_texture(COIN_ICON)
+	icon.custom_minimum_size = COIN_SIZE
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon)
+
+	var amount := _line(str(coins), 28, DONE if done else CURRENT)
+	## Без переноса: число короткое, а перенос по словам ломает его пополам,
+	## когда колонка с названием забирает всю ширину строки.
+	amount.autowrap_mode = TextServer.AUTOWRAP_OFF
+	amount.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	amount.custom_minimum_size = Vector2.ZERO
+	row.add_child(amount)
+	return row
 
 
 ## Свой Label вместо UIKit.label: там светлая буква с чёрной обводкой под арт,
@@ -163,7 +214,7 @@ func _line(text: String, size: int, color: Color) -> Label:
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(PANEL_WIDTH - 60.0, 0)
+	l.custom_minimum_size = Vector2(0, 0)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
 
@@ -221,7 +272,39 @@ func lines() -> PackedStringArray:
 	if _list == null:
 		return out
 	for row in _list.get_children():
-		for child in row.get_children():
-			if child is Label:
-				out.append((child as Label).text)
+		_collect_labels(row, out)
 	return out
+
+
+## Обход в глубину: строка журнала — это плашка, внутри неё колонка, внутри
+## колонки текст. Перебор одних только прямых детей не находит ничего.
+func _collect_labels(node: Node, out: PackedStringArray) -> void:
+	if node is Label:
+		out.append((node as Label).text)
+	for child in node.get_children():
+		_collect_labels(child, out)
+
+
+## Названия задач, отмеченных галочкой. Читаем текстуру чекбокса, а не состояние
+## задачи в мете: галочка — это то, по чему игрок судит о своём прогрессе, и
+## разойтись она может именно с метой.
+func done_titles() -> PackedStringArray:
+	var out := PackedStringArray()
+	if _list == null:
+		return out
+	for row in _list.get_children():
+		var texts := PackedStringArray()
+		_collect_labels(row, texts)
+		if not texts.is_empty() and _has_done_mark(row):
+			out.append(texts[0])
+	return out
+
+
+func _has_done_mark(node: Node) -> bool:
+	if node is TextureRect:
+		var tex: Texture2D = (node as TextureRect).texture
+		return tex != null and tex.resource_path == CHECKBOX_DONE
+	for child in node.get_children():
+		if _has_done_mark(child):
+			return true
+	return false

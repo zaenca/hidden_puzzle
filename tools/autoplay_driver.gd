@@ -58,10 +58,16 @@ func run(tree: SceneTree) -> void:
 	await _finish_current_level()
 	_check("после пазла — сразу городская площадь, без экрана результата",
 		Game.screen == Game.Screen.MAP)
-	## Осмотр района — часть разговора с мэром, а не добыча: ни предмета в
-	## инвентаре, ни начислений за первый пазл.
+	## Осмотр района — часть разговора с мэром, а не добыча: предмета в
+	## инвентаре после него нет. Монеты приходят, но за ЗАДАЧУ, а не за уровень:
+	## 300 стартовых + 10 обещанных в журнале.
 	_check("L1: инвентарь после первого пазла пуст", _bag_size() == 0)
-	_check("L1: за сюжетный пазл не начислено монет", PlayerState.amount_of("coins") == 300)
+	_check("L1: за задачу начислено 10 монет", PlayerState.amount_of("coins") == 310)
+	## Награда выдаётся один раз: пересчёт состояний задач идёт на каждом
+	## refresh, и платить по факту «задача выполнена» значило бы платить всегда.
+	Game.meta.refresh()
+	_check("L1: повторный пересчёт не удваивает награду",
+		PlayerState.amount_of("coins") == 310)
 
 	_check("L1: задача осмотра закрылась сама",
 		Game.meta.task_state("task_survey_district") == MetaService.TaskState.COMPLETED)
@@ -450,7 +456,7 @@ func _check_journal(done_title: String, current_title: String) -> void:
 	_check("журнал: открывается кнопкой", bool(node.call("is_open")))
 
 	var lines: PackedStringArray = node.call("lines")
-	_check("журнал: показывает все задачи — %d" % lines.size(), lines.size() >= 5)
+	_check("журнал: показывает все задачи", lines.size() >= 5)
 
 	var done_at := -1
 	var current_at := -1
@@ -458,14 +464,24 @@ func _check_journal(done_title: String, current_title: String) -> void:
 		var line := String(lines[i])
 		if line.contains(done_title):
 			done_at = i
-			_check("журнал: «%s» отмечено выполненным" % done_title, line.contains("✓"))
 		elif line.contains(current_title):
 			current_at = i
-			_check("журнал: «%s» отмечено текущим" % current_title, line.contains("▶"))
 	## Порядок, а не просто наличие: журнал существует ради «что после чего»,
 	## и список, где пройденное стоит после текущего, врёт именно об этом.
 	_check("журнал: пройденное стоит перед текущим",
 		done_at >= 0 and current_at > done_at)
+
+	## Галочка читается из картинки чекбокса: по ней игрок и судит о прогрессе.
+	var done: PackedStringArray = node.call("done_titles")
+	var done_marked := false
+	var current_marked := false
+	for title in done:
+		if String(title).contains(done_title):
+			done_marked = true
+		if String(title).contains(current_title):
+			current_marked = true
+	_check("журнал: у «%s» стоит галочка" % done_title, done_marked)
+	_check("журнал: у «%s» галочки нет" % current_title, not current_marked)
 	node.call("close")
 
 

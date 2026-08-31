@@ -1,6 +1,7 @@
 [
   {
     "id": "task_survey_district",
+    "reward": { "coins": 10 },
     "play_label": "Собрать",
     "order": 1,
     "shop_id": "bakery",

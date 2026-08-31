@@ -271,6 +271,7 @@ static func task(d: Dictionary) -> MetaTaskDefinition:
 	t.hotspot = String(d.get("hotspot", ""))
 	t.order = int(d.get("order", 0))
 	t.play_label = String(d.get("play_label", ""))
+	t.reward_coins = int((d.get("reward", {}) as Dictionary).get("coins", 0))
 	return t
 
 

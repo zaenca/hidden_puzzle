@@ -22,7 +22,6 @@ var _slots: Dictionary = {}          ## slot_id -> StateSlot
 var _slot_defs: Dictionary = {}      ## slot_id -> ShopSlotDefinition
 var _focus: MetaFocus = null
 var _task_list: VBoxContainer
-var _wallet: Label
 var _margin: MarginContainer
 
 ## Прямоугольник, к которому нормализованы rect'ы слотов. С настоящим артом это
@@ -69,7 +68,6 @@ func _build() -> void:
 	EventBus.shop_visual_changed.connect(_on_visual_changed)
 	EventBus.task_state_changed.connect(func(_t, _s): _queue_rebuild())
 	EventBus.cooldown_finished.connect(func(_a): _queue_rebuild())
-	EventBus.currency_changed.connect(func(_i, _v): _update_wallet())
 	EventBus.inventory_changed.connect(func(_i, _v):
 		call_deferred("_apply_margins")
 		call_deferred("_refresh_collection"))
@@ -363,10 +361,12 @@ func _build_ui() -> void:
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(title)
 
-	_wallet = UIKit.label("", 26)
-	_wallet.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	header.add_child(_wallet)
-	_update_wallet()
+	## Справа в этом углу стоит плашка кошелька — она в оверлее и про шапку сцены
+	## ничего не знает. Держим под неё место, иначе заголовок уедет под монеты.
+	var wallet_gap := Control.new()
+	wallet_gap.custom_minimum_size = Vector2(WalletBar.SIZE.x + WalletBar.EDGE, 0)
+	wallet_gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header.add_child(wallet_gap)
 
 	## Полоска «что собрать» стоит СРАЗУ под заголовком, а не над списком задач:
 	## внизу и так две панели, и третья накрыла бы ту самую сцену, в которой
@@ -401,10 +401,6 @@ func _apply_margins() -> void:
 	if _margin != null and _margin.is_inside_tree():
 		SafeArea.apply(_margin, 20, Game.bottom_reserved())
 
-
-func _update_wallet() -> void:
-	if _wallet != null:
-		_wallet.text = "%d ● %d ◆" % [PlayerState.amount_of("coins"), PlayerState.amount_of("hard")]
 
 
 func _queue_rebuild() -> void:

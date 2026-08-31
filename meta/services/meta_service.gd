@@ -20,6 +20,8 @@ var completed_levels: Dictionary = {} ## level_id -> сколько раз пр�
 var flags: Dictionary = {}
 var levels_completed_total: int = 0
 var pending_narrative: PackedStringArray = PackedStringArray()
+## task_id -> true. Задачи, за которые награда уже выдана.
+var rewarded_tasks: Dictionary = {}
 
 var _auto_applying: bool = false
 
@@ -54,6 +56,8 @@ func refresh() -> void:
 			var before: int = task_states.get(task_id, TaskState.LOCKED)
 			var after := TaskResolver.compute(db.task(task_id), self)
 			if after != before:
+				if after == TaskState.COMPLETED:
+					_pay_task_reward(task_id)
 				task_states[task_id] = after
 				EventBus.task_state_changed.emit(task_id, after)
 	_auto_apply_ready()
@@ -410,9 +414,24 @@ func _complete_action(task_id: String, action: MetaActionDefinition) -> void:
 	var lines := EffectRunner.apply(action.effects, self)
 	for l in lines:
 		pending_narrative.append(l)
+	_pay_task_reward(task_id)
 	task_states[task_id] = TaskState.COMPLETED
 	EventBus.task_state_changed.emit(task_id, TaskState.COMPLETED)
 	refresh()
+
+
+## Награда за задачу выдаётся один раз за партию. Состояния задач пересчитываются
+## на каждом refresh и после каждой загрузки сейва, поэтому «задача выполнена» —
+## не событие, а факт, и платить по нему нельзя: список выданных наград и есть
+## то, что отличает первое выполнение от сотого пересчёта.
+func _pay_task_reward(task_id: String) -> void:
+	if rewarded_tasks.has(task_id):
+		return
+	var task: MetaTaskDefinition = db.task(task_id)
+	if task == null or task.reward_coins <= 0:
+		return
+	rewarded_tasks[task_id] = true
+	player.grant("coins", task.reward_coins)
 
 
 func take_narrative() -> PackedStringArray:
@@ -433,6 +452,7 @@ func save_data() -> Dictionary:
 		"completed_levels": completed_levels.duplicate(),
 		"levels_completed_total": levels_completed_total,
 		"flags": flags.duplicate(),
+		"rewarded_tasks": rewarded_tasks.duplicate(),
 	}
 
 
@@ -447,6 +467,9 @@ func load_data(d: Dictionary) -> void:
 		completed_levels[String(k)] = int(d["completed_levels"][k])
 	levels_completed_total = int(d.get("levels_completed_total", 0))
 	flags = (d.get("flags", {}) as Dictionary).duplicate()
+	## Без этого списка загрузка сейва пересчитала бы состояния задач и заплатила
+	## за каждую пройденную заново — на каждом запуске игры.
+	rewarded_tasks = (d.get("rewarded_tasks", {}) as Dictionary).duplicate()
 
 
 func reset() -> void:
@@ -454,6 +477,7 @@ func reset() -> void:
 	task_states.clear()
 	completed_levels.clear()
 	flags.clear()
+	rewarded_tasks.clear()
 	levels_completed_total = 0
 	pending_narrative = PackedStringArray()
 	ensure_defaults()

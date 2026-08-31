@@ -9,6 +9,7 @@ var _debug_panel: Control
 var _inventory: InventoryBar
 var _notification: TaskNotification
 var _journal: TaskJournal
+var _wallet: WalletBar
 var _autoplay: AutoplayDriver = null
 
 
@@ -88,6 +89,13 @@ func _build_overlay() -> void:
 	root.add_child(_journal)
 	_journal.set_active(false)
 
+	## Кошелёк — тоже в оверлее: деньги не принадлежат экрану, и собранный в
+	## сцене счёт пришлось бы повторять в карте, локации и магазине.
+	_wallet = WalletBar.new()
+	_wallet.name = "WalletBar"
+	root.add_child(_wallet)
+	_wallet.set_active(false)
+
 	if not OS.is_debug_build():
 		return
 
@@ -157,6 +165,8 @@ func _on_screen_changed(screen: int) -> void:
 	## углу читалась бы как второй выход.
 	if _journal != null:
 		_journal.set_active(in_meta)
+	if _wallet != null:
+		_wallet.set_active(in_meta)
 
 
 func _show_toast(text: String) -> void:
