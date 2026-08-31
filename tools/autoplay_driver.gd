@@ -40,7 +40,10 @@ func run(tree: SceneTree) -> void:
 		Game.meta.task_state("task_survey_district") == MetaService.TaskState.AVAILABLE)
 
 	_check("старт: новая игра открывается вступлением", Game.screen == Game.Screen.INTRO)
-	Game.finish_intro()
+	## Заставку пропускаем кнопкой, а не вызовом finish_intro: у игрока есть
+	## только кнопка, и «метод отработал» ничего не говорит о том, что до неё
+	## можно дотянуться.
+	_press_skip("вступление")
 	await tree.create_timer(0.3).timeout
 	_check("после вступления — диалог с мэром", Game.screen == Game.Screen.DIALOG)
 	_check_dialog_runs()
@@ -206,7 +209,46 @@ func run(tree: SceneTree) -> void:
 	_check("сейв: пройдено разных уровней = %d" % distinct_levels,
 		Game.meta.completed_levels.size() == distinct_levels)
 
+	await _check_dialog_skip()
+
 	_report()
+
+
+## Пропуск проверяем нажатием на настоящую кнопку. Кнопка тут — единственное,
+## что есть у игрока: сцена, у которой пропуск работает только изнутри, для него
+## ничем не отличается от сцены без пропуска.
+func _press_skip(where: String) -> bool:
+	var button := _find_skip_button(Game.current())
+	_check("%s: кнопка «Пропустить» есть на экране" % where, button != null)
+	if button == null:
+		return false
+	button.pressed.emit()
+	return true
+
+
+func _find_skip_button(node: Node) -> Button:
+	if node == null:
+		return null
+	if node is Button and (node as Button).text == "Пропустить":
+		return node
+	for child in node.get_children():
+		var found := _find_skip_button(child)
+		if found != null:
+			return found
+	return null
+
+
+## Пропуск разговора обязан доигрывать его до конца, а не бросать: флаг и
+## переход дальше висят на on_finish, и выход мимо него оставил бы игрока между
+## сценами. Проверка стоит последней: она уводит с экрана, а до этого прогон
+## занят самим сюжетом.
+func _check_dialog_skip() -> void:
+	Game.open_dialog("intro_mayor")
+	await _tree.create_timer(0.4).timeout
+	if not _press_skip("диалог"):
+		return
+	await _tree.create_timer(0.4).timeout
+	_check("диалог: пропуск уводит с экрана диалога", Game.screen != Game.Screen.DIALOG)
 
 
 ## Диалог листается той же кнопкой, что и у игрока: проверяем, что цепочка

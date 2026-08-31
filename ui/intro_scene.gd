@@ -102,15 +102,9 @@ func _build_ui() -> void:
 	lift.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(lift)
 
-	var skip := UIKit.button("Пропустить", 26)
-	skip.custom_minimum_size = Vector2(240, 88)
-	skip.pressed.connect(_finish)
-	root.add_child(skip)
-	skip.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	skip.offset_left = -260
-	skip.offset_top = 40
-	skip.offset_right = -20
-	skip.offset_bottom = 128
+	## Пропуск целиком, а не по экрану: заставку смотрят один раз, и на
+	## повторном прохождении листать её по кадру — работа, а не выбор.
+	UIKit.add_skip_button(root, _finish)
 
 
 ## --- смена экранов ----------------------------------------------------------

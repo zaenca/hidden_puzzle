@@ -69,6 +69,67 @@ static func plate(texture_path: String, margin: int = 36) -> PanelContainer:
 	return p
 
 
+## --- пропуск сцены ----------------------------------------------------------
+
+## Плашка под кнопкой «Пропустить». Та же картинка, что у уведомления о задаче:
+## это один и тот же элемент интерфейса — короткая надпись на кремовом поле, —
+## и рисовать под неё вторую рамку значило бы завести второй визуальный язык.
+const SKIP_PLATE := "res://art/ui/taskbar_notification.png"
+const SKIP_SIZE := Vector2(268, 104)
+const SKIP_PATCH := 34   ## поля 9-slice: перекрывают рамку и скругление
+const SKIP_EDGE := 24    ## отступ от края экрана, поверх safe area
+
+
+## Кнопка «Пропустить» в правом верхнем углу — одна на заставку и на диалог.
+## Пропуск ищут в одном месте, поэтому вид и положение у него общие: сцена
+## сообщает только, что именно считать пропуском.
+##
+## Добавляет себя в root сама: якоря и offsets Control пересчитывает от размера
+## родителя, и выставлять их до add_child значит считать их от нуля.
+static func add_skip_button(root: Control, action: Callable, text: String = "Пропустить") -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = SKIP_SIZE
+	b.add_theme_font_size_override("font_size", 30)
+	## Тёмная буква без обводки: плашка кремовая, а светлый текст с чёрным
+	## контуром — набор для арта под ним, не для бумаги.
+	for slot in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		b.add_theme_color_override(slot, PLATE_TEXT)
+	var tex := Backdrop.load_texture(SKIP_PLATE)
+	if tex != null:
+		for style in ["normal", "hover", "pressed", "focus", "disabled"]:
+			b.add_theme_stylebox_override(style, _skip_box(tex))
+	b.pressed.connect(action)
+
+	root.add_child(b)
+	## Отступ от safe area, а не от края экрана: под вырезом кнопка видна, но не
+	## нажимается, и игрок остаётся в сцене, из которой только что попросился.
+	var inset := SafeArea.insets(root.get_viewport_rect().size)
+	var right := int(inset["right"]) + SKIP_EDGE
+	var top := int(inset["top"]) + SKIP_EDGE
+	b.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	b.offset_left = -(SKIP_SIZE.x + right)
+	b.offset_top = top
+	b.offset_right = -right
+	b.offset_bottom = top + SKIP_SIZE.y
+	return b
+
+
+static func _skip_box(tex: Texture2D) -> StyleBoxTexture:
+	var sb := StyleBoxTexture.new()
+	sb.texture = tex
+	sb.texture_margin_left = SKIP_PATCH
+	sb.texture_margin_right = SKIP_PATCH
+	sb.texture_margin_top = SKIP_PATCH
+	sb.texture_margin_bottom = SKIP_PATCH
+	sb.content_margin_left = 20
+	sb.content_margin_right = 20
+	sb.content_margin_top = 12
+	sb.content_margin_bottom = 12
+	return sb
+
+
 static func full_screen_dim(alpha: float = 0.72) -> ColorRect:
 	var r := ColorRect.new()
 	r.color = Color(0.04, 0.04, 0.06, alpha)
