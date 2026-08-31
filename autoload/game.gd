@@ -13,7 +13,9 @@ const SCENE_PATHS := {
 	Screen.LEVEL: "res://core/level/hybrid_level.tscn",
 }
 
-const NEW_GAME_WALLET := {"coins": 300, "hard": 60, "booster_hint": 3}
+## Партия начинается с пустым кошельком: монеты приходят за задания и уровни,
+## и стартовые 300 «на потестировать» врали игроку про его собственный прогресс.
+const NEW_GAME_WALLET := {"coins": 0, "hard": 60, "booster_hint": 3}
 const BOOSTER_ID := "booster_hint"
 ## Вступление показывается один раз за прохождение. Флаг живёт в мете, а не в
 ## настройках: он про эту партию, и «Сброс прогресса» обязан вернуть интро.

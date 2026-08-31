@@ -60,14 +60,14 @@ func run(tree: SceneTree) -> void:
 		Game.screen == Game.Screen.MAP)
 	## Осмотр района — часть разговора с мэром, а не добыча: предмета в
 	## инвентаре после него нет. Монеты приходят, но за ЗАДАЧУ, а не за уровень:
-	## 300 стартовых + 10 обещанных в журнале.
+	## кошелёк стартует пустым, и 10 монет в нём — ровно то, что обещал журнал.
 	_check("L1: инвентарь после первого пазла пуст", _bag_size() == 0)
-	_check("L1: за задачу начислено 10 монет", PlayerState.amount_of("coins") == 310)
+	_check("L1: за задачу начислено 10 монет", PlayerState.amount_of("coins") == 10)
 	## Награда выдаётся один раз: пересчёт состояний задач идёт на каждом
 	## refresh, и платить по факту «задача выполнена» значило бы платить всегда.
 	Game.meta.refresh()
 	_check("L1: повторный пересчёт не удваивает награду",
-		PlayerState.amount_of("coins") == 310)
+		PlayerState.amount_of("coins") == 10)
 
 	_check("L1: задача осмотра закрылась сама",
 		Game.meta.task_state("task_survey_district") == MetaService.TaskState.COMPLETED)

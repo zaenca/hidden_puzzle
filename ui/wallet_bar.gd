@@ -14,11 +14,15 @@ const PLATE := "res://art/ui/taskbar_notification.png"
 const COIN := "res://art/ui/coin.png"
 const PLUS := "res://art/ui/coinplus.png"
 
-const SIZE := Vector2(300, 104)
+const SIZE := Vector2(320, 108)
 const EDGE := 24.0        ## отступ от края экрана, поверх safe area
-const ICON := Vector2(64, 64)
-const PLUS_SIZE := Vector2(58, 58)
+const ICON := Vector2(66, 66)
+const PLUS_SIZE := Vector2(62, 62)
 const PATCH := 34
+## Поля внутри плашки. Рамка нарисована по краю картинки, и содержимое, положенное
+## во весь прямоугольник, ложится прямо на неё: монета и плюс наезжали на золото.
+const PAD_X := 26
+const PAD_Y := 14
 
 const TEXT := Color(0.24, 0.16, 0.07)
 
@@ -46,12 +50,20 @@ func _build() -> void:
 	_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_plate)
 
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", PAD_X)
+	margin.add_theme_constant_override("margin_right", PAD_X)
+	margin.add_theme_constant_override("margin_top", PAD_Y)
+	margin.add_theme_constant_override("margin_bottom", PAD_Y)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_plate.add_child(margin)
+
 	var row := HBoxContainer.new()
-	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	row.add_theme_constant_override("separation", 10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_plate.add_child(row)
+	margin.add_child(row)
 
 	var coin := TextureRect.new()
 	coin.texture = Backdrop.load_texture(COIN)
@@ -63,13 +75,15 @@ func _build() -> void:
 	row.add_child(coin)
 
 	## Тёмная буква без обводки: плашка кремовая, светлый текст с контуром —
-	## набор для арта под ним, не для бумаги.
+	## набор для арта под ним, не для бумаги. Без переноса: счёт растёт до
+	## четырёх знаков, и перенос сложил бы его пополам вместо сжатия плашки.
 	_amount = Label.new()
-	_amount.add_theme_font_size_override("font_size", 34)
+	_amount.add_theme_font_size_override("font_size", 36)
 	_amount.add_theme_color_override("font_color", TEXT)
+	_amount.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_amount.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_amount.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_amount.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_amount.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_amount.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(_amount)
 
