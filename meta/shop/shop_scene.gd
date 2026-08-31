@@ -342,7 +342,14 @@ func _build_ui() -> void:
 	## Куда ведёт «назад» — из данных: кладовая лежит внутри пекарни, и с неё
 	## правильный выход в пекарню, а не сразу на площадь.
 	var back_shop := String(shop.back.get("shop_id", ""))
-	var back := UIKit.button(String(shop.back.get("label", "‹ Район")), 30)
+	## Слева в этом углу стоит кнопка журнала — она в оверлее и про шапку сцены
+	## ничего не знает. Держим под неё место, иначе «Район» окажется под ней.
+	var journal_gap := Control.new()
+	journal_gap.custom_minimum_size = Vector2(TaskJournal.BUTTON_SIZE.x + TaskJournal.EDGE, 0)
+	journal_gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header.add_child(journal_gap)
+
+	var back := UIKit.plate_button(String(shop.back.get("label", "‹ Район")), 30)
 	back.custom_minimum_size = Vector2(210, 96)
 	if back_shop.is_empty():
 		back.pressed.connect(func(): Game.open_map())
@@ -438,20 +445,33 @@ func _enter_row() -> Control:
 	var flag := String(shop.enter.get("requires_flag", ""))
 	var unlocked := flag.is_empty() or bool(Game.meta.flags.get(flag, false))
 
-	var panel := UIKit.panel()
+	## Вход — такая же строка, как задача: он и есть задача, просто описанная в
+	## магазине, а не в tasks.json. Значит и плашка под ним та же.
+	var panel := UIKit.plate(UIKit.PLATE)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 8)
 	panel.add_child(col)
 
 	var label := String(shop.enter.get("label", "Войти"))
+	## По центру, в отличие от списка задач: здесь один пункт, а не колонка, и
+	## выравнивать его по левому краю не с чем.
 	if not unlocked:
-		col.add_child(UIKit.label(label, 32, Color(0.72, 0.70, 0.68)))
-		col.add_child(UIKit.label(String(shop.enter.get("locked_text", "")), 24,
-			Color(0.9, 0.82, 0.6)))
+		col.add_child(_plate_line(label, 32, UIKit.PLATE_HINT))
+		col.add_child(_plate_line(String(shop.enter.get("locked_text", "")), 24, UIKit.PLATE_HINT))
+		for line in col.get_children():
+			(line as Label).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		return panel
 
-	var button := UIKit.button(label, 32)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var title := _plate_line(label, 32, UIKit.PLATE_TEXT)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(title)
+
+	var button := UIKit.plate_button("Войти", 32)
+	## Рамка обводит надпись, а не всю ширину панели: растянутая кнопка читается
+	## как полоса, и непонятно, что нажимать — её или строку над ней.
+	var center := CenterContainer.new()
+	center.add_child(button)
+	col.add_child(center)
 	## Куда именно ведёт вход, решает контент: есть open_shop — переходим в ту
 	## локацию, нет — показываем текст-заглушку. Сцена по-прежнему не знает,
 	## что за дверью.
@@ -461,7 +481,6 @@ func _enter_row() -> Control:
 		button.pressed.connect(func(): EventBus.toast.emit(enter_text))
 	else:
 		button.pressed.connect(func(): Game.open_shop(target_shop))
-	col.add_child(button)
 	return panel
 
 
@@ -483,6 +502,10 @@ func _task_row(task: MetaTaskDefinition) -> Control:
 	var action: MetaActionDefinition = Game.meta.action_for_task(task.id)
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 10)
+	## Кнопки стоят по центру строки и по размеру своей надписи: рамка обводит
+	## слова, а растянутая во всю панель кнопка читается как полоса, и непонятно,
+	## что в ней нажимать.
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	match state:
 		MetaService.TaskState.AVAILABLE, MetaService.TaskState.IN_PROGRESS:
@@ -491,14 +514,12 @@ func _task_row(task: MetaTaskDefinition) -> Control:
 			col.add_child(_missing_label(action))
 			if not task.level_ids.is_empty():
 				var play := UIKit.plate_button(_play_label(task), 32)
-				play.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				play.pressed.connect(func(): Game.play_task(task.id))
 				buttons.add_child(play)
 
 		MetaService.TaskState.READY_TO_APPLY:
 			col.add_child(_plate_line(action.description if action != null else "", 24, UIKit.PLATE_HINT))
 			var apply := UIKit.plate_button(_apply_label(action), 32)
-			apply.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			apply.disabled = not Game.meta.can_start_action(task.id)
 			apply.pressed.connect(func(): _on_apply(task.id))
 			buttons.add_child(apply)
@@ -513,7 +534,6 @@ func _task_row(task: MetaTaskDefinition) -> Control:
 			_update_timer(task.id)
 			if Game.meta.can_claim(task.id):
 				var claim := UIKit.plate_button("Забрать", 32)
-				claim.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				claim.pressed.connect(func(): _on_claim(task.id))
 				buttons.add_child(claim)
 			else:
@@ -538,17 +558,16 @@ func _task_row(task: MetaTaskDefinition) -> Control:
 	return panel
 
 
+## Что написано на кнопке запуска. Подпись берётся у задачи: «Разобрать» на
+## кладовой говорит игроку, что он собирается сделать, а «Играть» — только то,
+## что сейчас будет геймплей, о чём он и так догадался, нажимая кнопку.
+##
+## Счётчик уровней с кнопки убран: «1/2» — это отчёт о работе, а не обещание.
 func _play_label(task: MetaTaskDefinition) -> String:
 	var info := Game.meta.resolve_level_for_task(task.id)
-	if info.is_empty():
-		return "Играть"
-	if bool(info.get("replay", false)):
+	if not info.is_empty() and bool(info.get("replay", false)):
 		return "Повтор (награда ниже)"
-	var done := 0
-	for lid in task.level_ids:
-		if Game.meta.completed_levels.has(lid):
-			done += 1
-	return "Играть · %d/%d" % [done + 1, task.level_ids.size()]
+	return task.play_label if not task.play_label.is_empty() else "Играть"
 
 
 func _apply_label(action: MetaActionDefinition) -> String:
@@ -576,11 +595,18 @@ func _missing_label(action: MetaActionDefinition) -> Control:
 		return Control.new()
 	var parts := PackedStringArray()
 	for r in missing:
+		## Требование «пройти уровень» игроку не показываем: кнопка запуска стоит
+		## тут же, и строка «нужно: уровень storeroom_02» рассказывает про
+		## внутреннее имя файла, а не про то, что делать.
+		if r.kind == Requirement.Kind.LEVEL:
+			continue
 		if r.kind == Requirement.Kind.ITEM:
 			parts.append("%s %d/%d" % [
 				ContentDB.item_name(r.id), PlayerState.amount_of(r.id), r.amount])
 		else:
 			parts.append(r.describe())
+	if parts.is_empty():
+		return Control.new()
 	return _plate_line("Нужно: " + ", ".join(parts), 24, MISSING)
 
 

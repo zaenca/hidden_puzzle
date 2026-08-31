@@ -270,6 +270,7 @@ static func task(d: Dictionary) -> MetaTaskDefinition:
 	t.action_id = String(d.get("action_id", ""))
 	t.hotspot = String(d.get("hotspot", ""))
 	t.order = int(d.get("order", 0))
+	t.play_label = String(d.get("play_label", ""))
 	return t
 
 

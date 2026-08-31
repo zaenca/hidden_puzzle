@@ -152,10 +152,11 @@ func _on_screen_changed(screen: int) -> void:
 		_inventory.set_active(in_meta)
 	if _notification != null:
 		_notification.set_active(in_meta)
-	## Журнал открывается только на карте: в локации слева вверху стоит выход,
-	## и вторая кнопка в том же углу — это две кнопки «уйти отсюда».
+	## Журнал держится там, где игрок решает, чем заняться, — на карте и в
+	## локации. На уровне слева вверху стоит выход, и вторая кнопка в том же
+	## углу читалась бы как второй выход.
 	if _journal != null:
-		_journal.set_active(screen == Game.Screen.MAP)
+		_journal.set_active(in_meta)
 
 
 func _show_toast(text: String) -> void:
