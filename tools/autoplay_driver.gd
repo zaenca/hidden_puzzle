@@ -69,6 +69,7 @@ func run(tree: SceneTree) -> void:
 	## поверх раскрытия сцены значит перебивать ровно тот кадр, ради которого
 	## уровень и собирали.
 	_check_task_notification("Собрать план района")
+	_check_journal("Собрать план района", "Осмотреть пекарню")
 	_check("мета: пекарня выбрана", Game.meta.shop_state("bakery") == "in_restoration")
 
 	# --- площадь: ровно одна активная задача и указатель на неё -------------
@@ -437,6 +438,37 @@ func _play_hall_to_cleanup() -> void:
 
 ## «Задача закрыта» и «игрок про это узнал» — разные утверждения. Плашка живёт
 ## в оверлее Boot, поэтому ищем её там, а не в текущей сцене.
+## Журнал заданий: путь целиком, с отметкой пройденного и текущего. Проверяем
+## то, что прочтёт игрок, а не то, что мета думает про свои задачи: список
+## строит виджет, и разойтись он может именно на строках.
+func _check_journal(done_title: String, current_title: String) -> void:
+	var node: Node = _tree.root.find_child("TaskJournal", true, false)
+	if node == null:
+		_check("журнал: виджет на месте", false)
+		return
+	node.call("open")
+	_check("журнал: открывается кнопкой", bool(node.call("is_open")))
+
+	var lines: PackedStringArray = node.call("lines")
+	_check("журнал: показывает все задачи — %d" % lines.size(), lines.size() >= 5)
+
+	var done_at := -1
+	var current_at := -1
+	for i in lines.size():
+		var line := String(lines[i])
+		if line.contains(done_title):
+			done_at = i
+			_check("журнал: «%s» отмечено выполненным" % done_title, line.contains("✓"))
+		elif line.contains(current_title):
+			current_at = i
+			_check("журнал: «%s» отмечено текущим" % current_title, line.contains("▶"))
+	## Порядок, а не просто наличие: журнал существует ради «что после чего»,
+	## и список, где пройденное стоит после текущего, врёт именно об этом.
+	_check("журнал: пройденное стоит перед текущим",
+		done_at >= 0 and current_at > done_at)
+	node.call("close")
+
+
 func _check_task_notification(expected_title: String) -> void:
 	var node: Node = _tree.root.find_child("TaskNotification", true, false)
 	if node == null:

@@ -1,6 +1,7 @@
 [
   {
     "id": "task_survey_district",
+    "order": 1,
     "shop_id": "bakery",
     "room_id": "hall",
     "location": "map",
@@ -13,6 +14,7 @@
   },
   {
     "id": "task_visit_bakery",
+    "order": 2,
     "shop_id": "bakery",
     "room_id": "hall",
     "location": "map",
@@ -25,6 +27,7 @@
   },
   {
     "id": "task_clear_hall",
+    "order": 3,
     "shop_id": "bakery",
     "room_id": "hall",
     "location": "shop",
@@ -37,6 +40,7 @@
   },
   {
     "id": "task_open_storeroom",
+    "order": 4,
     "shop_id": "bakery",
     "room_id": "storeroom",
     "location": "shop",
@@ -49,6 +53,7 @@
   },
   {
     "id": "task_clear_storeroom",
+    "order": 5,
     "shop_id": "bakery_storeroom",
     "room_id": "storeroom",
     "location": "shop",

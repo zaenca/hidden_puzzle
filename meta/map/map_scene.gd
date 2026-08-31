@@ -263,25 +263,33 @@ func _rebuild_tasks() -> void:
 		if state == MetaService.TaskState.COMPLETED:
 			continue
 
-		var panel := UIKit.panel()
+		## Текущая задача стоит на той же нарисованной плашке, что и попап
+		## «задание выполнено»: это два состояния одной строки, и разный фон под
+		## ними читался бы как две разные сущности.
+		var panel := UIKit.plate(UIKit.PLATE)
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", 8)
 		panel.add_child(box)
-		box.add_child(UIKit.label(task.title, 30, UIKit.ACCENT))
+		var title := UIKit.plate_label(30, false)
+		title.text = task.title
+		box.add_child(title)
 
 		match state:
 			MetaService.TaskState.AVAILABLE, MetaService.TaskState.IN_PROGRESS:
 				if not task.hint.is_empty():
-					box.add_child(UIKit.label(task.hint, 24))
+					var hint := UIKit.plate_label(24, false)
+					hint.text = task.hint
+					hint.add_theme_color_override("font_color", UIKit.PLATE_HINT)
+					box.add_child(hint)
 				## Задача без уровней — указатель: играть в ней нечего, идти
 				## надо в локацию, и кнопка «Играть» тут врала бы.
 				if not task.level_ids.is_empty():
-					var play := UIKit.button("Играть", 32)
+					var play := UIKit.plate_button("Играть", 32)
 					play.pressed.connect(func(): Game.play_task(task.id))
 					box.add_child(play)
 			MetaService.TaskState.READY_TO_APPLY:
 				var action: MetaActionDefinition = Game.meta.action_for_task(task.id)
-				var apply := UIKit.button(action.button_label if action != null else "Применить", 32)
+				var apply := UIKit.plate_button(action.button_label if action != null else "Применить", 32)
 				apply.pressed.connect(func():
 					if Game.meta.start_action(task.id):
 						SaveService.save_game()

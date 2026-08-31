@@ -6,6 +6,10 @@ const VISUAL_RECT := Rect2(30, 210, 1020, 940)
 const CELL := Vector2(120, 108)   ## ячейка полоски «что здесь надо собрать»
 const SCREEN := Vector2(1080, 1920)
 const LETTERBOX := Color(0.06, 0.05, 0.05, 1.0)
+## Цвета строк на кремовой плашке: пройденное и нехватка ресурсов. Не те же,
+## что на тёмной панели, — светло-зелёный по бумаге не читается.
+const DONE_GREEN := Color(0.42, 0.50, 0.28)
+const MISSING := Color(0.62, 0.34, 0.16)
 
 @onready var _bg: Sprite2D = $Visuals/Background
 @onready var _slots_root: Node2D = $Visuals/Slots
@@ -462,14 +466,19 @@ func _enter_row() -> Control:
 
 
 func _task_row(task: MetaTaskDefinition) -> Control:
-	var panel := UIKit.panel()
+	## Та же нарисованная плашка, что у задачи на карте и у попапа «задание
+	## выполнено»: одна строка задачи не должна выглядеть по-разному в зависимости
+	## от того, из какого экрана на неё смотрят.
+	var panel := UIKit.plate(UIKit.PLATE)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 8)
 	panel.add_child(col)
 	_rows[task.id] = panel
 
 	var state: int = Game.meta.task_state(task.id)
-	col.add_child(UIKit.label(task.title, 32, UIKit.ACCENT))
+	var title := UIKit.plate_label(32, false)
+	title.text = task.title
+	col.add_child(title)
 
 	var action: MetaActionDefinition = Game.meta.action_for_task(task.id)
 	var buttons := HBoxContainer.new()
@@ -478,47 +487,47 @@ func _task_row(task: MetaTaskDefinition) -> Control:
 	match state:
 		MetaService.TaskState.AVAILABLE, MetaService.TaskState.IN_PROGRESS:
 			if not task.hint.is_empty():
-				col.add_child(UIKit.label(task.hint, 24, Color(0.85, 0.84, 0.8)))
+				col.add_child(_plate_line(task.hint, 24, UIKit.PLATE_HINT))
 			col.add_child(_missing_label(action))
 			if not task.level_ids.is_empty():
-				var play := UIKit.button(_play_label(task), 32)
+				var play := UIKit.plate_button(_play_label(task), 32)
 				play.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				play.pressed.connect(func(): Game.play_task(task.id))
 				buttons.add_child(play)
 
 		MetaService.TaskState.READY_TO_APPLY:
-			col.add_child(UIKit.label(action.description if action != null else "", 24))
-			var apply := UIKit.button(_apply_label(action), 32)
+			col.add_child(_plate_line(action.description if action != null else "", 24, UIKit.PLATE_HINT))
+			var apply := UIKit.plate_button(_apply_label(action), 32)
 			apply.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			apply.disabled = not Game.meta.can_start_action(task.id)
 			apply.pressed.connect(func(): _on_apply(task.id))
 			buttons.add_child(apply)
-			var again := UIKit.button("Повтор уровня", 26)
+			var again := UIKit.plate_button("Повтор уровня", 26)
 			again.pressed.connect(func(): Game.play_task(task.id))
 			buttons.add_child(again)
 
 		MetaService.TaskState.APPLYING:
-			var timer := UIKit.label("", 28)
+			var timer := _plate_line("", 28, UIKit.PLATE_TEXT)
 			col.add_child(timer)
 			_timers[task.id] = timer
 			_update_timer(task.id)
 			if Game.meta.can_claim(task.id):
-				var claim := UIKit.button("Забрать", 32)
+				var claim := UIKit.plate_button("Забрать", 32)
 				claim.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				claim.pressed.connect(func(): _on_claim(task.id))
 				buttons.add_child(claim)
 			else:
 				if action != null and action.speedup_hard_cost > 0:
-					var fast := UIKit.button("Ускорить · %d ◆" % action.speedup_hard_cost, 28)
+					var fast := UIKit.plate_button("Ускорить · %d ◆" % action.speedup_hard_cost, 28)
 					fast.pressed.connect(func(): _on_speedup(task.id))
 					buttons.add_child(fast)
 				if action != null and action.ad_reduce_sec > 0:
-					var ad := UIKit.button("Реклама −%d мин" % int(action.ad_reduce_sec / 60), 28)
+					var ad := UIKit.plate_button("Реклама −%d мин" % int(action.ad_reduce_sec / 60), 28)
 					ad.pressed.connect(func(): _on_ad(task.id))
 					buttons.add_child(ad)
 
 		MetaService.TaskState.COMPLETED:
-			col.add_child(UIKit.label("✓ выполнено", 26, Color(0.55, 0.9, 0.6)))
+			col.add_child(_plate_line("✓ выполнено", 26, DONE_GREEN))
 
 	if buttons.get_child_count() > 0:
 		col.add_child(buttons)
@@ -550,6 +559,15 @@ func _apply_label(action: MetaActionDefinition) -> String:
 	return "%s · %s" % [action.button_label, TimeService.format_duration(action.duration_sec)]
 
 
+## Строка на нарисованной плашке. Своя, а не UIKit.label: там светлая буква с
+## чёрной обводкой под арт, а здесь тёмная по кремовой бумаге.
+func _plate_line(text: String, size: int, color: Color) -> Label:
+	var l := UIKit.plate_label(size, false)
+	l.text = text
+	l.add_theme_color_override("font_color", color)
+	return l
+
+
 func _missing_label(action: MetaActionDefinition) -> Control:
 	if action == null:
 		return Control.new()
@@ -563,7 +581,7 @@ func _missing_label(action: MetaActionDefinition) -> Control:
 				ContentDB.item_name(r.id), PlayerState.amount_of(r.id), r.amount])
 		else:
 			parts.append(r.describe())
-	return UIKit.label("Нужно: " + ", ".join(parts), 24, Color(0.9, 0.82, 0.6))
+	return _plate_line("Нужно: " + ", ".join(parts), 24, MISSING)
 
 
 ## --- действия ---------------------------------------------------------------

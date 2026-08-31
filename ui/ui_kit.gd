@@ -16,6 +16,8 @@ const PLATE := "res://art/ui/taskbar_notification.png"
 
 ## Текст поверх нарисованной кремовой плашки.
 const PLATE_TEXT := Color(0.24, 0.16, 0.07)
+## Второстепенная строка на плашке: подсказка под названием задачи.
+const PLATE_HINT := Color(0.47, 0.38, 0.26)
 
 
 static func label(text: String, size: int = 34, color: Color = Color(0.95, 0.94, 0.92)) -> Label:
@@ -80,12 +82,14 @@ static func plate(texture_path: String, margin: int = 36) -> PanelContainer:
 ## брифинг уровня, уведомление о задаче, — и расходиться им нельзя. Центр по
 ## вертикали здесь не украшение: панель держит высоту под три строки, и прижатая
 ## к верху короткая фраза оставляет под собой пустое кремовое поле.
-static func plate_label(size: int = 34) -> Label:
+static func plate_label(size: int = 34, centered: bool = true) -> Label:
 	var l := Label.new()
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", PLATE_TEXT)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	## Строка задачи выравнивается по левому краю: её читают как пункт списка,
+	## а по центру пункты списка не выстраиваются в колонку.
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if centered else HORIZONTAL_ALIGNMENT_LEFT
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER if centered else VERTICAL_ALIGNMENT_TOP
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l

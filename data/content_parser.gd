@@ -269,6 +269,7 @@ static func task(d: Dictionary) -> MetaTaskDefinition:
 	t.level_ids = PackedStringArray(d.get("level_ids", []))
 	t.action_id = String(d.get("action_id", ""))
 	t.hotspot = String(d.get("hotspot", ""))
+	t.order = int(d.get("order", 0))
 	return t
 
 

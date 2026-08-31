@@ -8,6 +8,7 @@ var _toast: Label
 var _debug_panel: Control
 var _inventory: InventoryBar
 var _notification: TaskNotification
+var _journal: TaskJournal
 var _autoplay: AutoplayDriver = null
 
 
@@ -80,6 +81,13 @@ func _build_overlay() -> void:
 	root.add_child(_notification)
 	_notification.set_active(false)
 
+	## Журнал заданий — тоже в оверлее: путь игрока не принадлежит ни карте, ни
+	## локации, и в сцене его пришлось бы собирать заново на каждом переходе.
+	_journal = TaskJournal.new()
+	_journal.name = "TaskJournal"
+	root.add_child(_journal)
+	_journal.set_active(false)
+
 	if not OS.is_debug_build():
 		return
 
@@ -144,6 +152,10 @@ func _on_screen_changed(screen: int) -> void:
 		_inventory.set_active(in_meta)
 	if _notification != null:
 		_notification.set_active(in_meta)
+	## Журнал открывается только на карте: в локации слева вверху стоит выход,
+	## и вторая кнопка в том же углу — это две кнопки «уйти отсюда».
+	if _journal != null:
+		_journal.set_active(screen == Game.Screen.MAP)
 
 
 func _show_toast(text: String) -> void:

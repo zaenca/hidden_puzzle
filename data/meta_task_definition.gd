@@ -12,3 +12,7 @@ extends Resource
 @export var level_ids: PackedStringArray = PackedStringArray()
 @export var action_id: String = ""
 @export var hotspot: String = ""        ## slot_id, к которому летит камера
+## Место задачи в сюжете. Явным числом, а не выводом из номера уровня: задачи
+## без уровней («Осмотреть пекарню», «Вынести мусор») из уровня порядок взять
+## не могут, а в журнале стоят посреди цепочки, а не в конце.
+@export var order: int = 0

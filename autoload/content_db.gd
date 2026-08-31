@@ -131,7 +131,13 @@ func item_name(id: String) -> String:
 	return it.display_name if it != null else id
 
 
+## Порядок задачи в сюжете. Явное поле `order` из данных главнее: задача без
+## уровней иначе получает 9999 и уезжает в конец списка, хотя по сюжету стоит
+## посреди цепочки. Вывод из номера уровня остаётся запасным — для контента,
+## где порядок ещё не проставлен.
 func _task_order(t: MetaTaskDefinition) -> int:
+	if t.order > 0:
+		return t.order
 	if t.level_ids.is_empty():
 		return 9999
 	var entry = level_index.get(t.level_ids[0], {})

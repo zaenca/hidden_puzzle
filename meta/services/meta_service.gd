@@ -135,6 +135,18 @@ func is_shop_open(shop_id: String) -> bool:
 	return shop_state(shop_id) != "locked"
 
 
+## Весь путь игрока в сюжетном порядке — для журнала. В отличие от tasks_at()
+## отдаёт и выполненные, и ещё закрытые: журнал существует ровно затем, чтобы
+## показать, что уже сделано и что впереди, а список из одной текущей строки
+## этого не говорит.
+func all_tasks() -> Array[MetaTaskDefinition]:
+	var out: Array[MetaTaskDefinition] = []
+	for t in db.tasks.values():
+		out.append(t)
+	out.sort_custom(func(a, b): return db._task_order(a) < db._task_order(b))
+	return out
+
+
 func tasks_at(location: String, shop_id: String = "") -> Array[MetaTaskDefinition]:
 	var out: Array[MetaTaskDefinition] = []
 	for t in db.tasks.values():
