@@ -70,6 +70,10 @@ func _build() -> void:
 	coin.custom_minimum_size = ICON
 	coin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	coin.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	## Мип-мапы: исходник монеты — тысяча пикселей, а на экране она 66, и без
+	## них уменьшение берёт один пиксель из шестнадцати — золото рассыпается
+	## в зерно и читается как мыло.
+	coin.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(coin)
@@ -94,6 +98,7 @@ func _build() -> void:
 	_plus.texture_normal = Backdrop.load_texture(PLUS)
 	_plus.ignore_texture_size = true
 	_plus.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	_plus.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_plus.custom_minimum_size = PLUS_SIZE
 	_plus.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_plus.pressed.connect(_on_plus)

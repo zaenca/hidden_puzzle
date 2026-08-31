@@ -2,7 +2,7 @@
   "id": "bakery_owner",
   "title": "Знакомство с хозяйкой пекарни",
   "_layout_note": "rect'ы нормализованы к картинке фона (941x1672). Табличка имени стоит над говорящим: помощница слева, хозяйка справа.",
-  "on_finish": { "set_flag": "met_baker", "play_task": "task_clear_hall" },
+  "on_finish": { "set_flag": "met_baker", "open_shop": "bakery" },
   "layout": {
     "text_rect": [0.11, 0.802, 0.68, 0.132],
     "advance": { "center": [0.865, 0.934], "radius": 0.058 }

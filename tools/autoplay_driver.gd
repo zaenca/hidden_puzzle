@@ -102,13 +102,20 @@ func run(tree: SceneTree) -> void:
 	_check("после фасада — разговор с хозяйкой", Game.screen == Game.Screen.DIALOG)
 	_check_dialog_runs()
 	await tree.create_timer(0.4).timeout
-	_check("после разговора игрок попадает сразу в уборку, а не в локацию",
-		Game.screen == Game.Screen.LEVEL)
+	## После знакомства игрок остаётся в зале, а не проваливается в уровень:
+	## сперва он видит комнату, о которой шла речь, и уже сам решает начать.
+	_check("после разговора игрок попадает в локацию, а не в уровень",
+		Game.screen == Game.Screen.SHOP)
 	_check("знакомство отмечено", bool(Game.meta.flags.get("met_baker", false)))
 	_check("задача «Осмотреть пекарню» закрылась знакомством",
 		Game.meta.task_state("task_visit_bakery") == MetaService.TaskState.COMPLETED)
+	_check_journal_hides_locked()
 
 	# --- уровень 2: пазл зала и уборка нажатием ----------------------------
+	## Уборку запускает игрок кнопкой из списка задач — прогон делает то же.
+	Game.play_task("task_clear_hall")
+	await tree.create_timer(0.5).timeout
+	_check("уборка зала запускается из списка задач", Game.screen == Game.Screen.LEVEL)
 	_check_hall_scene()
 	await _play_hall_to_cleanup()
 	_check("после уборки — локация пекарни", Game.screen == Game.Screen.SHOP)
@@ -447,6 +454,29 @@ func _play_hall_to_cleanup() -> void:
 ## Журнал заданий: путь целиком, с отметкой пройденного и текущего. Проверяем
 ## то, что прочтёт игрок, а не то, что мета думает про свои задачи: список
 ## строит виджет, и разойтись он может именно на строках.
+## Журнал показывает пройденное и текущее, но не то, что ещё закрыто: список
+## будущего — спойлер сюжета. Проверять надо именно отсутствие, поэтому берём
+## закрытые задачи у меты и ищем их заголовки среди строк.
+func _check_journal_hides_locked() -> void:
+	var node: Node = _tree.root.find_child("TaskJournal", true, false)
+	if node == null:
+		_check("журнал: виджет на месте", false)
+		return
+	node.call("open")
+	var joined := "\n".join(node.call("lines"))
+	var locked := PackedStringArray()
+	var leaked := ""
+	for task in Game.meta.all_tasks():
+		if Game.meta.task_state(task.id) != MetaService.TaskState.LOCKED:
+			continue
+		locked.append(task.title)
+		if joined.contains(task.title):
+			leaked = task.title
+	_check("журнал: закрытых задач на экране нет (закрыто — %d)" % locked.size(),
+		locked.size() > 0 and leaked.is_empty())
+	node.call("close")
+
+
 func _check_journal(done_title: String, current_title: String) -> void:
 	var node: Node = _tree.root.find_child("TaskJournal", true, false)
 	if node == null:
@@ -456,7 +486,7 @@ func _check_journal(done_title: String, current_title: String) -> void:
 	_check("журнал: открывается кнопкой", bool(node.call("is_open")))
 
 	var lines: PackedStringArray = node.call("lines")
-	_check("журнал: показывает все задачи", lines.size() >= 5)
+	_check("журнал: показывает пройденное и текущее", lines.size() >= 2)
 
 	var done_at := -1
 	var current_at := -1

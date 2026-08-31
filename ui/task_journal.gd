@@ -124,10 +124,17 @@ func _rebuild() -> void:
 		_list.remove_child(c)
 		c.queue_free()
 
+	## Показываем пройденное и то, чем можно заняться сейчас. Ещё закрытые задачи
+	## из журнала убраны: список будущего — это спойлер сюжета и обещание, которое
+	## игра пока не выполняет, а нумерация всё равно остаётся сквозной, и по ней
+	## видно, что путь продолжается.
 	var n := 0
 	for task in Game.meta.all_tasks():
 		n += 1
-		_list.add_child(_row(n, task, Game.meta.task_state(task.id)))
+		var state: int = Game.meta.task_state(task.id)
+		if state == MetaService.TaskState.LOCKED:
+			continue
+		_list.add_child(_row(n, task, state))
 
 
 ## Строка журнала — отдельная плашка: задания читают по одному, и общий список
@@ -176,6 +183,10 @@ func _checkbox(done: bool) -> Control:
 	box.custom_minimum_size = CHECKBOX_SIZE
 	box.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	box.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	## Мип-мапы: исходник иконки — тысяча пикселей, а на экране она 64, и без
+	## них уменьшение идёт по одному пикселю из шестнадцати — картинка сыпется
+	## на зерно и выглядит грязной.
+	box.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return box
@@ -193,6 +204,7 @@ func _reward(coins: int, done: bool) -> Control:
 	icon.custom_minimum_size = COIN_SIZE
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(icon)
 
