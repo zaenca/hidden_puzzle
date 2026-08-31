@@ -56,6 +56,13 @@ func _recalc() -> void:
 	_bounds = r
 
 
+## Габариты части вместе с ушками. Раскладка лотка обязана считать по ним, а не
+## по клетке пазла: ушки торчат за клетку, и часть, посчитанная по клетке,
+## ложится в ячейку с нахлёстом на соседнюю.
+func bounds() -> Rect2:
+	return _bounds
+
+
 func hit_test(world: Vector2) -> bool:
 	var local := to_local(world)
 	if Geometry2D.is_point_in_polygon(local, polygon):

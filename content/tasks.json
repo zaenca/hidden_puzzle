@@ -4,7 +4,7 @@
     "shop_id": "bakery",
     "room_id": "hall",
     "location": "map",
-    "title": "Осмотреть район",
+    "title": "Собрать план района",
     "hint": "Мэр просит выбрать первый объект для восстановления.",
     "unlock": [],
     "level_ids": ["bakery_01"],

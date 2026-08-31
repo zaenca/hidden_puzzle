@@ -53,8 +53,8 @@ func run(tree: SceneTree) -> void:
 		bool(Game.meta.flags.get(Game.INTRO_FLAG, false)))
 
 	# --- уровень 1: план района, только пазл из 6 частей --------------------
-	_check("L1: пазл собирается из 6 частей",
-		ContentDB.level("bakery_01").puzzle.piece_count() == 6)
+	_check("L1: пазл собирается из 9 частей",
+		ContentDB.level("bakery_01").puzzle.piece_count() == 9)
 	await _finish_current_level()
 	_check("после пазла — сразу городская площадь, без экрана результата",
 		Game.screen == Game.Screen.MAP)
@@ -68,7 +68,7 @@ func run(tree: SceneTree) -> void:
 	## Плашку копим, пока идёт уровень, и показываем уже в мете: поздравлять
 	## поверх раскрытия сцены значит перебивать ровно тот кадр, ради которого
 	## уровень и собирали.
-	_check_task_notification("Осмотреть район")
+	_check_task_notification("Собрать план района")
 	_check("мета: пекарня выбрана", Game.meta.shop_state("bakery") == "in_restoration")
 
 	# --- площадь: ровно одна активная задача и указатель на неё -------------

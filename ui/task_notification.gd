@@ -10,9 +10,6 @@ extends Control
 ## подряд, и две плашки друг поверх друга читаются как одна сломанная.
 
 const TEXTURE_PATH := "res://art/ui/taskbar_notification.png"
-## Ширина берётся из проекта, а не из size самого контрола: на первом показе
-## раскладка ещё не посчитана, size равен нулю, и плашка уезжает за левый край.
-const SCREEN_WIDTH := 1080.0
 const PATCH_MARGIN := 36      ## поля 9-slice: перекрывают рамку и скругление
 const SIZE := Vector2(880, 170)
 const TOP_Y := 150.0          ## куда выезжает плашка
@@ -132,7 +129,12 @@ func _play(title: String) -> void:
 
 	_plate.visible = true
 	_plate.modulate.a = 0.0
-	_plate.position = Vector2((SCREEN_WIDTH - SIZE.x) * 0.5, TOP_Y - SIZE.y - 40.0)
+	## Центр берём у вьюпорта в момент показа, а не из опорной ширины 1080: на
+	## окне шире опорного 9:16 «половина 1080» — уже не середина экрана, и плашка
+	## уезжает влево. size самого контрола для этого не годится: на первом показе
+	## раскладка ещё не посчитана и он равен нулю.
+	_plate.position = Vector2(
+		(get_viewport_rect().size.x - SIZE.x) * 0.5, TOP_Y - SIZE.y - 40.0)
 
 	var tw := create_tween()
 	_tween = tw

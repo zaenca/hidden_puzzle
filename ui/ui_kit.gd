@@ -94,8 +94,28 @@ static func plate_label(size: int = 34) -> Label:
 ## --- пропуск сцены ----------------------------------------------------------
 
 const SKIP_SIZE := Vector2(268, 104)
-const SKIP_PATCH := 34   ## поля 9-slice: перекрывают рамку и скругление
-const SKIP_EDGE := 24    ## отступ от края экрана, поверх safe area
+const PLATE_PATCH := 34   ## поля 9-slice: перекрывают рамку и скругление
+const SKIP_EDGE := 24     ## отступ от края экрана, поверх safe area
+
+
+## Кнопка на нарисованной плашке. Ею набрано всё, что игрок нажимает поверх
+## арта: серая кнопка движка рядом с нарисованной рамкой читается как окно
+## другой программы, а не как часть игры.
+static func plate_button(text: String, size: int = 30) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_size_override("font_size", size)
+	## Тёмная буква без обводки: плашка кремовая, а светлый текст с чёрным
+	## контуром — набор для арта под ним, не для бумаги.
+	for slot in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		b.add_theme_color_override(slot, PLATE_TEXT)
+	var tex := Backdrop.load_texture(PLATE)
+	if tex == null:
+		return b
+	for style in ["normal", "hover", "pressed", "focus", "disabled"]:
+		b.add_theme_stylebox_override(style, _plate_box(tex))
+	return b
 
 
 ## Кнопка «Пропустить» в правом верхнем углу — одна на заставку и на диалог.
@@ -105,19 +125,8 @@ const SKIP_EDGE := 24    ## отступ от края экрана, повер�
 ## Добавляет себя в root сама: якоря и offsets Control пересчитывает от размера
 ## родителя, и выставлять их до add_child значит считать их от нуля.
 static func add_skip_button(root: Control, action: Callable, text: String = "Пропустить") -> Button:
-	var b := Button.new()
-	b.text = text
-	b.focus_mode = Control.FOCUS_NONE
+	var b := plate_button(text)
 	b.custom_minimum_size = SKIP_SIZE
-	b.add_theme_font_size_override("font_size", 30)
-	## Тёмная буква без обводки: плашка кремовая, а светлый текст с чёрным
-	## контуром — набор для арта под ним, не для бумаги.
-	for slot in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		b.add_theme_color_override(slot, PLATE_TEXT)
-	var tex := Backdrop.load_texture(PLATE)
-	if tex != null:
-		for style in ["normal", "hover", "pressed", "focus", "disabled"]:
-			b.add_theme_stylebox_override(style, _skip_box(tex))
 	b.pressed.connect(action)
 
 	root.add_child(b)
@@ -134,13 +143,13 @@ static func add_skip_button(root: Control, action: Callable, text: String = "П�
 	return b
 
 
-static func _skip_box(tex: Texture2D) -> StyleBoxTexture:
+static func _plate_box(tex: Texture2D) -> StyleBoxTexture:
 	var sb := StyleBoxTexture.new()
 	sb.texture = tex
-	sb.texture_margin_left = SKIP_PATCH
-	sb.texture_margin_right = SKIP_PATCH
-	sb.texture_margin_top = SKIP_PATCH
-	sb.texture_margin_bottom = SKIP_PATCH
+	sb.texture_margin_left = PLATE_PATCH
+	sb.texture_margin_right = PLATE_PATCH
+	sb.texture_margin_top = PLATE_PATCH
+	sb.texture_margin_bottom = PLATE_PATCH
 	sb.content_margin_left = 20
 	sb.content_margin_right = 20
 	sb.content_margin_top = 12

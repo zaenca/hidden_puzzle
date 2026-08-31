@@ -14,7 +14,7 @@
     "palette": "street",
     "seed": 1011
   },
-  "puzzle": { "module_id": "jigsaw", "cols": 2, "rows": 3, "seed": 1101, "tab_ratio": 0.2, "snap_distance_px": 120 },
+  "puzzle": { "module_id": "jigsaw", "cols": 3, "rows": 3, "seed": 1101, "tab_ratio": 0.2, "snap_distance_px": 110 },
   "hidden_object": { "targets": [] },
   "_reward_note": "Первый пазл — часть завязки, а не заработок: ни экрана результата, ни начислений. План района остаётся сюжетом и в инвентарь не падает.",
   "show_result": false,

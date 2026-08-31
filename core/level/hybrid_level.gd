@@ -11,15 +11,20 @@ signal abandoned
 
 enum Phase { INTRO, PUZZLE, REVEAL, HIDDEN_OBJECT, CLEANUP, OUTRO, RESULT }
 
-const IMAGE_RECT := Rect2(0, 250, 1080, 1300)
-const TRAY_RECT := Rect2(30, 1595, 1020, 290)
-const TRAY_PATCH := 40   ## поля 9-slice лотка: перекрывают рамку и скругление
+## Доска и лоток стоят одной колонкой, и боковые границы у них общие: ширину
+## обоих задаёт картинка, вписанная в BOARD_AREA. Отдельной ширины у лотка нет
+## намеренно — две константы разъезжались бы на каждом новом арте.
+const BOARD_AREA := Rect2(0, 150, 1080, 1400)
+const BOARD_PAD := 18.0     ## углубление под картинкой: рамка вокруг доски
+const TRAY_TOP := 1565.0
+const TRAY_HEIGHT := 345.0
+const TRAY_PATCH := 40      ## поля 9-slice лотка: перекрывают рамку и скругление
 ## Поле раскладки внутри лотка. Части центруются по ячейкам, но ушки торчат за
 ## ячейку, и крайние куски заезжали бы на нарисованную рамку плашки. По бокам
 ## поле уже, чем сверху и снизу: ушки съедают именно ширину — по высоте частям
 ## и так просторно.
 const TRAY_PAD_X := 60.0
-const TRAY_PAD_Y := 20.0
+const TRAY_PAD_Y := 30.0
 const SCREEN := Vector2(1080, 1920)
 
 ## Уход в мету без экрана результата: сколько держим собранную картинку и за
@@ -82,7 +87,7 @@ func _build() -> void:
 	_hud.narrative_finished.connect(_start_puzzle)
 	_hud.result_continue.connect(_emit_result)
 
-	_view.setup(definition.art, definition.hidden_object.targets, context.items, IMAGE_RECT)
+	_view.setup(definition.art, definition.hidden_object.targets, context.items, BOARD_AREA)
 	_view.set_dim(1.0)
 	_build_backdrop()
 
@@ -93,6 +98,9 @@ func _build() -> void:
 
 	phase = Phase.INTRO
 	_hud.set_phase("")
+	## Кнопка «Далее» ложится в лоток: место, которое до конца брифинга пустует,
+	## а сразу после него занимают части. HUD сам его знать не может.
+	_hud.place_narrative_button(tray_rect())
 	_hud.show_narrative(definition.narrative)
 
 
@@ -113,12 +121,12 @@ func _build_backdrop() -> void:
 
 	## Место под доску: картинка на время сборки приглушена, и без углубления
 	## под ней она читается как грязное пятно, а не как «сюда собирают».
-	_backdrop.add_child(_slot(_view.rect.grow(18.0),
+	_backdrop.add_child(_slot(_board_rect(),
 		Color(0.10, 0.13, 0.20, 0.30), Color(1, 1, 1, 0.22), 28))
 
 	## Лоток — нарисованная плашка, та же, что под текстом в игре: части лежат на
 	## столе, а не в служебном прямоугольнике, дорисованном движком.
-	_tray_slot = _plate_slot(TRAY_RECT.grow(20.0))
+	_tray_slot = _plate_slot(tray_rect())
 	_backdrop.add_child(_tray_slot)
 
 
@@ -139,6 +147,22 @@ func _plate_slot(rect: Rect2) -> Control:
 	plate.position = rect.position
 	plate.size = rect.size
 	return plate
+
+
+## Доска с её углублением — то, что игрок видит как «поле». Считается от
+## реально занятого картинкой прямоугольника, а не от BOARD_AREA: арт вписан
+## по своему формату, и разница между областью и картинкой бывает в сотни px.
+func _board_rect() -> Rect2:
+	return _view.rect.grow(BOARD_PAD)
+
+
+## Лоток. Публично: HUD кладёт в него кнопку «Далее», а прогон проверяет, что
+## части лежат внутри рамки. Боковые границы берутся у доски — доска и лоток
+## обязаны стоять одной колонкой, иначе экран выглядит собранным из двух разных
+## макетов.
+func tray_rect() -> Rect2:
+	var board := _board_rect()
+	return Rect2(board.position.x, TRAY_TOP, board.size.x, TRAY_HEIGHT)
 
 
 func _slot(rect: Rect2, bg: Color, border: Color, radius: int) -> Panel:
@@ -167,7 +191,8 @@ func _start_puzzle() -> void:
 	## Не IMAGE_RECT, а то, что SceneView реально занял: картинка вписана в
 	## отведённую область по своему формату, и резать пазл надо по ней.
 	_puzzle.setup(definition.puzzle, _view.texture, _view.rect,
-		TRAY_RECT.grow_individual(-TRAY_PAD_X, -TRAY_PAD_Y, -TRAY_PAD_X, -TRAY_PAD_Y), _view.uv_scale())
+		tray_rect().grow_individual(-TRAY_PAD_X, -TRAY_PAD_Y, -TRAY_PAD_X, -TRAY_PAD_Y),
+		_view.uv_scale())
 	_puzzle.progress_changed.connect(_hud.set_progress)
 	_puzzle.solved.connect(_reveal)
 	_puzzle.begin()

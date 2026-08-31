@@ -4,6 +4,9 @@ extends Control
 ## нижней полосы (лоток пазла живёт в мире, список предметов — здесь).
 
 const HINT_ICON := "res://art/ui_hand.png"
+## Кнопка «Далее» под брифингом: ложится в лоток, поэтому размер её задаётся
+## здесь, а не растяжкой по контейнеру — в лотке её никто не растянет.
+const NEXT_SIZE := Vector2(360, 120)
 
 signal abandon_pressed
 signal booster_pressed
@@ -18,6 +21,7 @@ var _item_panel: PanelContainer
 var _booster: Button
 var _narrative: Control
 var _narrative_label: Label
+var _narrative_next: Button
 var _result: Control
 var _result_body: VBoxContainer
 var _toast: Label
@@ -50,7 +54,7 @@ func _build() -> void:
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(top)
 
-	var back := UIKit.button("‹", 40)
+	var back := UIKit.plate_button("‹", 40)
 	back.custom_minimum_size = Vector2(96, 96)
 	back.pressed.connect(func(): abandon_pressed.emit())
 	top.add_child(back)
@@ -117,31 +121,43 @@ func _build() -> void:
 
 
 func _build_narrative() -> void:
-	_narrative = UIKit.full_screen_dim(0.62)
+	## Прозрачная накладка, а не затемнение: брифинг рассказывает про картинку,
+	## которая под ним, и гасить её ради текста незачем. Клики она всё равно
+	## перехватывает — до кнопки «Далее» уровень трогать нечего.
+	_narrative = UIKit.full_screen_dim(0.0)
 	_narrative.visible = false
 	add_child(_narrative)
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_narrative.add_child(margin)
 	SafeArea.apply(margin, 40)
 
+	## По центру экрана: брифинг — единственное, что сейчас происходит, и
+	## прижимать его к низу значит освобождать место, которое некому занять.
 	var box := VBoxContainer.new()
-	box.alignment = BoxContainer.ALIGNMENT_END
-	box.add_theme_constant_override("separation", 20)
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(box)
 
 	## Брифинг — такая же реплика, как в диалоге, и стоит на той же нарисованной
 	## плашке. Тёмная панель под ним читалась как системное окно поверх игры.
 	var panel := UIKit.plate(UIKit.PLATE)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(panel)
 	_narrative_label = UIKit.plate_label(34)
 	_narrative_label.custom_minimum_size = Vector2(0, 200)
 	panel.add_child(_narrative_label)
 
-	var next := UIKit.button("Далее", 34)
-	next.pressed.connect(_advance_narrative)
-	box.add_child(next)
+	## Кнопка лежит отдельно от текста — в лотке, где вот-вот появятся части.
+	## Место уровень сообщает сам (place_narrative_button); до этого держим её
+	## внизу по центру, чтобы она нашлась и без подсказки уровня.
+	_narrative_next = UIKit.plate_button("Далее", 34)
+	_narrative_next.pressed.connect(_advance_narrative)
+	_narrative.add_child(_narrative_next)
+	var screen := get_viewport_rect().size
+	place_narrative_button(Rect2(0, screen.y * 0.78, screen.x, NEXT_SIZE.y))
 
 
 func _build_result() -> void:
@@ -173,6 +189,16 @@ func _build_result() -> void:
 
 
 ## --- API --------------------------------------------------------------------
+
+## Положить кнопку «Далее» по центру переданной области. Область сообщает
+## уровень — это лоток, в котором сразу после брифинга появятся части. HUD сам
+## её знать не может: лоток живёт в мире уровня, а не в интерфейсе.
+func place_narrative_button(area: Rect2) -> void:
+	if _narrative_next == null:
+		return
+	_narrative_next.size = NEXT_SIZE
+	_narrative_next.position = area.position + (area.size - NEXT_SIZE) * 0.5
+
 
 func set_level_title(text: String) -> void:
 	_title.text = text

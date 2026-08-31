@@ -75,7 +75,13 @@ func _layout_tray() -> void:
 	var tray_rows := 1 if count <= 6 else 2
 	var tray_cols := int(ceil(count / float(tray_rows)))
 	var cell := Vector2(_tray_rect.size.x / float(tray_cols), _tray_rect.size.y / float(tray_rows))
-	var s: float = minf(cell.x / _cell_size.x, cell.y / _cell_size.y) * 0.82
+	## Масштаб считаем по реальным габаритам частей, а не по клетке пазла: ушки
+	## торчат за клетку, и части, разложенные по клетке, наезжают друг на друга
+	## и на рамку лотка. Разница тем заметнее, чем крупнее tab_ratio.
+	var span := Vector2.ZERO
+	for piece in _pieces:
+		span = span.max(piece.bounds().size)
+	var s: float = minf(cell.x / span.x, cell.y / span.y) * 0.92
 	s = minf(s, _params.tray_scale * 1.6)
 
 	var order: Array[int] = []
@@ -94,8 +100,13 @@ func _layout_tray() -> void:
 		var row := slot / tray_cols
 		var col := slot % tray_cols
 		var center := _tray_rect.position + Vector2((col + 0.5) * cell.x, (row + 0.5) * cell.y)
+		## В ячейку кладём по центру габаритов, а не по центроиду полигона: ушки
+		## несимметричны — с одной стороны выступ, с другой впадина, — и центроид
+		## уезжает от середины куска на десятки пикселей. По нему часть садилась
+		## в ячейку со смещением и заезжала на рамку лотка.
+		var box := piece.bounds()
 		piece.tray_scale = s
-		piece.tray_point = center - piece.centroid * s
+		piece.tray_point = center - (box.position + box.size * 0.5) * s
 		piece.send_to_tray(false)
 
 
