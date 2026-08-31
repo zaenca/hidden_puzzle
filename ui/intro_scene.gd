@@ -83,15 +83,16 @@ func _build_ui() -> void:
 	col.add_theme_constant_override("separation", 20)
 	margin.add_child(col)
 
-	_panel = UIKit.panel(Color(0.07, 0.07, 0.10, 0.82))
+	## Текст заставки стоит на той же нарисованной плашке, что и остальные слова
+	## в игре: тёмная панель под ним была служебной заглушкой и выпадала из арта.
+	_panel = UIKit.plate(UIKit.PLATE)
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(_panel)
 
-	_label = UIKit.label("", 38)
-	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_label = UIKit.plate_label(38)
+	## Высота под три строки: экраны заставки разной длины, и панель, скачущая
+	## по высоте от кадра к кадру, читается как подёргивание картинки.
 	_label.custom_minimum_size = Vector2(0, 200)
-	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_label.modulate.a = 0.0
 	_panel.add_child(_label)
 

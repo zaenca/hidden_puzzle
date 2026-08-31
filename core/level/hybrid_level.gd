@@ -13,6 +13,13 @@ enum Phase { INTRO, PUZZLE, REVEAL, HIDDEN_OBJECT, CLEANUP, OUTRO, RESULT }
 
 const IMAGE_RECT := Rect2(0, 250, 1080, 1300)
 const TRAY_RECT := Rect2(30, 1595, 1020, 290)
+const TRAY_PATCH := 40   ## поля 9-slice лотка: перекрывают рамку и скругление
+## Поле раскладки внутри лотка. Части центруются по ячейкам, но ушки торчат за
+## ячейку, и крайние куски заезжали бы на нарисованную рамку плашки. По бокам
+## поле уже, чем сверху и снизу: ушки съедают именно ширину — по высоте частям
+## и так просторно.
+const TRAY_PAD_X := 60.0
+const TRAY_PAD_Y := 20.0
 const SCREEN := Vector2(1080, 1920)
 
 ## Уход в мету без экрана результата: сколько держим собранную картинку и за
@@ -47,7 +54,7 @@ var _hand: TutorialHand = null        ## обучающий ход в пазле
 var _find_hand: TutorialHand = null   ## бустер-подсказка в поиске
 var _cleanup: CleanupPhase = null
 var _hint_active: bool = false
-var _tray_slot: Panel = null
+var _tray_slot: Control = null
 var _boosters_left: int = 0
 var _boosters_spent: int = 0
 var _started_msec: int = 0
@@ -109,10 +116,29 @@ func _build_backdrop() -> void:
 	_backdrop.add_child(_slot(_view.rect.grow(18.0),
 		Color(0.10, 0.13, 0.20, 0.30), Color(1, 1, 1, 0.22), 28))
 
-	## Лоток — деревянная полка под частями.
-	_tray_slot = _slot(TRAY_RECT.grow(20.0),
-		Color(0.42, 0.28, 0.16, 0.45), Color(1.0, 0.93, 0.80, 0.25), 34)
+	## Лоток — нарисованная плашка, та же, что под текстом в игре: части лежат на
+	## столе, а не в служебном прямоугольнике, дорисованном движком.
+	_tray_slot = _plate_slot(TRAY_RECT.grow(20.0))
 	_backdrop.add_child(_tray_slot)
+
+
+## Плашка под лоток. NinePatchRect, а не тема панели: лоток живёт в мире, рядом
+## с доской, и ему нужен собственный узел. Арта может не быть — тогда остаётся
+## прежняя полка, потому что уровень обязан оставаться играбельным без картинок.
+func _plate_slot(rect: Rect2) -> Control:
+	var tex := Backdrop.load_texture(UIKit.PLATE)
+	if tex == null:
+		return _slot(rect, Color(0.42, 0.28, 0.16, 0.45), Color(1.0, 0.93, 0.80, 0.25), 34)
+	var plate := NinePatchRect.new()
+	plate.texture = tex
+	plate.patch_margin_left = TRAY_PATCH
+	plate.patch_margin_right = TRAY_PATCH
+	plate.patch_margin_top = TRAY_PATCH
+	plate.patch_margin_bottom = TRAY_PATCH
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate.position = rect.position
+	plate.size = rect.size
+	return plate
 
 
 func _slot(rect: Rect2, bg: Color, border: Color, radius: int) -> Panel:
@@ -140,7 +166,8 @@ func _start_puzzle() -> void:
 	_puzzle_host.add_child(_puzzle)
 	## Не IMAGE_RECT, а то, что SceneView реально занял: картинка вписана в
 	## отведённую область по своему формату, и резать пазл надо по ней.
-	_puzzle.setup(definition.puzzle, _view.texture, _view.rect, TRAY_RECT, _view.uv_scale())
+	_puzzle.setup(definition.puzzle, _view.texture, _view.rect,
+		TRAY_RECT.grow_individual(-TRAY_PAD_X, -TRAY_PAD_Y, -TRAY_PAD_X, -TRAY_PAD_Y), _view.uv_scale())
 	_puzzle.progress_changed.connect(_hud.set_progress)
 	_puzzle.solved.connect(_reveal)
 	_puzzle.begin()

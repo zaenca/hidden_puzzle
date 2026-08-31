@@ -8,6 +8,12 @@ const MIN_TOUCH := 96
 const BG_DARK := Color(0.09, 0.09, 0.12, 0.86)
 const BG_PANEL := Color(0.14, 0.13, 0.16, 0.94)
 const ACCENT := Color(0.98, 0.73, 0.25)
+## Нарисованная плашка — единственная подложка под текст в игре: и уведомление о
+## задаче, и полоса предметов, и реплики в диалоге стоят на ней. Всё, что говорит
+## с игроком словами, обязано стоять на ней же, иначе интерфейс распадается на
+## две разные игры — нарисованную и служебную.
+const PLATE := "res://art/ui/taskbar_notification.png"
+
 ## Текст поверх нарисованной кремовой плашки.
 const PLATE_TEXT := Color(0.24, 0.16, 0.07)
 
@@ -69,12 +75,24 @@ static func plate(texture_path: String, margin: int = 36) -> PanelContainer:
 	return p
 
 
+## Текст на нарисованной плашке: тёмная буква без обводки и по центру в обе
+## стороны. Отдельным конструктором, потому что таких мест уже три — заставка,
+## брифинг уровня, уведомление о задаче, — и расходиться им нельзя. Центр по
+## вертикали здесь не украшение: панель держит высоту под три строки, и прижатая
+## к верху короткая фраза оставляет под собой пустое кремовое поле.
+static func plate_label(size: int = 34) -> Label:
+	var l := Label.new()
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", PLATE_TEXT)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+
 ## --- пропуск сцены ----------------------------------------------------------
 
-## Плашка под кнопкой «Пропустить». Та же картинка, что у уведомления о задаче:
-## это один и тот же элемент интерфейса — короткая надпись на кремовом поле, —
-## и рисовать под неё вторую рамку значило бы завести второй визуальный язык.
-const SKIP_PLATE := "res://art/ui/taskbar_notification.png"
 const SKIP_SIZE := Vector2(268, 104)
 const SKIP_PATCH := 34   ## поля 9-slice: перекрывают рамку и скругление
 const SKIP_EDGE := 24    ## отступ от края экрана, поверх safe area
@@ -96,7 +114,7 @@ static func add_skip_button(root: Control, action: Callable, text: String = "П�
 	## контуром — набор для арта под ним, не для бумаги.
 	for slot in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		b.add_theme_color_override(slot, PLATE_TEXT)
-	var tex := Backdrop.load_texture(SKIP_PLATE)
+	var tex := Backdrop.load_texture(PLATE)
 	if tex != null:
 		for style in ["normal", "hover", "pressed", "focus", "disabled"]:
 			b.add_theme_stylebox_override(style, _skip_box(tex))

@@ -131,10 +131,11 @@ func _build_narrative() -> void:
 	box.add_theme_constant_override("separation", 20)
 	margin.add_child(box)
 
-	var panel := UIKit.panel()
+	## Брифинг — такая же реплика, как в диалоге, и стоит на той же нарисованной
+	## плашке. Тёмная панель под ним читалась как системное окно поверх игры.
+	var panel := UIKit.plate(UIKit.PLATE)
 	box.add_child(panel)
-	_narrative_label = UIKit.label("", 34)
-	_narrative_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_narrative_label = UIKit.plate_label(34)
 	_narrative_label.custom_minimum_size = Vector2(0, 200)
 	panel.add_child(_narrative_label)
 
