@@ -1,0 +1,36 @@
+[
+  {
+    "_note": "Библиотека материалов. Смысл — в поле tile_size: размер плитки В ЕДИНИЦАХ КОМНАТЫ, а не в пикселях PNG. Поэтому одна штукатурка в трёх комнатах имеет один масштаб, а замена PNG 256x256 на 1024x1024 ничего в кадре не двигает. Пока настоящих PNG нет, вместо texture стоит generator: картинка рисуется кодом. Появится файл — в этой строке заполняется texture, и generator перестаёт использоваться. Ни один скрипт при этом не трогается.",
+    "id": "old_plaster_01",
+    "category": "wall",
+    "generator": "plaster",
+    "tile_size": [1.4, 1.4],
+    "tint": "#cbb493",
+    "seed": 11
+  },
+  { "id": "old_plaster_02", "category": "wall", "generator": "plaster", "tile_size": [1.4, 1.4], "tint": "#b59a76", "seed": 27 },
+  { "id": "white_plaster_01", "category": "wall", "generator": "plaster", "tile_size": [1.6, 1.6], "tint": "#e8e2d6", "seed": 5 },
+  { "id": "brick_wall_01", "category": "wall", "generator": "brick", "tile_size": [1.15, 0.85], "tint": "#ffffff", "seed": 3 },
+  { "id": "white_tiles_01", "category": "wall", "generator": "tiles", "tile_size": [0.85, 0.85], "tint": "#f2efe8", "seed": 9 },
+  { "id": "wood_wall_01", "category": "wall", "generator": "wood", "tile_size": [1.0, 1.0], "tint": "#ffffff", "seed": 13 },
+  { "id": "concrete_wall_01", "category": "wall", "generator": "concrete", "tile_size": [1.5, 1.5], "tint": "#a9a69e", "seed": 19 },
+
+  { "id": "terracotta_floor_01", "category": "floor", "generator": "tiles", "tile_size": [0.5, 0.5], "tint": "#cc7d51", "seed": 21 },
+  { "id": "wood_floor_01", "category": "floor", "generator": "wood", "tile_size": [0.32, 1.9], "tint": "#ffffff", "seed": 33 },
+  { "id": "concrete_floor_01", "category": "floor", "generator": "concrete", "tile_size": [1.4, 1.4], "tint": "#9a978f", "seed": 44 },
+  { "id": "stone_floor_01", "category": "floor", "generator": "brick", "tile_size": [0.9, 0.7], "tint": "#8e8b84", "seed": 51 },
+
+  {
+    "_note": "Шахматка с красным уголком — отладочная. По ней сразу видно и раскладку, и ориентацию поверхности: перевёрнутая или зеркальная стена на обычной текстуре выглядит правдоподобно.",
+    "id": "debug_checker", "category": "floor", "generator": "checker", "tile_size": [0.55, 0.55], "tint": "#ffffff"
+  },
+
+  { "id": "window_wood_01", "category": "element", "generator": "window", "tint": "#ffffff" },
+  { "id": "door_old_01", "category": "element", "generator": "door", "tint": "#ffffff" },
+  { "id": "doorway_dark", "category": "element", "generator": "flat", "tint": "#1a1512" },
+  { "id": "trim_wood_01", "category": "trim", "generator": "wood", "tile_size": [0.45, 0.45], "tint": "#d8ccb8", "seed": 61 },
+
+  { "id": "crack_01", "category": "decal", "generator": "crack", "tint": "#ffffff", "seed": 7 },
+  { "id": "stain_01", "category": "decal", "generator": "stain", "tint": "#ffffff", "seed": 23 },
+  { "id": "cobweb_01", "category": "decal", "generator": "cobweb", "tint": "#ffffff" }
+]

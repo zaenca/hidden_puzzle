@@ -12,6 +12,11 @@ extends Resource
 ## без арта остаётся играбельным. rect'ы слотов нормализованы именно к этой
 ## картинке, а не к экрану.
 @export var background_path: String = ""
+## Процедурная комната вместо готового фона. Заполнено — интерьер собирается
+## RoomAssembler'ом по `content/rooms/<id>.json`, и background_path не нужен.
+## Пусто — прежний путь: картинка или градиент. Именно поэтому переход на
+## процедурные комнаты идёт по одной локации за раз, а не разом.
+@export var room_id: String = ""
 @export var visual_scene: PackedScene = null   ## финальный арт; пока null
 @export var rooms: Array = []                  ## [{id, title}]
 @export var slots: Array[ShopSlotDefinition] = []

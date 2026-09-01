@@ -11,6 +11,7 @@ var _notification: TaskNotification
 var _journal: TaskJournal
 var _wallet: WalletBar
 var _autoplay: AutoplayDriver = null
+var _room_shot: RoomShot = null
 
 
 var _dbg_lines: PackedStringArray = PackedStringArray()
@@ -38,18 +39,36 @@ func _ready() -> void:
 	Game.boot()
 	_dbg("Game.boot ok; screen=%d" % Game.screen)
 
+	var shot := _room_shot_target()
 	if _wants_autoplay():
 		_dbg("autoplay start")
 		# Ссылку надо держать: RefCounted-драйвер иначе освобождается сразу
 		# после вызова, и корутина не возобновляется.
 		_autoplay = AutoplayDriver.new()
 		_autoplay.run(get_tree())
+	elif not shot.is_empty():
+		_dbg("room shot: " + shot)
+		_room_shot = RoomShot.new()
+		_room_shot.run(get_tree(), shot, _cmdline_value("--room-template="))
 	else:
 		_dbg("autoplay NOT requested")
 
 
 func _wants_autoplay() -> bool:
 	return OS.get_cmdline_user_args().has("--autoplay") or OS.get_cmdline_args().has("--autoplay")
+
+
+## `--room-shot=<shop_id>` — снять кадр локации и выйти. Нужно для подбора
+## геометрии процедурных комнат: её принимают глазами, а не проверками.
+func _room_shot_target() -> String:
+	return _cmdline_value("--room-shot=")
+
+
+func _cmdline_value(prefix: String) -> String:
+	for arg in OS.get_cmdline_user_args() + OS.get_cmdline_args():
+		if String(arg).begins_with(prefix):
+			return String(arg).substr(prefix.length())
+	return ""
 
 
 func _build_overlay() -> void:
@@ -124,6 +143,11 @@ func _build_overlay() -> void:
 	col.add_child(_debug_button("Пекарня: фасад + хозяйка", func():
 		_debug_panel.visible = false
 		Game.open_intro("bakery_facade")))
+	## Лаборатория процедурных комнат. Из карты в неё не попасть намеренно: это
+	## не часть игры, а стенд, на котором проверяют перспективу и материалы.
+	col.add_child(_debug_button("Комната: тест материалов", func():
+		_debug_panel.visible = false
+		Game.open_shop("room_lab")))
 	col.add_child(_debug_button("Перемотать 10 мин", func():
 		TimeService.fast_forward(600)
 		EventBus.toast.emit("Время +10 минут")))

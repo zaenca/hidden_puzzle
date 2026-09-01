@@ -36,6 +36,7 @@ var _hint_button: Button = null
 var _collection_panel: PanelContainer = null
 var _collection_row: HBoxContainer = null
 var _hand: TutorialHand = null
+var _room: RoomAssembler = null
 
 
 func setup(payload: Dictionary) -> void:
@@ -61,6 +62,9 @@ func _build() -> void:
 		_slot_defs[def.id] = def
 		slot.set_state(Game.meta.current_slot_state(shop_id, def.id), false)
 
+	_bind_room_slots()
+	_refresh_room_state()
+
 	_build_ui()
 	_rebuild_tasks()
 	_refresh_highlights()
@@ -80,6 +84,8 @@ func _build() -> void:
 ## край. Файла нет — прежний градиент по палитре, чтобы магазин без ассетов
 ## оставался играбельным.
 func _setup_background() -> void:
+	if _setup_room():
+		return
 	var tex := Backdrop.load_texture(shop.background_path)
 	_has_art = tex != null
 	if not _has_art:
@@ -92,6 +98,90 @@ func _setup_background() -> void:
 	## хитбоксами, и игрок ищет дверь, которой на экране нет.
 	_fill_letterbox()
 	_visual_rect = Backdrop.fit(_bg, tex, SCREEN)
+
+
+## Интерьер, собранный из поверхностей, вместо готового фона. Локация об этом
+## почти ничего не знает: комната — такой же способ занять экран, как картинка
+## или градиент, и всё остальное (слоты, задачи, подсветка) работает поверх неё
+## без изменений.
+##
+## Комната занимает экран целиком, поэтому rect'ы слотов нормализованы к экрану,
+## а не к прямоугольнику картинки: обрезать тут нечего.
+func _setup_room() -> bool:
+	if shop.room_id.is_empty():
+		return false
+	var def := ContentDB.room(shop.room_id)
+	if def == null:
+		return false
+	var tpl := ContentDB.room_template(def.template_id)
+	if tpl == null:
+		push_error("ShopScene: у комнаты '%s' нет шаблона '%s'" % [def.id, def.template_id])
+		return false
+
+	_room = RoomAssembler.new()
+	_room.name = "Room"
+	## Комната кладётся ПОД слоты собственным z-диапазоном: внутри неё слои
+	## расписаны от пола до переднего плана, и без общего сдвига её виньетка
+	## накрыла бы объекты локации.
+	_room.z_index = -100
+	var host := _bg.get_parent()
+	host.add_child(_room)
+	host.move_child(_room, 0)
+	_room.build(def, tpl, ContentDB.room_materials, SCREEN)
+	## Смена геометрии переставляет элементы, а к ним привязаны области слотов.
+	_room.rebuilt.connect(func():
+		_bind_room_slots()
+		_refresh_room_state()
+		_refresh_highlights())
+
+	_bg.visible = false
+	_visual_rect = Rect2(Vector2.ZERO, SCREEN)
+	_has_art = true
+	if OS.is_debug_build() and def.debug_panel:
+		_build_room_debug_panel()
+	return true
+
+
+## Переключатель материалов. Только в debug-сборке и только у комнат, которые
+## сами об этом просят: лаборатория тем и отличается от игровой локации.
+func _build_room_debug_panel() -> void:
+	var def := ContentDB.room(shop.room_id)
+	var current := {}
+	for surface_id in def.surfaces:
+		var cfg: RoomSurfaceConfig = def.surfaces[surface_id]
+		current[surface_id] = cfg.material_id
+	var panel := RoomDebugPanel.create(_room, ContentDB.room_materials,
+		ContentDB.room_templates, current, def.template_id)
+	_ui.add_child(panel)
+	panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	panel.offset_left = -290
+	panel.offset_right = 290
+	panel.offset_top = 150
+	panel.offset_bottom = 150
+
+
+## Область слота — по элементу комнаты, если он к нему привязан. Дверь должна
+## нажиматься ровно там, где комната её нарисовала; подогнанный руками rect при
+## первой же смене шаблона геометрии уезжает с неё.
+func _bind_room_slots() -> void:
+	if _room == null:
+		return
+	for slot_id in _slot_defs:
+		var def: ShopSlotDefinition = _slot_defs[slot_id]
+		if def.room_element.is_empty() or not _room.has_element(def.room_element):
+			continue
+		(_slots[slot_id] as StateSlot).world_rect = _room.element_rect(def.room_element)
+
+
+## Видимость элементов комнаты по состоянию мира. Ноды не пересоздаются —
+## меняется только `visible`, поэтому дверь открывается прямо в кадре.
+func _refresh_room_state() -> void:
+	if _room == null:
+		return
+	var states := {}
+	for slot_id in _slot_defs:
+		states[slot_id] = Game.meta.current_slot_state(shop_id, String(slot_id))
+	_room.apply_state(Game.meta.flags, states)
 
 
 ## Полосы над и под вписанным артом. Пустота движка за краем комнаты читается
@@ -115,6 +205,7 @@ func _on_visual_changed(changed_shop: String, slot_id: String, state_id: String)
 	var slot: StateSlot = _slots.get(slot_id)
 	if slot != null:
 		slot.set_state(state_id, true)
+	_refresh_room_state()
 	_refresh_highlights()
 	_queue_rebuild()
 
@@ -161,6 +252,7 @@ func _interact(slot_id: String) -> void:
 	elif not String(result.get("text", "")).is_empty():
 		EventBus.toast.emit(String(result["text"]))
 
+	_refresh_room_state()
 	_refresh_highlights()
 	_rebuild_tasks()
 

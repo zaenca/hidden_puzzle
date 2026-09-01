@@ -12,6 +12,10 @@ var actions: Dictionary = {}      ## id -> MetaActionDefinition
 var level_index: Dictionary = {}  ## id -> {path, shop_id, task_id, order}
 var level_ids: PackedStringArray = PackedStringArray()
 var map_data: Dictionary = {}
+## Библиотеки процедурных комнат. Шаблоны геометрии и материалы — глобальные и
+## маленькие, поэтому грузятся сразу; сами комнаты ищутся по id, как диалоги.
+var room_templates: Dictionary = {}   ## id -> RoomTemplate
+var room_materials: Dictionary = {}   ## id -> RoomMaterial
 
 var loaded: bool = false
 
@@ -20,6 +24,7 @@ var _cache_order: Array[String] = []
 var _dialog_cache: Dictionary = {}
 var _intro_cache: Dictionary = {}
 var _tutorial_cache: Dictionary = {}
+var _room_cache: Dictionary = {}
 
 
 func load_all() -> void:
@@ -51,6 +56,14 @@ func load_all() -> void:
 			level_index[id] = entry
 			ids.append(id)
 		level_ids = ids
+
+	for raw in _array(CONTENT_ROOT + "room_templates.json"):
+		var tpl := ContentParser.room_template(raw)
+		room_templates[tpl.id] = tpl
+
+	for raw in _array(CONTENT_ROOT + "room_materials.json"):
+		var mat := ContentParser.room_material(raw)
+		room_materials[mat.id] = mat
 
 	var map = ContentParser.read_json(CONTENT_ROOT + "map.json")
 	if map is Dictionary:
@@ -93,6 +106,27 @@ func _cutscene(cache: Dictionary, folder: String, id: String) -> Dictionary:
 		push_error("ContentDB: не читается %s/%s.json" % [folder, id])
 	cache[id] = out
 	return out
+
+
+## Процедурная комната. Индекса нет, файл ищется по id — как у диалогов и
+## заставок: комната принадлежит ровно одной локации или уровню, и отдельный
+## список «какие комнаты бывают» дублировал бы ссылку на неё.
+func room(id: String) -> RoomDefinition:
+	if id.is_empty():
+		return null
+	if _room_cache.has(id):
+		return _room_cache[id]
+	var d = ContentParser.read_json("%srooms/%s.json" % [CONTENT_ROOT, id])
+	if not (d is Dictionary):
+		push_error("ContentDB: не читается rooms/%s.json" % id)
+		return null
+	var def := ContentParser.room(d)
+	_room_cache[id] = def
+	return def
+
+
+func room_template(id: String) -> RoomTemplate:
+	return room_templates.get(id)
 
 
 func level(id: String) -> LevelDefinition:

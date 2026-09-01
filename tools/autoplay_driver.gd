@@ -227,6 +227,7 @@ func run(tree: SceneTree) -> void:
 	_check("сейв: пройдено разных уровней = %d" % distinct_levels,
 		Game.meta.completed_levels.size() == distinct_levels)
 
+	await _check_procedural_room()
 	await _check_dialog_skip()
 
 	_report()
@@ -769,3 +770,103 @@ func _report() -> void:
 	if failed == 0:
 		_say("Полный цикл puzzle -> hidden object -> quest item -> meta change работает.")
 	_tree.quit(1 if failed > 0 else 0)
+
+
+## --- процедурная комната ----------------------------------------------------
+##
+## Кадр прогон не проверяет — для этого есть room_shot. Здесь проверяется то,
+## что кадром как раз НЕ видно: что комната собралась из данных, что область
+## слота взялась у нарисованного элемента, а не осталась подогнанным вручную
+## прямоугольником, и что смена состояния слота действительно переключает вид.
+## Ошибка в любом из трёх выглядит на скриншоте нормально.
+
+func _check_procedural_room() -> void:
+	Game.open_shop("room_lab")
+	await _tree.create_timer(0.4).timeout
+	var scene: Node = Game.current()
+	if scene == null or not ("_room" in scene):
+		_check("комната: локация на процедурном интерьере открылась", false)
+		return
+	var room: RoomAssembler = scene._room
+	_check("комната: интерьер собран из данных, а не из фона", room != null)
+	if room == null:
+		return
+
+	_check("комната: три поверхности встали в кадр",
+		room.geom.polygons.size() == RoomGeometry.SURFACES.size())
+	for surface_id in RoomGeometry.SURFACES:
+		var poly: PackedVector2Array = room.geom.polygons[surface_id]
+		_check("комната: поверхность '%s' не выродилась (%d точек)" % [surface_id, poly.size()],
+			poly.size() >= 3)
+
+	## Перспектива: у пола дальний край обязан быть уже ближнего. Проверка
+	## грубая намеренно — тонкости видны глазом, а вывернутая наизнанку
+	## проекция глазом как раз выглядит правдоподобно.
+	var far_left := room.geom.uv_to_screen(RoomGeometry.SURFACE_FLOOR, Vector2(0.0, 0.05))
+	var far_right := room.geom.uv_to_screen(RoomGeometry.SURFACE_FLOOR, Vector2(1.0, 0.05))
+	var near_left := room.geom.uv_to_screen(RoomGeometry.SURFACE_FLOOR, Vector2(0.0, 0.95))
+	var near_right := room.geom.uv_to_screen(RoomGeometry.SURFACE_FLOOR, Vector2(1.0, 0.95))
+	_check("комната: дальний край пола уже ближнего",
+		absf(far_right.x - far_left.x) < absf(near_right.x - near_left.x))
+	_check("комната: дальний край пола выше ближнего",
+		far_left.y < near_left.y)
+
+	## Гомография обратима: точка поверхности, переведённая на экран и обратно,
+	## обязана вернуться в себя. Именно на этом стоит и раскладка плитки, и
+	## попадание пальцем по стене.
+	var h := room.geom.homography(RoomGeometry.SURFACE_RIGHT)
+	var probe := Vector2(0.37, 0.62)
+	var back := h.map_screen(h.map_uv(probe))
+	_check("комната: отображение поверхности обратимо (ошибка %.4f)" % back.distance_to(probe),
+		back.distance_to(probe) < 0.001)
+
+	var slot_rect: Rect2 = room.element_rect("door_01")
+	_check("комната: область двери взята у нарисованного элемента",
+		slot_rect.size.x > 40.0 and slot_rect.size.y > 100.0)
+	if "_slots" in scene:
+		var slot: StateSlot = scene._slots.get("lab_door")
+		_check("комната: хитбокс слота совпал с элементом",
+			slot != null and slot.world_rect.is_equal_approx(slot_rect))
+
+	## Дверь открывается существующей системой слотов — комната только
+	## переключает вид. Отдельного механизма взаимодействия у неё нет.
+	##
+	## Тап идёт ЧЕРЕЗ хит-тест сцены, а не прямым вызовом interact: проверяется
+	## именно то, что палец попадает туда, где комната нарисовала дверь. Прямой
+	## вызов прошёл бы и при хитбоксе, уехавшем на полэкрана.
+	_check("комната: дверь начинает закрытой",
+		Game.meta.current_slot_state("room_lab", "lab_door") == "closed")
+	## Рука пуста: правило двери описано под пустую руку, и оставшийся с прошлой
+	## локации выбранный предмет молча увёл бы тап мимо всех правил.
+	Game.clear_selection()
+	var centre := slot_rect.position + slot_rect.size * 0.5
+	_check("комната: центр двери попадает в её хитбокс",
+		(scene._slots["lab_door"] as StateSlot).world_rect.has_point(centre))
+	var touch := InputEventScreenTouch.new()
+	## Событие приходит в экранных координатах, а сцена переводит их в мировые.
+	## Подаём именно экранные — иначе проверка обошла бы ровно тот перевод,
+	## на котором и ломается попадание пальцем.
+	touch.position = scene.get_canvas_transform() * centre
+	touch.pressed = true
+	scene._unhandled_input(touch)
+	await _tree.create_timer(0.3).timeout
+	_check("комната: тап по центру нарисованной двери её открыл",
+		Game.meta.current_slot_state("room_lab", "lab_door") == "open")
+
+	var closed_view: Array = room._element_nodes.get("door_01", [])
+	var open_view: Array = room._element_nodes.get("door_01_open", [])
+	var closed_visible := not closed_view.is_empty() and (closed_view[0] as Node2D).visible
+	var open_visible := not open_view.is_empty() and (open_view[0] as Node2D).visible
+	_check("комната: закрытая дверь исчезла из кадра", not closed_visible)
+	_check("комната: открытый проём появился", open_visible)
+
+	## Зерно — это воспроизводимость: комната, которая после перезахода
+	## выглядит иначе, была бы багом, а не разнообразием.
+	var before := room.element_rect("left_wall_scatter_0")
+	Game.open_shop("room_lab")
+	await _tree.create_timer(0.4).timeout
+	var again: RoomAssembler = Game.current()._room
+	_check("комната: одно зерно — одна и та же раскладка",
+		again.element_rect("left_wall_scatter_0").is_equal_approx(before))
+
+	Game.meta.set_slot_state("room_lab", "lab_door", "closed")

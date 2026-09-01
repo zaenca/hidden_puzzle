@@ -311,6 +311,7 @@ static func shop_slot(d: Dictionary) -> ShopSlotDefinition:
 	s.states = states
 	s.default_state = String(d.get("default", states[0].id if not states.is_empty() else ""))
 	s.highlight = String(d.get("highlight", "auto"))
+	s.room_element = String(d.get("room_element", ""))
 	var acts: Array[SlotInteraction] = []
 	for raw in d.get("interactions", []):
 		acts.append(slot_interaction(raw))
@@ -324,6 +325,7 @@ static func shop(d: Dictionary) -> ShopDefinition:
 	s.display_name = String(d.get("display_name", s.id))
 	s.palette = String(d.get("palette", "bakery"))
 	s.background_path = String(d.get("background", ""))
+	s.room_id = String(d.get("room", ""))
 	s.map_rect = to_rect(d.get("map_rect", [0.1, 0.4, 0.3, 0.2]))
 	s.rooms = d.get("rooms", [])
 	s.enter = d.get("enter", {})
@@ -335,3 +337,146 @@ static func shop(d: Dictionary) -> ShopDefinition:
 		slots.append(shop_slot(raw))
 	s.slots = slots
 	return s
+
+
+## --- процедурные комнаты ----------------------------------------------------
+##
+## Формат намеренно повторяет тот, что уже есть у магазинов: rect'ы массивом из
+## четырёх чисел, цвета строкой "#rrggbb", необязательное поле = отсутствующий
+## ключ. Комната описывается тем же языком, что и локация, — иначе рядом с
+## существующим контентом появился бы второй диалект JSON.
+
+static func to_vec2(v, fallback := Vector2.ZERO) -> Vector2:
+	if typeof(v) != TYPE_ARRAY or (v as Array).size() < 2:
+		return fallback
+	return Vector2(float(v[0]), float(v[1]))
+
+
+static func room_material(d: Dictionary) -> RoomMaterial:
+	var m := RoomMaterial.new()
+	m.id = String(d.get("id", ""))
+	m.category = String(d.get("category", "wall"))
+	m.texture_path = String(d.get("texture", ""))
+	m.generator = String(d.get("generator", ""))
+	m.tile_size = to_vec2(d.get("tile_size", null), Vector2.ONE)
+	m.tint = to_color(d.get("tint", "#ffffff"))
+	m.seed = int(d.get("seed", 0))
+	return m
+
+
+static func room_template(d: Dictionary) -> RoomTemplate:
+	var t := RoomTemplate.new()
+	t.id = String(d.get("id", ""))
+	t.title = String(d.get("title", t.id))
+	var room: Dictionary = d.get("room", {})
+	t.width = float(room.get("width", 4.2))
+	t.depth = float(room.get("depth", 4.2))
+	t.height = float(room.get("height", 3.0))
+	t.corner_angle_deg = float(room.get("corner_angle", 45.0))
+	var cam: Dictionary = d.get("camera", {})
+	t.cam_distance = float(cam.get("distance", 5.0))
+	t.cam_eye_height = float(cam.get("eye_height", 1.55))
+	t.cam_shift_x = float(cam.get("shift_x", 0.0))
+	t.fov_deg = float(cam.get("fov", 62.0))
+	t.horizon = float(cam.get("horizon", 0.42))
+	t.wall_extend_up = float(room.get("extend_up", 2.0))
+	return t
+
+
+static func room_surface(surface_id: String, d: Dictionary) -> RoomSurfaceConfig:
+	var s := RoomSurfaceConfig.new()
+	s.id = surface_id
+	s.material_id = String(d.get("material", ""))
+	s.texture_path = String(d.get("texture", ""))
+	s.generator = String(d.get("generator", ""))
+	s.tile_size = to_vec2(d.get("tile_size", null), Vector2.ZERO)
+	s.repeat = to_vec2(d.get("repeat", null), Vector2.ZERO)
+	s.tile_scale = float(d.get("tile_scale", 1.0))
+	s.tint = to_color(d.get("tint", "#ffffff"))
+	s.uv_offset = to_vec2(d.get("uv_offset", null), Vector2.ZERO)
+	return s
+
+
+static func room_element(d: Dictionary, default_layer: int) -> RoomElement:
+	var e := RoomElement.new()
+	e.id = String(d.get("id", ""))
+	e.type = String(d.get("type", "decal"))
+	e.surface = String(d.get("surface", "left_wall"))
+	e.rect = to_rect(d.get("rect", [0.2, 0.2, 0.2, 0.2]))
+	e.material_id = String(d.get("material", ""))
+	e.texture_path = String(d.get("texture", ""))
+	e.generator = String(d.get("generator", ""))
+	e.tint = to_color(d.get("tint", "#ffffff"))
+	e.opacity = float(d.get("opacity", 1.0))
+	e.rotation_deg = float(d.get("rotation", 0.0))
+	e.flip_h = bool(d.get("flip_h", false))
+	e.flip_v = bool(d.get("flip_v", false))
+	e.layer = int(d.get("layer", default_layer))
+	e.shadow = float(d.get("shadow", 0.0))
+	e.shadow_offset = to_vec2(d.get("shadow_offset", null), Vector2(0.0, 0.02))
+	e.shadow_color = to_color(d.get("shadow_color", ""), Color(0, 0, 0, 0.45))
+	e.inset = float(d.get("inset", 0.0))
+	e.frame = float(d.get("frame", 0.0))
+	e.frame_material_id = String(d.get("frame_material", ""))
+	e.frame_texture_path = String(d.get("frame_texture", ""))
+	e.frame_generator = String(d.get("frame_generator", ""))
+	e.frame_tint = to_color(d.get("frame_tint", "#ffffff"))
+	e.visible_if_flag = String(d.get("visible_if_flag", ""))
+	e.hidden_if_flag = String(d.get("hidden_if_flag", ""))
+	e.slot_id = String(d.get("slot", ""))
+	e.slot_state = String(d.get("slot_state", ""))
+	return e
+
+
+static func room_trims(d: Dictionary) -> RoomTrims:
+	var t := RoomTrims.new()
+	var corner: Dictionary = d.get("corner_shadow", {})
+	t.corner_width = float(corner.get("width", 0.0))
+	t.corner_strength = float(corner.get("strength", 0.0))
+	t.corner_color = to_color(corner.get("color", ""), Color(0, 0, 0, 1))
+	var base: Dictionary = d.get("baseboard", {})
+	t.baseboard_height = float(base.get("height", 0.0))
+	t.baseboard_material_id = String(base.get("material", ""))
+	t.baseboard_generator = String(base.get("generator", ""))
+	t.baseboard_tint = to_color(base.get("tint", ""), Color(0.86, 0.82, 0.76))
+	var contact: Dictionary = d.get("contact_shadow", {})
+	t.contact_size = float(contact.get("size", 0.0))
+	t.contact_strength = float(contact.get("strength", 0.0))
+	t.contact_color = to_color(contact.get("color", ""), Color(0, 0, 0, 1))
+	return t
+
+
+static func room(d: Dictionary) -> RoomDefinition:
+	var r := RoomDefinition.new()
+	r.id = String(d.get("id", ""))
+	r.template_id = String(d.get("room_template", "medium_room"))
+	r.seed = int(d.get("seed", 0))
+
+	var surfaces: Dictionary = d.get("surfaces", {})
+	for surface_id in surfaces:
+		r.surfaces[String(surface_id)] = room_surface(String(surface_id), surfaces[surface_id])
+
+	var elements: Array[RoomElement] = []
+	for raw in d.get("elements", []):
+		elements.append(room_element(raw, RoomElement.LAYER_STRUCTURE))
+	r.elements = elements
+
+	var decals: Array[RoomElement] = []
+	for raw in d.get("decals", []):
+		var decal := room_element(raw, RoomElement.LAYER_WALL_DECAL)
+		## Наклейка на полу обязана лечь под стены: положенная поверх, она
+		## выглядит нарисованной на стекле перед комнатой.
+		if decal.surface == "floor" and not (raw as Dictionary).has("layer"):
+			decal.layer = RoomElement.LAYER_FLOOR_DECAL
+		decals.append(decal)
+	r.decals = decals
+
+	r.trims = room_trims(d.get("trims", {}))
+	r.tint = to_color(d.get("tint", "#ffffff"))
+	var vignette = d.get("vignette", {})
+	if vignette is Dictionary:
+		r.vignette = float(vignette.get("strength", 0.0))
+		r.vignette_color = to_color(vignette.get("color", ""), Color(0, 0, 0, 1))
+	r.scatter = d.get("scatter", [])
+	r.debug_panel = bool(d.get("debug_panel", false))
+	return r

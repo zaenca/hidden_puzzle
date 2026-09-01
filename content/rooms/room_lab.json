@@ -1,0 +1,105 @@
+{
+  "_note": "Тестовая комната прототипа. Здесь проверяется вся система разом: три поверхности с повторяющейся текстурой, перспектива, окно на левой стене, дверь на правой, трещина, затемнение в углу и контактная тень у пола. Пекарню она не трогает — это отдельная локация, в которую попадают только из debug-панели.",
+
+  "id": "room_lab",
+  "room_template": "medium_room",
+  "seed": 48125,
+  "debug_panel": true,
+
+  "surfaces": {
+    "left_wall":  { "material": "old_plaster_01" },
+    "right_wall": { "material": "old_plaster_02" },
+    "floor":      { "material": "terracotta_floor_01" }
+  },
+
+  "elements": [
+    {
+      "_note": "Окно. rect нормализован К СТЕНЕ: 0.20 — это пятая часть стены от её левого края, а не пятая часть экрана. shadow/inset/frame и делают его встроенным, а не наклеенным: снизу подложена мягкая тень, сверху — тень откоса, вокруг — наличник.",
+      "id": "window_01",
+      "type": "window",
+      "surface": "left_wall",
+      "rect": [0.20, 0.20, 0.30, 0.34],
+      "material": "window_wood_01",
+      "shadow": 0.10,
+      "shadow_offset": [0.0, 0.03],
+      "inset": 0.55,
+      "frame": 0.055,
+      "frame_material": "trim_wood_01"
+    },
+    {
+      "_note": "Дверь в закрытом состоянии. Привязана к слоту локации lab_door: комната только рисует, а нажатие и смена состояния остаются на существующей системе слотов.",
+      "id": "door_01",
+      "type": "door",
+      "surface": "right_wall",
+      "rect": [0.46, 0.10, 0.34, 0.90],
+      "material": "door_old_01",
+      "slot": "lab_door",
+      "slot_state": "closed",
+      "shadow": 0.08,
+      "shadow_offset": [0.0, 0.0],
+      "inset": 0.45,
+      "frame": 0.05,
+      "frame_material": "trim_wood_01"
+    },
+    {
+      "_note": "Та же дверь открытой — тёмный проём. Отдельным элементом, а не вторым состоянием картинки: с точки зрения комнаты это просто другой вид в том же месте.",
+      "id": "door_01_open",
+      "type": "door",
+      "surface": "right_wall",
+      "rect": [0.46, 0.10, 0.34, 0.90],
+      "material": "doorway_dark",
+      "slot": "lab_door",
+      "slot_state": "open",
+      "inset": 0.85,
+      "frame": 0.05,
+      "frame_material": "trim_wood_01"
+    }
+  ],
+
+  "decals": [
+    {
+      "_note": "Трещина. Поворот идёт в плоскости стены, а не на экране, поэтому она наклоняется вместе с ней.",
+      "surface": "right_wall",
+      "material": "crack_01",
+      "rect": [0.10, 0.28, 0.16, 0.34],
+      "rotation": -7,
+      "opacity": 0.85
+    },
+    {
+      "surface": "left_wall",
+      "material": "cobweb_01",
+      "rect": [0.62, 0.02, 0.20, 0.16],
+      "opacity": 0.7
+    }
+  ],
+
+  "trims": {
+    "corner_shadow":  { "width": 0.12, "strength": 0.42 },
+    "baseboard":      { "height": 0.055, "material": "trim_wood_01", "tint": "#c9b79c" },
+    "contact_shadow": { "size": 0.10, "strength": 0.38 }
+  },
+
+  "vignette": { "strength": 0.22 },
+
+  "scatter": [
+    {
+      "_note": "Процедурный слой поверх явной конфигурации. Одно зерно — один и тот же кадр: комната, которая после перезагрузки выглядит иначе, была бы багом, а не разнообразием.",
+      "surface": "floor",
+      "material": "stain_01",
+      "count": 4,
+      "area": [0.05, 0.05, 0.85, 0.75],
+      "size": [0.08, 0.16],
+      "rotation": [-25, 25],
+      "opacity": [0.18, 0.4]
+    },
+    {
+      "surface": "left_wall",
+      "material": "stain_01",
+      "count": 3,
+      "area": [0.1, 0.45, 0.8, 0.45],
+      "size": [0.06, 0.13],
+      "rotation": [-20, 20],
+      "opacity": [0.15, 0.35]
+    }
+  ]
+}

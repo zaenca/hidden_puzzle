@@ -18,6 +18,9 @@ var actions := {}
 var shops := {}
 var levels := {}
 var index := []
+var rooms := {}
+var room_templates := {}
+var room_materials := {}
 
 
 func _initialize() -> void:
@@ -28,6 +31,7 @@ func _initialize() -> void:
 		_check_actions()
 		_check_tasks()
 		_check_shops()
+		_check_rooms()
 		_check_intros()
 		_check_dialogs()
 		_check_item_flow()
@@ -87,6 +91,31 @@ func _load() -> void:
 			if sd is Dictionary:
 				var s := ContentParser.shop(sd)
 				shops[s.id] = s
+
+	for d in _json_array("room_templates.json"):
+		var tpl := ContentParser.room_template(d)
+		room_templates[tpl.id] = tpl
+
+	for d in _json_array("room_materials.json"):
+		var mat := ContentParser.room_material(d)
+		room_materials[mat.id] = mat
+
+	## Комнаты грузятся по ссылкам из локаций: индекса у них нет, а обход
+	## каталога проверял бы и те файлы, которые в игру не попадают.
+	for shop_v in shops.values():
+		var shop: ShopDefinition = shop_v
+		if shop.room_id.is_empty() or rooms.has(shop.room_id):
+			continue
+		var rd = ContentParser.read_json("%srooms/%s.json" % [ROOT, shop.room_id])
+		if not (rd is Dictionary):
+			_err("%s: комната '%s' не читается" % [shop.id, shop.room_id])
+			continue
+		rooms[shop.room_id] = ContentParser.room(rd)
+
+
+func _json_array(file: String) -> Array:
+	var d = ContentParser.read_json(ROOT + file)
+	return d if d is Array else []
 
 
 func _check_ids() -> void:
@@ -710,3 +739,148 @@ func _report() -> void:
 		print("OK: ошибок нет (предупреждений: %d)" % warnings.size())
 	else:
 		print("ПРОВАЛ: ошибок %d" % errors.size())
+
+
+## --- процедурные комнаты ----------------------------------------------------
+##
+## Ошибки здесь дорогие ровно потому, что они молчаливые: комната без материала
+## соберётся на пурпурной шахматке, окно с rect за пределами 0..1 уедет мимо
+## стены, а поверхность, которой нет в шаблоне, просто не нарисуется. В кадре
+## это видно, но кадр смотрят не после каждой правки JSON.
+
+func _check_rooms() -> void:
+	for mat_v in room_materials.values():
+		var mat: RoomMaterial = mat_v
+		if mat.has_texture() and not ResourceLoader.exists(mat.texture_path):
+			_warn("материал %s: нет файла '%s' — пойдёт процедурная заглушка"
+				% [mat.id, mat.texture_path])
+		if not mat.has_texture() and mat.generator.is_empty():
+			_err("материал %s: ни texture, ни generator — рисовать нечем" % mat.id)
+		if mat.tile_size.x <= 0.0 or mat.tile_size.y <= 0.0:
+			_err("материал %s: нулевой размер плитки" % mat.id)
+
+	for tpl_v in room_templates.values():
+		var tpl: RoomTemplate = tpl_v
+		if tpl.width <= 0.0 or tpl.depth <= 0.0 or tpl.height <= 0.0:
+			_err("шаблон %s: нулевой размер комнаты" % tpl.id)
+		## Камера в самом углу — не «странный кадр», а вывернутая наизнанку
+		## проекция: половина комнаты окажется за её плоскостью.
+		if tpl.cam_distance <= RoomGeometry.SAFE_DEPTH:
+			_err("шаблон %s: камера стоит в самом углу (distance %.2f)"
+				% [tpl.id, tpl.cam_distance])
+			continue
+		if tpl.cam_eye_height <= 0.0 or tpl.cam_eye_height >= tpl.height:
+			_err("шаблон %s: глаз камеры вне высоты комнаты" % tpl.id)
+		if tpl.horizon <= 0.05 or tpl.horizon >= 0.95:
+			_err("шаблон %s: линия горизонта за пределами экрана" % tpl.id)
+			continue
+		_check_template_frame(tpl)
+
+	for room_v in rooms.values():
+		var room: RoomDefinition = room_v
+		if not room_templates.has(room.template_id):
+			_err("комната %s: шаблон '%s' не описан" % [room.id, room.template_id])
+		for surface_id in room.surfaces:
+			if not RoomGeometry.SURFACES.has(String(surface_id)):
+				_err("комната %s: поверхность '%s' не существует (есть %s)"
+					% [room.id, surface_id, ", ".join(RoomGeometry.SURFACES)])
+		for surface_id in RoomGeometry.SURFACES:
+			if not room.surfaces.has(surface_id):
+				_warn("комната %s: поверхность '%s' не описана — пойдёт заглушка"
+					% [room.id, surface_id])
+				continue
+			var cfg: RoomSurfaceConfig = room.surfaces[surface_id]
+			_check_room_art("комната %s / поверхность %s" % [room.id, surface_id],
+				cfg.material_id, cfg.texture_path, cfg.generator)
+		for el in room.elements:
+			_check_room_element(room, el, "элемент")
+		for el in room.decals:
+			_check_room_element(room, el, "наклейка")
+		_check_room_trims(room)
+		_check_room_scatter(room)
+
+
+## Шаблон проверяется тем же кодом, которым он потом рисуется: числа камеры
+## сами по себе ничего не говорят, а вот «стык стены с полом уехал за нижний
+## край» — говорит, и увидеть это до запуска дешевле, чем после.
+func _check_template_frame(tpl: RoomTemplate) -> void:
+	var screen := Vector2(1080, 1920)
+	var geom := RoomGeometry.build(tpl, screen)
+	if geom.corner_base.y <= geom.horizon_y + 40.0:
+		_err("шаблон %s: стык стен с полом оказался на линии горизонта — пола не будет видно"
+			% tpl.id)
+	elif geom.corner_base.y >= screen.y - 80.0:
+		_warn("шаблон %s: стык стен с полом почти у нижнего края — пол в кадр не поместится"
+			% tpl.id)
+	if geom.corner_top.y >= geom.corner_base.y:
+		_err("шаблон %s: верх угла ниже его основания — геометрия вывернута" % tpl.id)
+	for surface_id in RoomGeometry.SURFACES:
+		var poly: PackedVector2Array = geom.polygons[surface_id]
+		if poly.size() < 3:
+			_err("шаблон %s: поверхность '%s' не попала в кадр" % [tpl.id, surface_id])
+
+
+func _check_room_element(room: RoomDefinition, el: RoomElement, kind: String) -> void:
+	var who := "комната %s / %s '%s'" % [room.id, kind, el.id if not el.id.is_empty() else el.type]
+	if not RoomGeometry.SURFACES.has(el.surface):
+		_err("%s: поверхность '%s' не существует" % [who, el.surface])
+	_check_room_art(who, el.material_id, el.texture_path, el.generator)
+	## rect нормализован К ПОВЕРХНОСТИ. Выход за 0..1 — это не «чуть за краем»,
+	## а элемент на соседней стене или под полом: там его никто не увидит.
+	if el.rect.size.x <= 0.0 or el.rect.size.y <= 0.0:
+		_err("%s: нулевой размер" % who)
+	elif el.rect.position.x < -0.001 or el.rect.position.y < -0.001 \
+			or el.rect.end.x > 1.001 or el.rect.end.y > 1.001:
+		_warn("%s: rect выходит за поверхность — часть окажется за её краем" % who)
+	if el.opacity <= 0.0:
+		_warn("%s: прозрачность 0 — не будет видно" % who)
+	## Привязка к слоту работает только парой: без состояния элемент виден
+	## всегда, и «дверь закрыта» нарисуется поверх «дверь открыта».
+	if el.slot_id.is_empty() != el.slot_state.is_empty():
+		_err("%s: привязке к слоту нужны и slot, и slot_state" % who)
+
+
+func _check_room_art(who: String, material_id: String,
+		texture_path: String, generator: String) -> void:
+	if not material_id.is_empty() and not room_materials.has(material_id):
+		_err("%s: материал '%s' не описан в room_materials.json" % [who, material_id])
+	if not texture_path.is_empty() and not ResourceLoader.exists(texture_path):
+		_warn("%s: нет файла '%s'" % [who, texture_path])
+	if material_id.is_empty() and texture_path.is_empty() and generator.is_empty():
+		_warn("%s: ни материала, ни картинки — пойдёт отладочная заглушка" % who)
+
+
+func _check_room_trims(room: RoomDefinition) -> void:
+	var trims := room.trims
+	if trims == null:
+		return
+	if trims.has_baseboard() and not trims.baseboard_material_id.is_empty() \
+			and not room_materials.has(trims.baseboard_material_id):
+		_err("комната %s: плинтус ссылается на материал '%s', которого нет"
+			% [room.id, trims.baseboard_material_id])
+	if trims.corner_width > 0.5:
+		_warn("комната %s: затемнение угла шире половины стены" % room.id)
+	if trims.contact_size > 0.5:
+		_warn("комната %s: контактная тень шире половины пола" % room.id)
+
+
+func _check_room_scatter(room: RoomDefinition) -> void:
+	for raw in room.scatter:
+		if typeof(raw) != TYPE_DICTIONARY:
+			_err("комната %s: правило scatter не словарь" % room.id)
+			continue
+		var rule: Dictionary = raw
+		var material_id := String(rule.get("material", ""))
+		if not material_id.is_empty() and not room_materials.has(material_id):
+			_err("комната %s: scatter ссылается на материал '%s', которого нет"
+				% [room.id, material_id])
+		if not RoomGeometry.SURFACES.has(String(rule.get("surface", ""))):
+			_err("комната %s: scatter на несуществующей поверхности '%s'"
+				% [room.id, rule.get("surface", "")])
+		if int(rule.get("count", 0)) <= 0:
+			_warn("комната %s: правило scatter ничего не разбрасывает" % room.id)
+	## Зерно — это воспроизводимость. Комната со случайным слоем и нулевым
+	## зерном после перезагрузки выглядит иначе, и это баг, а не разнообразие.
+	if not room.scatter.is_empty() and room.seed == 0:
+		_warn("комната %s: есть scatter, но нет seed — раскладка не воспроизводима"
+			% room.id)
