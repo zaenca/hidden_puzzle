@@ -11,11 +11,13 @@ const SURFACE_TITLES := {
 	"left_wall": "Левая стена",
 	"right_wall": "Правая стена",
 	"floor": "Пол",
+	"ceiling": "Потолок",
 }
 ## Какие материалы предлагать каждой поверхности. Пол на настенном кирпиче
-## смотрится нормально, поэтому фильтр мягкий: стенам — всё, кроме элементов
-## и наклеек, полу — то же самое.
-const SURFACE_CATEGORIES := ["wall", "floor"]
+## смотрится нормально, поэтому фильтр мягкий: любой материал поверхности любой
+## поверхности. Отсеиваются только элементы и наклейки — окно, натянутое на всю
+## стену, ничего не проверяет.
+const SURFACE_CATEGORIES := ["wall", "floor", "ceiling"]
 ## Строка выбора геометрии. Отдельным ключом, а не поверхностью: список у неё
 ## свой, а обработчик тот же.
 const TEMPLATE_ROW := "__template"
@@ -66,6 +68,11 @@ func _build(current: Dictionary, current_template: String) -> void:
 			ids.append(String(id))
 
 	for surface_id in SURFACE_TITLES:
+		## Строка только для тех поверхностей, что у комнаты есть. Потолок
+		## необязателен, и строка «Потолок», которая ничего не переключает,
+		## врала бы про то, из чего комната собрана.
+		if not current.has(surface_id):
+			continue
 		_choices[surface_id] = ids
 		_index[surface_id] = maxi(0, ids.find(String(current.get(surface_id, ""))))
 		col.add_child(_row(String(surface_id), String(SURFACE_TITLES[surface_id])))

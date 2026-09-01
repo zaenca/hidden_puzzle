@@ -2,7 +2,7 @@
   "title": "Городская площадь",
   "palette": "street",
   "background": "res://art/map_city.jpg",
-  "shops": ["shops/bakery.json", "shops/bakery_storeroom.json", "shops/room_lab.json"],
+  "shops": ["shops/bakery.json", "shops/bakery_storeroom.json", "shops/room_lab.json", "shops/room_lab_storeroom.json"],
   "buildings": [
     { "shop_id": "",            "label": "Мэрия",      "rect": [0.344, 0.035, 0.343, 0.332], "color": "#8a8f9c" },
     { "shop_id": "bakery",      "label": "Пекарня",    "rect": [0.000, 0.293, 0.347, 0.250], "color": "#c08a4e" },

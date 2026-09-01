@@ -786,12 +786,23 @@ func _check_rooms() -> void:
 					% [room.id, surface_id, ", ".join(RoomGeometry.SURFACES)])
 		for surface_id in RoomGeometry.SURFACES:
 			if not room.surfaces.has(surface_id):
-				_warn("комната %s: поверхность '%s' не описана — пойдёт заглушка"
-					% [room.id, surface_id])
+				## Потолок необязателен: без него стены достраиваются вверх и
+				## верх кадра остаётся стеной — это выбор, а не забытая строка.
+				if surface_id != RoomGeometry.SURFACE_CEILING:
+					_warn("комната %s: поверхность '%s' не описана — пойдёт заглушка"
+						% [room.id, surface_id])
 				continue
 			var cfg: RoomSurfaceConfig = room.surfaces[surface_id]
 			_check_room_art("комната %s / поверхность %s" % [room.id, surface_id],
 				cfg.material_id, cfg.texture_path, cfg.generator)
+		## Стены достраиваются вверх ровно затем, чтобы закрыть верх кадра. Если
+		## шаблон это отключил, закрыть его должен потолок — иначе там останется
+		## дыра, и увидит её игрок, а не автор комнаты.
+		var tpl: RoomTemplate = room_templates.get(room.template_id)
+		if tpl != null and tpl.wall_extend_up <= 0.0 \
+				and not room.surfaces.has(RoomGeometry.SURFACE_CEILING):
+			_err("комната %s: шаблон '%s' не достраивает стены вверх, а потолка нет — верх кадра будет пустым"
+				% [room.id, room.template_id])
 		for el in room.elements:
 			_check_room_element(room, el, "элемент")
 		for el in room.decals:
@@ -815,6 +826,10 @@ func _check_template_frame(tpl: RoomTemplate) -> void:
 	if geom.corner_top.y >= geom.corner_base.y:
 		_err("шаблон %s: верх угла ниже его основания — геометрия вывернута" % tpl.id)
 	for surface_id in RoomGeometry.SURFACES:
+		## Потолок в кадр попадать не обязан: в шаблоне с достроенными вверх
+		## стенами его линия стыка уходит выше экрана, и это нормально.
+		if surface_id == RoomGeometry.SURFACE_CEILING:
+			continue
 		var poly: PackedVector2Array = geom.polygons[surface_id]
 		if poly.size() < 3:
 			_err("шаблон %s: поверхность '%s' не попала в кадр" % [tpl.id, surface_id])
@@ -822,8 +837,12 @@ func _check_template_frame(tpl: RoomTemplate) -> void:
 
 func _check_room_element(room: RoomDefinition, el: RoomElement, kind: String) -> void:
 	var who := "комната %s / %s '%s'" % [room.id, kind, el.id if not el.id.is_empty() else el.type]
-	if not RoomGeometry.SURFACES.has(el.surface):
-		_err("%s: поверхность '%s' не существует" % [who, el.surface])
+	if not RoomGeometry.ELEMENT_SURFACES.has(el.surface):
+		_err("%s: поверхность '%s' не существует (есть %s)"
+			% [who, el.surface, ", ".join(RoomGeometry.ELEMENT_SURFACES)])
+	elif el.surface == RoomGeometry.SURFACE_CEILING \
+			and not room.surfaces.has(RoomGeometry.SURFACE_CEILING):
+		_warn("%s: стоит на потолке, которого у комнаты нет" % who)
 	_check_room_art(who, el.material_id, el.texture_path, el.generator)
 	## rect нормализован К ПОВЕРХНОСТИ. Выход за 0..1 — это не «чуть за краем»,
 	## а элемент на соседней стене или под полом: там его никто не увидит.
@@ -858,6 +877,14 @@ func _check_room_trims(room: RoomDefinition) -> void:
 			and not room_materials.has(trims.baseboard_material_id):
 		_err("комната %s: плинтус ссылается на материал '%s', которого нет"
 			% [room.id, trims.baseboard_material_id])
+	if trims.has_cornice() and not trims.cornice_material_id.is_empty() \
+			and not room_materials.has(trims.cornice_material_id):
+		_err("комната %s: карниз ссылается на материал '%s', которого нет"
+			% [room.id, trims.cornice_material_id])
+	## Карниз — стык стены с потолком. Без потолка ему не с чем стыковаться, и
+	## он читается как полоса, приклеенная поперёк стены.
+	if trims.has_cornice() and not room.surfaces.has(RoomGeometry.SURFACE_CEILING):
+		_warn("комната %s: карниз есть, а потолка нет" % room.id)
 	if trims.corner_width > 0.5:
 		_warn("комната %s: затемнение угла шире половины стены" % room.id)
 	if trims.contact_size > 0.5:
@@ -874,7 +901,7 @@ func _check_room_scatter(room: RoomDefinition) -> void:
 		if not material_id.is_empty() and not room_materials.has(material_id):
 			_err("комната %s: scatter ссылается на материал '%s', которого нет"
 				% [room.id, material_id])
-		if not RoomGeometry.SURFACES.has(String(rule.get("surface", ""))):
+		if not RoomGeometry.ELEMENT_SURFACES.has(String(rule.get("surface", ""))):
 			_err("комната %s: scatter на несуществующей поверхности '%s'"
 				% [room.id, rule.get("surface", "")])
 		if int(rule.get("count", 0)) <= 0:

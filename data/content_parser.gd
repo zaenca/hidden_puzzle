@@ -439,6 +439,11 @@ static func room_trims(d: Dictionary) -> RoomTrims:
 	t.baseboard_material_id = String(base.get("material", ""))
 	t.baseboard_generator = String(base.get("generator", ""))
 	t.baseboard_tint = to_color(base.get("tint", ""), Color(0.86, 0.82, 0.76))
+	var cornice: Dictionary = d.get("cornice", {})
+	t.cornice_height = float(cornice.get("height", 0.0))
+	t.cornice_material_id = String(cornice.get("material", ""))
+	t.cornice_generator = String(cornice.get("generator", ""))
+	t.cornice_tint = to_color(cornice.get("tint", ""), Color(0.86, 0.82, 0.76))
 	var contact: Dictionary = d.get("contact_shadow", {})
 	t.contact_size = float(contact.get("size", 0.0))
 	t.contact_strength = float(contact.get("strength", 0.0))
@@ -464,10 +469,15 @@ static func room(d: Dictionary) -> RoomDefinition:
 	var decals: Array[RoomElement] = []
 	for raw in d.get("decals", []):
 		var decal := room_element(raw, RoomElement.LAYER_WALL_DECAL)
-		## Наклейка на полу обязана лечь под стены: положенная поверх, она
-		## выглядит нарисованной на стекле перед комнатой.
-		if decal.surface == "floor" and not (raw as Dictionary).has("layer"):
-			decal.layer = RoomElement.LAYER_FLOOR_DECAL
+		## Наклейка на полу обязана лечь под стены, а на потолке — над ними:
+		## положенная не в свой слой, она выглядит нарисованной на стекле перед
+		## кадром, а не лежащей на поверхности.
+		if not (raw as Dictionary).has("layer"):
+			match decal.surface:
+				RoomGeometry.SURFACE_FLOOR:
+					decal.layer = RoomElement.LAYER_FLOOR_DECAL
+				RoomGeometry.SURFACE_CEILING:
+					decal.layer = RoomElement.LAYER_CEILING + 1
 		decals.append(decal)
 	r.decals = decals
 

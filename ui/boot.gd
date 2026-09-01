@@ -148,6 +148,11 @@ func _build_overlay() -> void:
 	col.add_child(_debug_button("Комната: тест материалов", func():
 		_debug_panel.visible = false
 		Game.open_shop("room_lab")))
+	## Та же кладовая, что и в игре, но собранная системой. Рядом с настоящей на
+	## PNG сразу видно, что система уже вытягивает, а чего ей не хватает.
+	col.add_child(_debug_button("Комната: кладовая процедурно", func():
+		_debug_panel.visible = false
+		Game.open_shop("room_lab_storeroom")))
 	col.add_child(_debug_button("Перемотать 10 мин", func():
 		TimeService.fast_forward(600)
 		EventBus.toast.emit("Время +10 минут")))

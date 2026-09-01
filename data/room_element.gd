@@ -14,6 +14,9 @@ extends Resource
 const LAYER_FLOOR := 0
 const LAYER_FLOOR_DECAL := 10
 const LAYER_WALL := 20
+## Потолок поверх стен: стены могут быть достроены выше своей высоты, и потолок
+## обязан их накрыть, а не встать под ними.
+const LAYER_CEILING := 25
 const LAYER_WALL_DECAL := 30
 const LAYER_TRIM := 40
 const LAYER_STRUCTURE := 50

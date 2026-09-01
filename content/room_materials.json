@@ -25,7 +25,18 @@
     "id": "debug_checker", "category": "floor", "generator": "checker", "tile_size": [0.55, 0.55], "tint": "#ffffff"
   },
 
+  { "id": "worn_plaster_01", "category": "wall", "generator": "plaster_worn", "tile_size": [1.6, 1.6], "tint": "#8a6a48", "seed": 71 },
+  { "id": "worn_plaster_02", "category": "wall", "generator": "plaster_worn", "tile_size": [1.6, 1.6], "tint": "#8e6c49", "seed": 83 },
+  { "id": "terracotta_floor_02", "category": "floor", "generator": "tiles", "tile_size": [0.42, 0.42], "tint": "#a3643f", "seed": 29 },
+
+  {
+    "_note": "Потолок. Балка стоит на краю плитки, поэтому её шаг — это размер плитки: 0.9 по одной оси даёт балку каждые 0.9 единицы комнаты, 3.0 по другой — сплошной настил между ними.",
+    "id": "wood_ceiling_01", "category": "ceiling", "generator": "beams", "tile_size": [0.9, 3.0], "tint": "#d8ccbc", "seed": 37
+  },
+
   { "id": "window_wood_01", "category": "element", "generator": "window", "tint": "#ffffff" },
+  { "id": "lamp_hanging_01", "category": "element", "generator": "lamp", "tint": "#ffffff" },
+  { "id": "lamp_glow_01", "category": "decal", "generator": "glow", "tint": "#ffffff" },
   { "id": "door_old_01", "category": "element", "generator": "door", "tint": "#ffffff" },
   { "id": "doorway_dark", "category": "element", "generator": "flat", "tint": "#1a1512" },
   { "id": "trim_wood_01", "category": "trim", "generator": "wood", "tile_size": [0.45, 0.45], "tint": "#d8ccb8", "seed": 61 },

@@ -53,8 +53,14 @@ static func generate(generator: String, seed_value: int = 0) -> Texture2D:
 static func _draw(generator: String, seed_value: int) -> Image:
 	match generator:
 		"plaster": return _noise_fill(Color(0.86, 0.80, 0.70), 0.13, seed_value)
+		## Та же штукатурка, но облезлая: пятна крупнее и контрастнее. Ровная
+		## стена читается как новая, а кладовая должна читаться как заброшенная.
+		"plaster_worn": return _noise_fill(Color(0.80, 0.72, 0.58), 0.34, seed_value)
 		"concrete": return _noise_fill(Color(0.62, 0.62, 0.60), 0.11, seed_value)
 		"brick": return _brick(seed_value)
+		"beams": return _beams(seed_value)
+		"glow": return _glow()
+		"lamp": return _lamp()
 		"tiles": return _tiles(seed_value)
 		"wood": return _wood(seed_value)
 		"checker": return _checker()
@@ -150,6 +156,79 @@ static func _wood(seed_value: int) -> Image:
 			_wrapped_rect(img, gx, 0, 1, TILE_SIZE, base.darkened(rng.randf_range(0.10, 0.25)))
 		## Шов между досками.
 		_wrapped_rect(img, p * pw, 0, 2, TILE_SIZE, base.darkened(0.45))
+	return img
+
+
+## Балочный потолок: настил из досок плюс поперечная балка на краю плитки.
+## Балка стоит именно на краю, а не посередине: тогда её шаг задаётся размером
+## плитки, и «балка через каждые 0.9 метра» пишется одним числом в JSON.
+static func _beams(seed_value: int) -> Image:
+	var img := Image.create_empty(TILE_SIZE, TILE_SIZE, false, Image.FORMAT_RGBA8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value + 8081
+	var deck := Color(0.46, 0.33, 0.20)
+	img.fill(deck)
+	## Настил: доски поперёк балки, каждая своего оттенка.
+	var boards := 8
+	var bh := TILE_SIZE / boards
+	for b in boards:
+		var c := deck.lightened(rng.randf_range(-0.10, 0.12))
+		c.a = 1.0
+		_wrapped_rect(img, 0, b * bh, TILE_SIZE, bh - 2, c)
+		_wrapped_rect(img, 0, b * bh + bh - 2, TILE_SIZE, 2, deck.darkened(0.45))
+	## Балка: тень под ней, тело, блик по верхней грани.
+	var beam := Color(0.38, 0.26, 0.15)
+	var beam_w := 46
+	_wrapped_rect(img, -10, 0, 10, TILE_SIZE, Color(0.16, 0.11, 0.07))
+	_wrapped_rect(img, 0, 0, beam_w, TILE_SIZE, beam)
+	_wrapped_rect(img, 0, 0, 7, TILE_SIZE, beam.lightened(0.22))
+	_wrapped_rect(img, beam_w - 6, 0, 6, TILE_SIZE, beam.darkened(0.35))
+	return img
+
+
+## Пятно света от лампы. Кладётся на стену наклейкой: направленного света у
+## системы нет, а без светового пятна лампа в кадре ничего не освещает и
+## читается как нарисованная деталь, а не как источник.
+static func _glow() -> Image:
+	var size := 256
+	var img := Image.create_empty(size, size, false, Image.FORMAT_RGBA8)
+	var c := Vector2(size, size) * 0.5
+	for y in size:
+		for x in size:
+			var d: float = (Vector2(x, y) - c).length() / (size * 0.5)
+			var a: float = 1.0 - smoothstep(0.0, 1.0, clampf(d, 0.0, 1.0))
+			img.set_pixel(x, y, Color(1.0, 0.86, 0.62, a * a))
+	return img
+
+
+## Подвесная лампа: шнур, тёмный плафон, светящаяся лампочка и ореол вокруг неё.
+static func _lamp() -> Image:
+	var w := 220
+	var h := 560
+	var img := Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var metal := Color(0.13, 0.12, 0.12, 1.0)
+	## Длинный шнур: лампа висит от самого потолка, и обрезанный шнур читается
+	## как лампа, приклеенная к воздуху.
+	img.fill_rect(Rect2i(w / 2 - 4, 0, 8, 400), metal)
+	img.fill_rect(Rect2i(w / 2 - 13, 380, 26, 34), metal)
+	## Плафон — трапеция: сверху узкий, снизу широкий.
+	var top_y := 412
+	var bot_y := 484
+	for y in range(top_y, bot_y):
+		var t := float(y - top_y) / float(bot_y - top_y)
+		var half := int(lerpf(26.0, 86.0, sqrt(t)))
+		var shade := metal.lightened(0.10 * (1.0 - t))
+		img.fill_rect(Rect2i(w / 2 - half, y, half * 2, 1), shade)
+	## Блик по левой кромке плафона — иначе он читается плоским пятном.
+	for y in range(top_y, bot_y):
+		var t := float(y - top_y) / float(bot_y - top_y)
+		var half := int(lerpf(26.0, 86.0, sqrt(t)))
+		img.fill_rect(Rect2i(w / 2 - half, y, 5, 1), Color(0.34, 0.32, 0.30, 1.0))
+	## Лампочка и ореол.
+	_disc(img, Vector2(w * 0.5, 500), 40.0, Color(1.0, 0.82, 0.50, 0.26))
+	_disc(img, Vector2(w * 0.5, 497), 21.0, Color(1.0, 0.90, 0.66, 0.85))
+	_disc(img, Vector2(w * 0.5, 495), 12.0, Color(1.0, 0.98, 0.88, 1.0))
 	return img
 
 

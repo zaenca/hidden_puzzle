@@ -31,6 +31,9 @@ var _surface_nodes: Dictionary = {}    ## surface id -> Polygon2D
 var _surface_cfg: Dictionary = {}      ## surface id -> RoomSurfaceConfig
 var _element_nodes: Dictionary = {}    ## element id -> Array[Node2D]
 var _element_rects: Dictionary = {}    ## element id -> Rect2 на экране
+## element id -> PackedVector2Array, сам четырёхугольник. Rect2 — только его
+## габарит, а перекошен элемент или нет, видно лишь по четырём точкам.
+var _element_quads: Dictionary = {}
 var _elements: Dictionary = {}         ## element id -> RoomElement
 var _surface_shader: Shader = null
 var _decal_shader: Shader = null
@@ -56,6 +59,7 @@ func build(def: RoomDefinition, tpl: RoomTemplate, materials: Dictionary,
 	_surface_nodes.clear()
 	_element_nodes.clear()
 	_element_rects.clear()
+	_element_quads.clear()
 	_elements.clear()
 
 	_build_surfaces()
@@ -126,6 +130,11 @@ func set_surface_material(surface_id: String, material_id: String) -> void:
 func _build_surfaces() -> void:
 	for surface_id in RoomGeometry.SURFACES:
 		var cfg: RoomSurfaceConfig = _def.surface(surface_id)
+		## Потолок строго по заявке: комната без него — это выбор (стены
+		## достраиваются вверх, верх кадра остаётся стеной), а комната без пола
+		## или стены — забытая строка, и её видно по отладочной заглушке.
+		if cfg == null and surface_id == RoomGeometry.SURFACE_CEILING:
+			continue
 		if cfg == null:
 			cfg = RoomSurfaceConfig.new()
 			cfg.id = surface_id
@@ -134,11 +143,17 @@ func _build_surfaces() -> void:
 		var poly := Polygon2D.new()
 		poly.name = "Surface_" + surface_id
 		poly.polygon = geom.polygons[surface_id]
-		poly.z_index = RoomElement.LAYER_FLOOR if surface_id == RoomGeometry.SURFACE_FLOOR \
-			else RoomElement.LAYER_WALL
+		poly.z_index = _surface_layer(surface_id)
 		add_child(poly)
 		_surface_nodes[surface_id] = poly
 		_apply_surface_material(poly, surface_id, cfg)
+
+
+static func _surface_layer(surface_id: String) -> int:
+	match surface_id:
+		RoomGeometry.SURFACE_FLOOR: return RoomElement.LAYER_FLOOR
+		RoomGeometry.SURFACE_CEILING: return RoomElement.LAYER_CEILING
+		_: return RoomElement.LAYER_WALL
 
 
 func _apply_surface_material(poly: Polygon2D, surface_id: String,
@@ -188,7 +203,7 @@ func _build_elements(list: Array) -> void:
 
 
 func _build_element(el: RoomElement) -> void:
-	if not RoomGeometry.SURFACES.has(el.surface):
+	if not RoomGeometry.ELEMENT_SURFACES.has(el.surface):
 		push_warning("RoomAssembler: элемент '%s' на неизвестной поверхности '%s'"
 			% [el.id, el.surface])
 		return
@@ -252,17 +267,29 @@ func _build_element(el: RoomElement) -> void:
 		_element_nodes[el.id] = nodes
 		_elements[el.id] = el
 		_element_rects[el.id] = _bounds(quad)
+		_element_quads[el.id] = quad
 
 
-## Плинтус: полоса внизу каждой стены в координатах самой стены, поэтому он
-## сходится в углу сам, без подгонки.
+## Плинтус и карниз: полосы внизу и вверху каждой стены в координатах самой
+## стены, поэтому они сходятся в углу сами, без подгонки.
 func _build_baseboard() -> void:
 	var trims := _def.trims
-	if trims == null or not trims.has_baseboard():
+	if trims == null:
 		return
-	var mat: RoomMaterial = _materials.get(trims.baseboard_material_id)
+	if trims.has_baseboard():
+		_wall_band("baseboard", trims.baseboard_material_id, trims.baseboard_generator,
+			trims.baseboard_tint,
+			Rect2(0.0, 1.0 - trims.baseboard_height, 1.0, trims.baseboard_height))
+	if trims.has_cornice():
+		_wall_band("cornice", trims.cornice_material_id, trims.cornice_generator,
+			trims.cornice_tint, Rect2(0.0, 0.0, 1.0, trims.cornice_height))
+
+
+func _wall_band(band_name: String, material_id: String, generator: String,
+		tint: Color, rect: Rect2) -> void:
+	var mat: RoomMaterial = _materials.get(material_id)
 	var path := ""
-	var gen := trims.baseboard_generator
+	var gen := generator
 	if mat != null and gen.is_empty():
 		path = mat.texture_path
 		gen = mat.generator
@@ -270,9 +297,8 @@ func _build_baseboard() -> void:
 		gen = "wood"
 	var tex := RoomTextures.resolve(path, gen, _def.seed)
 	for surface_id in [RoomGeometry.SURFACE_LEFT, RoomGeometry.SURFACE_RIGHT]:
-		var rect := Rect2(0.0, 1.0 - trims.baseboard_height, 1.0, trims.baseboard_height)
-		_quad_node("baseboard_" + surface_id,
-			_quad_for(surface_id, rect, 0.0), tex, trims.baseboard_tint,
+		_quad_node("%s_%s" % [band_name, surface_id],
+			_quad_for(surface_id, rect, 0.0), tex, tint,
 			RoomElement.LAYER_TRIM, Vector2.ZERO)
 
 
@@ -383,6 +409,8 @@ func _quad_for(surface_id: String, rect: Rect2, rotation_deg: float) -> PackedVe
 		rect.end,
 		Vector2(rect.position.x, rect.end.y),
 	]
+	if surface_id == RoomGeometry.SURFACE_SCREEN:
+		return _screen_quad(rect, rotation_deg)
 	if absf(rotation_deg) > 0.01:
 		var extent := geom.extent(surface_id)
 		var centre := rect.position + rect.size * 0.5
@@ -398,6 +426,21 @@ func _quad_for(surface_id: String, rect: Rect2, rotation_deg: float) -> PackedVe
 	for c in corners:
 		out.append(geom.uv_to_screen(surface_id, c))
 	return out
+
+
+## Элемент, который ни на одной плоскости комнаты не лежит: лампа висит в
+## воздухе, передний план стоит перед кадром. Перспективы у него нет и быть не
+## должно — натянутая на стену лампа перекосилась бы вместе со стеной.
+func _screen_quad(rect: Rect2, rotation_deg: float) -> PackedVector2Array:
+	var r := Rect2(rect.position * _screen, rect.size * _screen)
+	var corners := PackedVector2Array([
+		r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)])
+	if absf(rotation_deg) > 0.01:
+		var pivot := r.position + r.size * 0.5
+		var a := deg_to_rad(rotation_deg)
+		for i in 4:
+			corners[i] = pivot + (corners[i] - pivot).rotated(a)
+	return corners
 
 
 func _quad_node(node_name: String, quad: PackedVector2Array, tex: Texture2D,

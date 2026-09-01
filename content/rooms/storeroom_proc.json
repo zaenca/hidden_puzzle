@@ -1,0 +1,110 @@
+{
+  "_note": "Процедурная копия кладовой пекарни. Собрана по art/bakery_storeroom.png, чтобы можно было сравнить систему с нарисованным фоном на одном и том же помещении. Настоящую кладовую НЕ заменяет: та по-прежнему стоит на своём PNG, а это отдельная локация в лаборатории. Мебели (верстак и шкаф) здесь нет — элементы системы живут только на поверхностях, а стоящий посреди комнаты предмет лежит на своей плоскости; это следующий этап.",
+
+  "id": "storeroom_proc",
+  "room_template": "storeroom_room",
+  "seed": 5107,
+  "debug_panel": true,
+
+  "surfaces": {
+    "left_wall":  { "material": "worn_plaster_01" },
+    "right_wall": { "material": "worn_plaster_02" },
+    "floor":      { "material": "terracotta_floor_02" },
+    "ceiling":    { "material": "wood_ceiling_01" }
+  },
+
+  "elements": [
+    {
+      "_note": "Окно у самого дальнего края левой стены и под потолком — как на исходном арте. u = 0 у левой стены это её наружный край, а не угол комнаты.",
+      "id": "window_01",
+      "type": "window",
+      "surface": "left_wall",
+      "rect": [0.33, 0.06, 0.19, 0.21],
+      "material": "window_wood_01",
+      "shadow": 0.14,
+      "shadow_offset": [0.0, 0.03],
+      "inset": 0.7,
+      "frame": 0.07,
+      "frame_material": "trim_wood_01",
+      "frame_tint": "#cbb9a0"
+    },
+    {
+      "_note": "Лампа висит в воздухе и ни на одной плоскости комнаты не лежит — поэтому surface = screen: перспективы у неё нет и быть не должно, натянутая на стену она перекосилась бы вместе со стеной.",
+      "id": "lamp_01",
+      "type": "prop",
+      "surface": "screen",
+      "rect": [0.305, 0.0, 0.145, 0.205],
+      "material": "lamp_hanging_01",
+      "layer": 60
+    }
+  ],
+
+  "decals": [
+    {
+      "_note": "Пятно света от лампы на правой стене. Направленного света у системы нет, а без пятна лампа ничего не освещает и читается как деталь, а не как источник.",
+      "surface": "right_wall",
+      "material": "lamp_glow_01",
+      "rect": [0.0, 0.08, 0.46, 0.66],
+      "opacity": 0.30
+    },
+    {
+      "surface": "floor",
+      "material": "lamp_glow_01",
+      "rect": [0.0, 0.0, 0.45, 0.6],
+      "opacity": 0.10
+    },
+    {
+      "surface": "right_wall",
+      "material": "crack_01",
+      "rect": [0.38, 0.26, 0.12, 0.32],
+      "rotation": 5,
+      "opacity": 0.5
+    },
+    {
+      "surface": "left_wall",
+      "material": "cobweb_01",
+      "rect": [0.72, 0.02, 0.22, 0.18],
+      "opacity": 0.45
+    }
+  ],
+
+  "trims": {
+    "_note": "Плинтуса нет намеренно: на исходном арте штукатурка доходит до плитки, стык держит контактная тень. Карниз, наоборот, есть — он там деревянный, заодно с потолком.",
+    "cornice":        { "height": 0.055, "material": "trim_wood_01", "tint": "#8a6742" },
+    "corner_shadow":  { "width": 0.16, "strength": 0.52 },
+    "contact_shadow": { "size": 0.11, "strength": 0.46 }
+  },
+
+  "tint": "#ffffff",
+  "vignette": { "strength": 0.5, "color": "#0d0906" },
+
+  "scatter": [
+    {
+      "surface": "right_wall",
+      "material": "stain_01",
+      "count": 5,
+      "area": [0.05, 0.1, 0.9, 0.8],
+      "size": [0.10, 0.22],
+      "rotation": [-30, 30],
+      "opacity": [0.14, 0.32]
+    },
+    {
+      "surface": "left_wall",
+      "material": "stain_01",
+      "count": 3,
+      "area": [0.1, 0.2, 0.8, 0.7],
+      "size": [0.10, 0.24],
+      "rotation": [-25, 25],
+      "opacity": [0.14, 0.3]
+    },
+    {
+      "surface": "floor",
+      "material": "stain_01",
+      "count": 3,
+      "area": [0.1, 0.1, 0.8, 0.7],
+      "size": [0.09, 0.18],
+      "rotation": [-40, 40],
+      "opacity": [0.10, 0.22]
+    }
+  ]
+}

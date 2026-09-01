@@ -134,6 +134,14 @@ func run(tree: SceneTree) -> void:
 	# --- дверь в цех: заперто, ключ, применение ключа -----------------------
 	_check("зал: дверь заперта", Game.meta.current_slot_state("bakery", "door") == "locked")
 	_check("зал: вход в цех пока закрыт", not bool(Game.meta.flags.get("door_open", false)))
+	## Задача про кладовую открывается ПОСЛЕ уборки зала, а не после открытия
+	## двери: игрок должен видеть цель, пока ищет ключ, иначе он ищет наугад.
+	_check("кладовая: задача открылась сразу после уборки зала",
+		Game.meta.task_state("task_open_storeroom") == MetaService.TaskState.AVAILABLE)
+	_check("кладовая: пазлов у задачи нет",
+		ContentDB.task("task_open_storeroom").level_ids.is_empty())
+	_check("кладовая: собирать нечего — уровней в индексе только два",
+		ContentDB.level_ids.size() == 2)
 
 	var take := Game.meta.interact("bakery", "door", "")
 	_check("тап по двери сработал: %s" % take.get("text", ""), bool(take.get("ok", false)))
@@ -159,31 +167,19 @@ func run(tree: SceneTree) -> void:
 	_check("открытая дверь больше не выдаёт ключ", PlayerState.amount_of("bakery_key") == 0)
 	_check("открытая дверь отвечает текстом", not String(closed.get("text", "")).is_empty())
 
-	# --- кладовая: два пазла, уборка, мусор кликом в инвентарь -------------
-	_check("кладовая: задача открылась после открытия двери",
-		Game.meta.task_state("task_open_storeroom") == MetaService.TaskState.AVAILABLE)
-	_check("кладовая: вход внутрь пока закрыт",
-		not bool(Game.meta.flags.get("storeroom_ready", false)))
-
-	_check("L3: кладовая собирается из 9 частей",
-		ContentDB.level("storeroom_01").puzzle.piece_count() == 9)
-	await _play("task_open_storeroom")
-	_check("L3: кладовая собрана", Game.meta.completed_levels.has("storeroom_01"))
-	_check("после первого пазла задача ещё не готова к применению",
-		Game.meta.task_state("task_open_storeroom") == MetaService.TaskState.IN_PROGRESS)
-
-	_check("L4: шкаф собирается из 9 частей",
-		ContentDB.level("storeroom_02").puzzle.piece_count() == 9)
-	await _play("task_open_storeroom")
-	_check("L4: шкаф собран", Game.meta.completed_levels.has("storeroom_02"))
-	_check("собраны оба предмета — задачу можно применить",
-		Game.meta.task_state("task_open_storeroom") == MetaService.TaskState.READY_TO_APPLY)
-
-	_apply("task_open_storeroom")
+	# --- кладовая: открылась ключом, без сборки -----------------------------
+	## Задача закрывается сама тем же действием, которым игрок открыл дверь.
+	## Отдельной кнопки «подтвердить» после этого нет: она бы ничего не решала.
+	_check("кладовая: задача закрылась открытой дверью, без сборки",
+		Game.meta.task_state("task_open_storeroom") == MetaService.TaskState.COMPLETED)
+	_check("кладовая: ни один уровень не проходился",
+		not Game.meta.completed_levels.has("storeroom_01")
+		and not Game.meta.completed_levels.has("storeroom_02"))
 	_check("флаг storeroom_ready выставлен",
 		bool(Game.meta.flags.get("storeroom_ready", false)))
 	_check("мета: кладовая перешла в восстановление",
 		Game.meta.shop_state("bakery_storeroom") == "in_restoration")
+	_check_task_notification("Открыть кладовую")
 
 	Game.open_shop("bakery_storeroom")
 	await tree.create_timer(0.4).timeout
@@ -228,6 +224,7 @@ func run(tree: SceneTree) -> void:
 		Game.meta.completed_levels.size() == distinct_levels)
 
 	await _check_procedural_room()
+	await _check_procedural_ceiling()
 	await _check_dialog_skip()
 
 	_report()
@@ -799,17 +796,10 @@ func _check_procedural_room() -> void:
 		_check("комната: поверхность '%s' не выродилась (%d точек)" % [surface_id, poly.size()],
 			poly.size() >= 3)
 
-	## Перспектива: у пола дальний край обязан быть уже ближнего. Проверка
-	## грубая намеренно — тонкости видны глазом, а вывернутая наизнанку
-	## проекция глазом как раз выглядит правдоподобно.
-	var far_left := room.geom.uv_to_screen(RoomGeometry.SURFACE_FLOOR, Vector2(0.0, 0.05))
-	var far_right := room.geom.uv_to_screen(RoomGeometry.SURFACE_FLOOR, Vector2(1.0, 0.05))
-	var near_left := room.geom.uv_to_screen(RoomGeometry.SURFACE_FLOOR, Vector2(0.0, 0.95))
-	var near_right := room.geom.uv_to_screen(RoomGeometry.SURFACE_FLOOR, Vector2(1.0, 0.95))
-	_check("комната: дальний край пола уже ближнего",
-		absf(far_right.x - far_left.x) < absf(near_right.x - near_left.x))
+	_check_perspective(room, RoomGeometry.SURFACE_FLOOR, "пол")
 	_check("комната: дальний край пола выше ближнего",
-		far_left.y < near_left.y)
+		room.geom.uv_to_screen(RoomGeometry.SURFACE_FLOOR, Vector2(0.0, 0.05)).y
+		< room.geom.uv_to_screen(RoomGeometry.SURFACE_FLOOR, Vector2(0.0, 0.6)).y)
 
 	## Гомография обратима: точка поверхности, переведённая на экран и обратно,
 	## обязана вернуться в себя. Именно на этом стоит и раскладка плитки, и
@@ -870,3 +860,77 @@ func _check_procedural_room() -> void:
 		again.element_rect("left_wall_scatter_0").is_equal_approx(before))
 
 	Game.meta.set_slot_state("room_lab", "lab_door", "closed")
+
+
+## Вторая лабораторная комната — процедурная копия кладовой. Проверяется то,
+## чего в первой нет: потолок как четвёртая поверхность и элемент, который ни
+## на одной плоскости комнаты не лежит.
+func _check_procedural_ceiling() -> void:
+	Game.open_shop("room_lab_storeroom")
+	await _tree.create_timer(0.4).timeout
+	var scene: Node = Game.current()
+	if scene == null or not ("_room" in scene) or scene._room == null:
+		_check("кладовая процедурно: локация открылась", false)
+		return
+	var room: RoomAssembler = scene._room
+	_check("кладовая процедурно: интерьер собран", true)
+
+	var ceiling: PackedVector2Array = room.geom.polygons[RoomGeometry.SURFACE_CEILING]
+	_check("потолок: попал в кадр (%d точек)" % ceiling.size(), ceiling.size() >= 3)
+	## Потолок обязан лежать ВЫШЕ верха угла комнаты: если он оказался ниже,
+	## значит проекция вывернулась, а на кадре это выглядит правдоподобно.
+	var centre := Vector2.ZERO
+	for p in ceiling:
+		centre += p
+	centre /= maxf(1.0, float(ceiling.size()))
+	_check("потолок: лежит выше верха угла", centre.y < room.geom.corner_top.y)
+
+	_check_perspective(room, RoomGeometry.SURFACE_CEILING, "потолок")
+	_check("потолок: дальний край ниже ближнего",
+		room.geom.uv_to_screen(RoomGeometry.SURFACE_CEILING, Vector2(0.0, 0.05)).y
+		> room.geom.uv_to_screen(RoomGeometry.SURFACE_CEILING, Vector2(0.0, 0.6)).y)
+
+	## Лампа висит в воздухе: её прямоугольник обязан остаться прямоугольником.
+	## Натянутая на стену, она перекосилась бы вместе со стеной — и это тот
+	## случай, когда на скриншоте всё выглядит нормально.
+	var lamp := room.element_rect("lamp_01")
+	_check("лампа: стоит в кадре без перспективы",
+		lamp.size.x > 40.0 and lamp.size.y > 100.0)
+	var quad: PackedVector2Array = room._element_quads.get("lamp_01", PackedVector2Array())
+	_check("лампа: её четырёхугольник не перекошен",
+		quad.size() == 4 and absf(quad[0].y - quad[1].y) < 0.01
+		and absf(quad[0].x - quad[3].x) < 0.01)
+
+
+## Перспектива на поверхности: одна и та же плитка у дальнего края обязана
+## занимать на экране меньше места, чем у ближнего.
+##
+## «Дальний край уже ближнего» тут не годится: у пола и потолка оси идут вдоль
+## двух стен, а не «влево-вправо» и «от нас», поэтому крайние линии не
+## параллельны и их ширины сравнивать бессмысленно. Площадь маленького квадрата
+## разметки — величина однозначная, и на вывернутой проекции она ведёт себя
+## наоборот.
+func _check_perspective(room: RoomAssembler, surface_id: String, title: String) -> void:
+	var part: Rect2 = room.geom.safe_part[surface_id]
+	var side := 0.08
+	var far_area := _patch_area(room, surface_id, part.position + Vector2(0.02, 0.02), side)
+	var near_area := _patch_area(room, surface_id,
+		part.end - Vector2(side + 0.02, side + 0.02), side)
+	_check("%s: плитка у дальнего края мельче, чем у ближнего (%.0f против %.0f px²)"
+		% [title, far_area, near_area], far_area < near_area)
+
+
+## Площадь четырёхугольника, в который проецируется квадратик разметки.
+func _patch_area(room: RoomAssembler, surface_id: String, uv: Vector2, side: float) -> float:
+	var pts := PackedVector2Array([
+		room.geom.uv_to_screen(surface_id, uv),
+		room.geom.uv_to_screen(surface_id, uv + Vector2(side, 0.0)),
+		room.geom.uv_to_screen(surface_id, uv + Vector2(side, side)),
+		room.geom.uv_to_screen(surface_id, uv + Vector2(0.0, side)),
+	])
+	var area := 0.0
+	for i in 4:
+		var a := pts[i]
+		var b := pts[(i + 1) % 4]
+		area += a.x * b.y - b.x * a.y
+	return absf(area) * 0.5

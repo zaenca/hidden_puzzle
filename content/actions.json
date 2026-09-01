@@ -43,17 +43,18 @@
     ]
   },
   {
-    "id": "clean_storeroom",
-    "title": "Убрать кладовую",
-    "description": "Кладовая собрана, шкаф на месте — пора за уборку.",
-    "button_label": "Убрать кладовую",
-    "requirements": [{ "type": "level", "level_id": "storeroom_02" }],
+    "_note": "auto_apply: задача закрывается сама, как только дверь поддалась. Работа игрока — найти ключ и применить его; отдельная кнопка «подтвердить» после этого ничего бы не решала, а такую задачу лучше не показывать вовсе, чем показывать с мёртвой кнопкой. Текста здесь нет намеренно: что за дверью, рассказывает сама дверь, и второе модальное окно подряд читалось бы как сбой.",
+    "id": "open_storeroom",
+    "title": "Открыть кладовую",
+    "description": "Дверь поддалась — за ней кладовая.",
+    "button_label": "Войти",
+    "auto_apply": true,
+    "requirements": [{ "type": "flag", "flag": "door_open" }],
     "costs": [],
     "duration_sec": 0,
     "effects": [
       { "type": "set_shop_state", "shop_id": "bakery_storeroom", "state": "in_restoration" },
-      { "type": "set_flag", "flag": "storeroom_ready" },
-      { "type": "narrative", "text": "Шкаф встал у правой стены. Теперь видно, во что кладовую превратили: полки в паутине, муке и мусоре." }
+      { "type": "set_flag", "flag": "storeroom_ready" }
     ]
   },
   {

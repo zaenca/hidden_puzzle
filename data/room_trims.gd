@@ -19,6 +19,13 @@ extends Resource
 @export var baseboard_generator: String = ""
 @export var baseboard_tint: Color = Color(0.86, 0.82, 0.76)
 
+## Карниз: та же полоса, но вверху стены. Нужен там, где есть потолок: без него
+## деревянный потолок читается как отдельная картинка, приставленная к стене.
+@export var cornice_height: float = 0.0
+@export var cornice_material_id: String = ""
+@export var cornice_generator: String = ""
+@export var cornice_tint: Color = Color(0.86, 0.82, 0.76)
+
 ## Контактная тень на полу вдоль стен — то, что превращает стык в стык.
 ## size — доля пола от стены, strength — плотность.
 @export var contact_size: float = 0.0
@@ -31,6 +38,9 @@ func has_corner() -> bool:
 
 func has_baseboard() -> bool:
 	return baseboard_height > 0.0
+
+func has_cornice() -> bool:
+	return cornice_height > 0.0
 
 func has_contact() -> bool:
 	return contact_size > 0.0 and contact_strength > 0.0

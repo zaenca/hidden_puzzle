@@ -153,11 +153,14 @@ func _build_room_debug_panel() -> void:
 	var panel := RoomDebugPanel.create(_room, ContentDB.room_materials,
 		ContentDB.room_templates, current, def.template_id)
 	_ui.add_child(panel)
-	panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	## Внизу, а не вверху: наверху у комнаты потолок, лампа и верх стен — то
+	## самое, ради чего стенд и открывают. Задач у лабораторной локации нет,
+	## поэтому низ экрана свободен.
+	panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	panel.offset_left = -290
 	panel.offset_right = 290
-	panel.offset_top = 150
-	panel.offset_bottom = 150
+	panel.offset_top = -360
+	panel.offset_bottom = -60
 
 
 ## Область слота — по элементу комнаты, если он к нему привязан. Дверь должна
