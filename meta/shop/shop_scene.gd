@@ -37,6 +37,10 @@ var _collection_panel: PanelContainer = null
 var _collection_row: HBoxContainer = null
 var _hand: TutorialHand = null
 var _room: RoomAssembler = null
+## Лаборатория комнат: какая заготовка сейчас в стенде и сама панель. У игровой
+## локации оба поля остаются пустыми.
+var _lab_room_id: String = ""
+var _lab_panel: RoomLabPanel = null
 
 
 func setup(payload: Dictionary) -> void:
@@ -138,20 +142,28 @@ func _setup_room() -> bool:
 	_visual_rect = Rect2(Vector2.ZERO, SCREEN)
 	_has_art = true
 	if OS.is_debug_build() and def.debug_panel:
+		_lab_room_id = shop.room_id
 		_build_room_debug_panel()
 	return true
 
 
-## Переключатель материалов. Только в debug-сборке и только у комнат, которые
-## сами об этом просят: лаборатория тем и отличается от игровой локации.
+## Лаборатория комнат. Только в debug-сборке и только у комнат, которые сами об
+## этом просят: стенд тем и отличается от игровой локации.
 func _build_room_debug_panel() -> void:
-	var def := ContentDB.room(shop.room_id)
+	var def := ContentDB.room(_lab_room_id)
 	var current := {}
 	for surface_id in def.surfaces:
 		var cfg: RoomSurfaceConfig = def.surfaces[surface_id]
 		current[surface_id] = cfg.material_id
-	var panel := RoomDebugPanel.create(_room, ContentDB.room_materials,
-		ContentDB.room_templates, current, def.template_id)
+	## Экранная точка → координаты сцены. Панель живёт в CanvasLayer, комната —
+	## под камерой, и без этого перевода предмет вставал бы не туда, куда его
+	## отпустили.
+	var to_world := func(p: Vector2) -> Vector2:
+		return get_canvas_transform().affine_inverse() * p
+	var panel := RoomLabPanel.create(_room, ContentDB.room_materials,
+		ContentDB.room_templates, current, def.template_id, _lab_room_id,
+		to_world, _load_lab_room)
+	_lab_panel = panel
 	_ui.add_child(panel)
 	## Внизу, а не вверху: наверху у комнаты потолок, лампа и верх стен — то
 	## самое, ради чего стенд и открывают. Задач у лабораторной локации нет,
@@ -159,8 +171,26 @@ func _build_room_debug_panel() -> void:
 	panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	panel.offset_left = -290
 	panel.offset_right = 290
-	panel.offset_top = -360
-	panel.offset_bottom = -60
+	panel.offset_top = -820
+	panel.offset_bottom = -40
+
+
+## Загрузить в стенд другую заготовку. Комната пересобирается целиком: у другой
+## заготовки другие поверхности и другая геометрия, подменить в ней материал
+## недостаточно. Перестраивается только стенд — контент на диске не трогается.
+func _load_lab_room(room_id: String) -> void:
+	var def := ContentDB.room(room_id)
+	if def == null:
+		return
+	var tpl := ContentDB.room_template(def.template_id)
+	if tpl == null:
+		return
+	_lab_room_id = room_id
+	_room.build(def, tpl, ContentDB.room_materials, SCREEN)
+	if _lab_panel != null:
+		_lab_panel.queue_free()
+		_lab_panel = null
+	_build_room_debug_panel()
 
 
 ## Область слота — по элементу комнаты, если он к нему привязан. Дверь должна

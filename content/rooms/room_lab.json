@@ -1,5 +1,5 @@
 {
-  "_note": "Тестовая комната прототипа. Здесь проверяется вся система разом: три поверхности с повторяющейся текстурой, перспектива, окно на левой стене, дверь на правой, трещина, затемнение в углу и контактная тень у пола. Пекарню она не трогает — это отдельная локация, в которую попадают только из debug-панели.",
+  "_note": "Заготовка лаборатории комнат — единственный стенд системы. Здесь проверяется всё разом: четыре поверхности с повторяющейся текстурой, перспектива, окно, дверь с двумя состояниями, мебель на полу, трещина, затемнение в углу, карниз и контактная тень. Пекарню она не трогает: это отдельная локация, в которую попадают только из debug-панели. Стенд умеет загрузить сюда любую другую заготовку из content/rooms и сохранить собранное обратно в этот же файл.",
 
   "id": "room_lab",
   "room_template": "medium_room",
@@ -9,7 +9,8 @@
   "surfaces": {
     "left_wall":  { "material": "old_plaster_01" },
     "right_wall": { "material": "old_plaster_02" },
-    "floor":      { "material": "terracotta_floor_01" }
+    "floor":      { "material": "terracotta_floor_01" },
+    "ceiling":    { "material": "wood_ceiling_01" }
   },
 
   "elements": [
@@ -53,6 +54,34 @@
       "inset": 0.85,
       "frame": 0.05,
       "frame_material": "trim_wood_01"
+    },
+    {
+      "_note": "Мебель. placement = stand: предмет не лежит ни на одной плоскости комнаты, он стоит основанием в точке пола (anchor) и растёт вверх на size метров. Поэтому шкаф в глубине комнаты выходит меньше такого же шкафа у ног — без единого отдельного правила, по той же перспективе, что и плитка под ним.",
+      "id": "shelf_wood_01_1",
+      "type": "furniture",
+      "surface": "floor",
+      "placement": "stand",
+      "anchor": [0.14, 0.30],
+      "size": [1.35, 1.80],
+      "material": "shelf_wood_01"
+    },
+    {
+      "id": "crate_wood_01_1",
+      "type": "furniture",
+      "surface": "floor",
+      "placement": "stand",
+      "anchor": [0.52, 0.62],
+      "size": [0.66, 0.56],
+      "material": "crate_wood_01"
+    },
+    {
+      "id": "barrel_wood_01_1",
+      "type": "furniture",
+      "surface": "floor",
+      "placement": "stand",
+      "anchor": [0.72, 0.34],
+      "size": [0.58, 0.82],
+      "material": "barrel_wood_01"
     }
   ],
 
@@ -76,6 +105,7 @@
   "trims": {
     "corner_shadow":  { "width": 0.12, "strength": 0.42 },
     "baseboard":      { "height": 0.055, "material": "trim_wood_01", "tint": "#c9b79c" },
+    "cornice":        { "height": 0.045, "material": "trim_wood_01", "tint": "#b09570" },
     "contact_shadow": { "size": 0.10, "strength": 0.38 }
   },
 

@@ -65,7 +65,12 @@ static func _draw(generator: String, seed_value: int) -> Image:
 		"wood": return _wood(seed_value)
 		"checker": return _checker()
 		"window": return _window()
+		"window_arched": return _window_arched()
 		"door": return _door()
+		"door_barn": return _door_barn()
+		"crate": return _crate(seed_value)
+		"barrel": return _barrel()
+		"table": return _table(seed_value)
 		"crack": return _crack(seed_value)
 		"stain": return _stain(seed_value)
 		"cobweb": return _cobweb()
@@ -288,6 +293,147 @@ static func _door() -> Image:
 		img.fill_rect(Rect2i(46, py, w - 92, h / 2 - 130), base.darkened(0.14))
 		img.fill_rect(Rect2i(52, py + 6, w - 104, h / 2 - 142), base.lightened(0.06))
 	_disc(img, Vector2(w - 44, h * 0.52), 15.0, Color(0.78, 0.68, 0.32))
+	return img
+
+
+## Арочное окно: то же стекло, но верх полукруглый. Второй тип нужен не для
+## разнообразия ради: по нему сразу видно, что система тянет не одну картинку,
+## а любую, и что перспектива не зашита в конкретный PNG.
+static func _window_arched() -> Image:
+	var w := 300
+	var h := 440
+	var img := Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var frame := Color(0.70, 0.60, 0.46)
+	var radius := w / 2
+	var arch_y := radius
+	## Тело окна плюс полукруг сверху.
+	img.fill_rect(Rect2i(0, arch_y, w, h - arch_y), frame)
+	_disc(img, Vector2(w * 0.5, arch_y), float(radius), frame)
+
+	var m := 24
+	for y in range(m, h - m):
+		var t := float(y - m) / float(h - 2 * m)
+		var sky := Color(0.60, 0.76, 0.90).lerp(Color(0.88, 0.90, 0.86), t)
+		## Внутри арки ширина стекла сужается к верху — иначе полукруг снаружи
+		## и прямоугольник внутри читаются как две разные рамы.
+		var half := float(w) * 0.5 - float(m)
+		if y < arch_y:
+			var dy := float(arch_y - y)
+			var r := float(radius - m)
+			half = sqrt(maxf(0.0, r * r - dy * dy))
+		if half <= 1.0:
+			continue
+		img.fill_rect(Rect2i(int(w * 0.5 - half), y, int(half * 2.0), 1), sky)
+	var bar := frame.darkened(0.12)
+	img.fill_rect(Rect2i(w / 2 - 6, m, 12, h - 2 * m), bar)
+	img.fill_rect(Rect2i(m, int(h * 0.62), w - 2 * m, 12), bar)
+	img.fill_rect(Rect2i(0, h - 16, w, 16), frame.darkened(0.28))
+	return img
+
+
+## Дверь на косых накладках — сарайная. Отличается от филёнчатой силуэтом, а не
+## оттенком: два одинаковых по форме варианта не выбор, а иллюзия выбора.
+static func _door_barn() -> Image:
+	var w := 300
+	var h := 640
+	var img := Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
+	var base := Color(0.48, 0.35, 0.22)
+	img.fill(base)
+	for p in 5:
+		var x := p * w / 5
+		img.fill_rect(Rect2i(x, 0, 3, h), base.darkened(0.32))
+	var band := base.darkened(0.16)
+	img.fill_rect(Rect2i(0, 40, w, 34), band)
+	img.fill_rect(Rect2i(0, h - 90, w, 34), band)
+	## Косые накладки крест-накрест.
+	for i in h:
+		var t := float(i) / float(h)
+		var x1 := int(lerpf(6.0, float(w - 40), t))
+		img.fill_rect(Rect2i(x1, i, 34, 1), band)
+		img.fill_rect(Rect2i(w - x1 - 34, i, 34, 1), band)
+	img.fill_rect(Rect2i(0, 0, w, 10), base.lightened(0.16))
+	img.fill_rect(Rect2i(0, h - 10, w, 10), base.darkened(0.35))
+	_disc(img, Vector2(w - 40, h * 0.5), 13.0, Color(0.24, 0.22, 0.20))
+	return img
+
+
+## --- мебель -----------------------------------------------------------------
+##
+## Заглушки рисуются анфас и стоят на нижней кромке картинки: предмет ставят
+## основанием в точку пола, и нарисованный «с воздухом снизу» шкаф повис бы.
+
+static func _crate(seed_value: int) -> Image:
+	var w := 260
+	var h := 220
+	var img := Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value + 991
+	var wood := Color(0.60, 0.44, 0.26)
+	img.fill_rect(Rect2i(0, 0, w, h), wood)
+	for b in 5:
+		var y := b * h / 5
+		var c := wood.lightened(rng.randf_range(-0.10, 0.10))
+		c.a = 1.0
+		img.fill_rect(Rect2i(0, y, w, h / 5 - 3), c)
+	var edge := wood.darkened(0.35)
+	img.fill_rect(Rect2i(0, 0, 14, h), edge)
+	img.fill_rect(Rect2i(w - 14, 0, 14, h), edge)
+	img.fill_rect(Rect2i(0, 0, w, 12), wood.lightened(0.18))
+	img.fill_rect(Rect2i(0, h - 12, w, 12), edge)
+	for i in h:
+		var t := float(i) / float(h)
+		img.fill_rect(Rect2i(int(lerpf(14.0, float(w - 36), t)), i, 22, 1), edge)
+	return img
+
+
+static func _barrel() -> Image:
+	var w := 200
+	var h := 280
+	var img := Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var wood := Color(0.52, 0.36, 0.20)
+	for y in h:
+		var t := float(y) / float(h - 1)
+		## Бочку выдаёт силуэт: к верху и низу она сужается.
+		var bulge := sin(t * PI) * 0.16 + 0.84
+		var half := float(w) * 0.5 * bulge
+		for x in range(int(w * 0.5 - half), int(w * 0.5 + half)):
+			var across: float = (float(x) - w * 0.5) / maxf(1.0, half)
+			var c := wood.lightened(0.14 * (1.0 - absf(across) * 1.6))
+			c.a = 1.0
+			img.set_pixel(x, y, c)
+	## Клёпки и обручи.
+	for s in 6:
+		var x := int(w * 0.16 + float(s) * w * 0.136)
+		img.fill_rect(Rect2i(x, 8, 2, h - 16), wood.darkened(0.34))
+	for hoop in [0.10, 0.44, 0.86]:
+		var y := int(float(h) * hoop)
+		img.fill_rect(Rect2i(6, y, w - 12, 12), Color(0.30, 0.27, 0.24, 1.0))
+	return img
+
+
+static func _table(seed_value: int) -> Image:
+	var w := 360
+	var h := 220
+	var img := Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value + 445
+	var wood := Color(0.56, 0.40, 0.24)
+	## Столешница.
+	img.fill_rect(Rect2i(0, 0, w, 34), wood.lightened(0.12))
+	img.fill_rect(Rect2i(0, 30, w, 12), wood.darkened(0.30))
+	for g in 6:
+		img.fill_rect(Rect2i(rng.randi_range(4, w - 6), 2, 1, 28), wood.darkened(0.18))
+	## Ножки и нижняя полка — по ним верстак отличается от ящика.
+	var leg := 26
+	img.fill_rect(Rect2i(10, 42, leg, h - 42), wood)
+	img.fill_rect(Rect2i(w - 10 - leg, 42, leg, h - 42), wood)
+	img.fill_rect(Rect2i(10, 42, 6, h - 42), wood.lightened(0.14))
+	img.fill_rect(Rect2i(w - 16 - leg, 42, 6, h - 42), wood.darkened(0.22))
+	img.fill_rect(Rect2i(10, h - 70, w - 20, 16), wood.darkened(0.12))
 	return img
 
 

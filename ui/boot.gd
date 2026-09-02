@@ -145,14 +145,12 @@ func _build_overlay() -> void:
 		Game.open_intro("bakery_facade")))
 	## Лаборатория процедурных комнат. Из карты в неё не попасть намеренно: это
 	## не часть игры, а стенд, на котором проверяют перспективу и материалы.
-	col.add_child(_debug_button("Комната: тест материалов", func():
+	## Стенд один на всю систему: заготовки переключаются внутри него, а не
+	## отдельными кнопками. Два входа в одно и то же расходились бы уже на
+	## третьей комнате.
+	col.add_child(_debug_button("Лаборатория комнат", func():
 		_debug_panel.visible = false
 		Game.open_shop("room_lab")))
-	## Та же кладовая, что и в игре, но собранная системой. Рядом с настоящей на
-	## PNG сразу видно, что система уже вытягивает, а чего ей не хватает.
-	col.add_child(_debug_button("Комната: кладовая процедурно", func():
-		_debug_panel.visible = false
-		Game.open_shop("room_lab_storeroom")))
 	col.add_child(_debug_button("Перемотать 10 мин", func():
 		TimeService.fast_forward(600)
 		EventBus.toast.emit("Время +10 минут")))

@@ -100,17 +100,25 @@ func _load() -> void:
 		var mat := ContentParser.room_material(d)
 		room_materials[mat.id] = mat
 
-	## Комнаты грузятся по ссылкам из локаций: индекса у них нет, а обход
-	## каталога проверял бы и те файлы, которые в игру не попадают.
+	## Комнаты проверяются ВСЕ, а не только те, на которые ссылается локация:
+	## лаборатория умеет загрузить любую заготовку из каталога, и битая комната
+	## без владельца-локации всё равно однажды откроется.
+	var rooms_dir := DirAccess.open(ROOT + "rooms")
+	if rooms_dir != null:
+		for file in rooms_dir.get_files():
+			if not file.ends_with(".json"):
+				continue
+			var room_id := file.trim_suffix(".json")
+			var rd = ContentParser.read_json("%srooms/%s" % [ROOT, file])
+			if not (rd is Dictionary):
+				_err("комната '%s' не читается" % room_id)
+				continue
+			rooms[room_id] = ContentParser.room(rd)
+
 	for shop_v in shops.values():
 		var shop: ShopDefinition = shop_v
-		if shop.room_id.is_empty() or rooms.has(shop.room_id):
-			continue
-		var rd = ContentParser.read_json("%srooms/%s.json" % [ROOT, shop.room_id])
-		if not (rd is Dictionary):
-			_err("%s: комната '%s' не читается" % [shop.id, shop.room_id])
-			continue
-		rooms[shop.room_id] = ContentParser.room(rd)
+		if not shop.room_id.is_empty() and not rooms.has(shop.room_id):
+			_err("%s: комнаты '%s' нет в content/rooms" % [shop.id, shop.room_id])
 
 
 func _json_array(file: String) -> Array:
@@ -844,9 +852,11 @@ func _check_room_element(room: RoomDefinition, el: RoomElement, kind: String) ->
 			and not room.surfaces.has(RoomGeometry.SURFACE_CEILING):
 		_warn("%s: стоит на потолке, которого у комнаты нет" % who)
 	_check_room_art(who, el.material_id, el.texture_path, el.generator)
+	if el.stands():
+		_check_room_stand(who, el)
 	## rect нормализован К ПОВЕРХНОСТИ. Выход за 0..1 — это не «чуть за краем»,
 	## а элемент на соседней стене или под полом: там его никто не увидит.
-	if el.rect.size.x <= 0.0 or el.rect.size.y <= 0.0:
+	elif el.rect.size.x <= 0.0 or el.rect.size.y <= 0.0:
 		_err("%s: нулевой размер" % who)
 	elif el.rect.position.x < -0.001 or el.rect.position.y < -0.001 \
 			or el.rect.end.x > 1.001 or el.rect.end.y > 1.001:
@@ -911,3 +921,20 @@ func _check_room_scatter(room: RoomDefinition) -> void:
 	if not room.scatter.is_empty() and room.seed == 0:
 		_warn("комната %s: есть scatter, но нет seed — раскладка не воспроизводима"
 			% room.id)
+
+
+## Предмет, стоящий на полу. Ошибки здесь особенно тихие: шкаф с нулевым
+## размером просто не рисуется, а поставленный за пределами пола уезжает за
+## кадр — и в обоих случаях кажется, что «мебель не работает».
+func _check_room_stand(who: String, el: RoomElement) -> void:
+	if el.surface != RoomGeometry.SURFACE_FLOOR:
+		_err("%s: стоящий предмет ставится только на пол, а не на '%s'"
+			% [who, el.surface])
+	if el.size.x <= 0.0 or el.size.y <= 0.0:
+		_err("%s: нулевой размер предмета" % who)
+	elif el.size.x > 12.0 or el.size.y > 12.0:
+		_warn("%s: размер %.1f x %.1f единиц — предмет больше комнаты"
+			% [who, el.size.x, el.size.y])
+	if el.anchor.x < -0.001 or el.anchor.y < -0.001 \
+			or el.anchor.x > 1.001 or el.anchor.y > 1.001:
+		_warn("%s: предмет стоит за пределами пола — уедет за кадр" % who)

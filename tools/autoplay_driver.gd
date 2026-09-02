@@ -866,14 +866,11 @@ func _check_procedural_room() -> void:
 ## чего в первой нет: потолок как четвёртая поверхность и элемент, который ни
 ## на одной плоскости комнаты не лежит.
 func _check_procedural_ceiling() -> void:
-	Game.open_shop("room_lab_storeroom")
-	await _tree.create_timer(0.4).timeout
 	var scene: Node = Game.current()
 	if scene == null or not ("_room" in scene) or scene._room == null:
-		_check("кладовая процедурно: локация открылась", false)
+		_check("лаборатория: интерьер собран", false)
 		return
 	var room: RoomAssembler = scene._room
-	_check("кладовая процедурно: интерьер собран", true)
 
 	var ceiling: PackedVector2Array = room.geom.polygons[RoomGeometry.SURFACE_CEILING]
 	_check("потолок: попал в кадр (%d точек)" % ceiling.size(), ceiling.size() >= 3)
@@ -890,16 +887,69 @@ func _check_procedural_ceiling() -> void:
 		room.geom.uv_to_screen(RoomGeometry.SURFACE_CEILING, Vector2(0.0, 0.05)).y
 		> room.geom.uv_to_screen(RoomGeometry.SURFACE_CEILING, Vector2(0.0, 0.6)).y)
 
-	## Лампа висит в воздухе: её прямоугольник обязан остаться прямоугольником.
-	## Натянутая на стену, она перекосилась бы вместе со стеной — и это тот
-	## случай, когда на скриншоте всё выглядит нормально.
-	var lamp := room.element_rect("lamp_01")
-	_check("лампа: стоит в кадре без перспективы",
-		lamp.size.x > 40.0 and lamp.size.y > 100.0)
-	var quad: PackedVector2Array = room._element_quads.get("lamp_01", PackedVector2Array())
-	_check("лампа: её четырёхугольник не перекошен",
+	_check_furniture(room)
+	_check_room_roundtrip(room)
+
+
+## Мебель. Проверяется не «нарисовалась ли», а три вещи, которые молча ломаются
+## и на скриншоте выглядят правдоподобно: предмет стоит вертикально, стоит
+## основанием на полу и уменьшается с удалением.
+func _check_furniture(room: RoomAssembler) -> void:
+	var shelf := room.element_rect("shelf_wood_01_1")
+	_check("мебель: полка собралась", shelf.size.x > 20.0 and shelf.size.y > 20.0)
+
+	var quad: PackedVector2Array = room._element_quads.get("shelf_wood_01_1",
+		PackedVector2Array())
+	## Предмет повёрнут к зрителю: его прямоугольник обязан остаться
+	## прямоугольником. Натянутый на плоскость, он лёг бы вместе с ней на пол.
+	_check("мебель: стоит вертикально, а не лежит по полу",
 		quad.size() == 4 and absf(quad[0].y - quad[1].y) < 0.01
 		and absf(quad[0].x - quad[3].x) < 0.01)
+
+	## Низ предмета обязан совпасть с точкой пола, на которую его поставили:
+	## иначе шкаф висит в воздухе, и заметно это только на глаз.
+	var el := room.element("shelf_wood_01_1")
+	if el != null and quad.size() == 4:
+		var base := room.geom.uv_to_screen(RoomGeometry.SURFACE_FLOOR, el.anchor)
+		_check("мебель: основание стоит ровно в своей точке пола",
+			absf(quad[2].y - base.y) < 0.5 and absf((quad[2].x + quad[3].x) * 0.5 - base.x) < 0.5)
+
+	## Один и тот же предмет у дальней стены и у ног — разного размера. Ставим
+	## его дважды и сравниваем: без этого мебель просто не в перспективе.
+	var far_id := room.place_material("crate_wood_01",
+		room.geom.uv_to_screen(RoomGeometry.SURFACE_FLOOR, Vector2(0.05, 0.05)))
+	var near_id := room.place_material("crate_wood_01",
+		room.geom.uv_to_screen(RoomGeometry.SURFACE_FLOOR, Vector2(0.55, 0.55)))
+	var far_rect := room.element_rect(far_id)
+	var near_rect := room.element_rect(near_id)
+	_check("мебель: перетаскивание ставит предмет на пол",
+		not far_id.is_empty() and not near_id.is_empty())
+	_check("мебель: у дальней стены мельче, чем у ног (%.0f против %.0f px)"
+		% [far_rect.size.y, near_rect.size.y], far_rect.size.y < near_rect.size.y)
+
+	## Поставленное опознаётся обратно по точке экрана — на этом держится
+	## перетаскивание уже стоящего предмета.
+	_check("мебель: поставленное опознаётся по точке экрана",
+		room.element_at(near_rect.get_center()) == near_id)
+
+	room.remove_element(far_id)
+	room.remove_element(near_id)
+	_check("мебель: убирается из комнаты",
+		not room.has_element(far_id) and not room.has_element(near_id))
+
+	## Окно перетаскивается на стену, а не на пол, — и наоборот. Решает это
+	## комната по точке, куда отпустили, а не палитра.
+	var wall_point := room.geom.uv_to_screen(RoomGeometry.SURFACE_RIGHT, Vector2(0.2, 0.4))
+	var win_id := room.place_material("window_arched_01", wall_point)
+	var win_el := room.element(win_id)
+	_check("окно: перетаскивание сажает его на стену",
+		win_el != null and win_el.surface == RoomGeometry.SURFACE_RIGHT
+		and not win_el.stands())
+	room.remove_element(win_id)
+
+	## Промах мимо комнаты — это промах, а не «поставим куда-нибудь».
+	_check("палитра: мимо кадра предмет не ставится",
+		room.place_material("crate_wood_01", Vector2(-500, -500)).is_empty())
 
 
 ## Перспектива на поверхности: одна и та же плитка у дальнего края обязана
@@ -934,3 +984,45 @@ func _patch_area(room: RoomAssembler, surface_id: String, uv: Vector2, side: flo
 		var b := pts[(i + 1) % 4]
 		area += a.x * b.y - b.x * a.y
 	return absf(area) * 0.5
+
+
+## Сохранение комнаты. Проверяется не запись в файл, а обратимость: то, что
+## сериализатор выдал, обязан прочитать тот же ContentParser, которым живёт
+## игра. Стенд, после которого комната читается иначе, чем выглядела, хуже
+## отсутствия стенда — он тихо портит контент.
+##
+## На диск тут ничего не пишется намеренно: прогон не должен трогать контент.
+func _check_room_roundtrip(room: RoomAssembler) -> void:
+	var before := room.definition()
+	var text := JSON.stringify(RoomSerializer.to_dict(before, "roundtrip_probe"), "  ")
+	var parsed = JSON.parse_string(text)
+	if not (parsed is Dictionary):
+		_check("сохранение: комната сериализуется в валидный JSON", false)
+		return
+	_check("сохранение: комната сериализуется в валидный JSON", true)
+
+	var after := ContentParser.room(parsed)
+	_check("сохранение: шаблон и зерно пережили запись",
+		after.template_id == before.template_id and after.seed == before.seed)
+	_check("сохранение: все поверхности на месте (%d)" % after.surfaces.size(),
+		after.surfaces.size() == before.surfaces.size())
+	_check("сохранение: все элементы на месте (%d)" % after.elements.size(),
+		after.elements.size() == before.elements.size())
+	_check("сохранение: все наклейки на месте (%d)" % after.decals.size(),
+		after.decals.size() == before.decals.size())
+
+	## Мебель — самое хрупкое место записи: у неё другой набор полей, и потерять
+	## якорь значит собрать комнату, в которой шкаф стоит в другом углу.
+	var shelf_before := before.element("shelf_wood_01_1")
+	var shelf_after := after.element("shelf_wood_01_1")
+	_check("сохранение: у мебели уцелели постановка, якорь и размер",
+		shelf_before != null and shelf_after != null
+		and shelf_after.stands()
+		and shelf_after.anchor.is_equal_approx(shelf_before.anchor)
+		and shelf_after.size.is_equal_approx(shelf_before.size))
+
+	## Привязка к слоту — то, чем комната цепляется за существующую механику.
+	var door_after := after.element("door_01")
+	_check("сохранение: у двери уцелела привязка к слоту локации",
+		door_after != null and door_after.slot_id == "lab_door"
+		and door_after.slot_state == "closed")

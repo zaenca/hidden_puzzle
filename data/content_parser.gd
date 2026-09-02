@@ -359,6 +359,7 @@ static func room_material(d: Dictionary) -> RoomMaterial:
 	m.texture_path = String(d.get("texture", ""))
 	m.generator = String(d.get("generator", ""))
 	m.tile_size = to_vec2(d.get("tile_size", null), Vector2.ONE)
+	m.size = to_vec2(d.get("size", null), Vector2.ZERO)
 	m.tint = to_color(d.get("tint", "#ffffff"))
 	m.seed = int(d.get("seed", 0))
 	return m
@@ -403,6 +404,10 @@ static func room_element(d: Dictionary, default_layer: int) -> RoomElement:
 	e.type = String(d.get("type", "decal"))
 	e.surface = String(d.get("surface", "left_wall"))
 	e.rect = to_rect(d.get("rect", [0.2, 0.2, 0.2, 0.2]))
+	e.placement = String(d.get("placement", RoomElement.PLACE_SURFACE))
+	e.anchor = to_vec2(d.get("anchor", null), Vector2(0.5, 0.5))
+	e.size = to_vec2(d.get("size", null), Vector2.ONE)
+	e.placed_in_editor = bool(d.get("placed", false))
 	e.material_id = String(d.get("material", ""))
 	e.texture_path = String(d.get("texture", ""))
 	e.generator = String(d.get("generator", ""))

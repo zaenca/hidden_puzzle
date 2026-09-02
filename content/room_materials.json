@@ -34,10 +34,26 @@
     "id": "wood_ceiling_01", "category": "ceiling", "generator": "beams", "tile_size": [0.9, 3.0], "tint": "#d8ccbc", "seed": 37
   },
 
-  { "id": "window_wood_01", "category": "element", "generator": "window", "tint": "#ffffff" },
+  {
+    "_note": "Окна, двери и мебель. Категория решает, где предмет предлагают в лаборатории и на какую поверхность он встаёт: window и door — на стену, furniture — на пол. Поле size — габарит В ЕДИНИЦАХ КОМНАТЫ: дверь 0.92 x 2.05 остаётся дверью в человеческий рост в любой комнате, поэтому один и тот же предмет не приходится подгонять под каждый шаблон геометрии.",
+    "id": "window_wood_01", "category": "window", "generator": "window", "size": [1.15, 1.05], "tint": "#ffffff"
+  },
+  { "id": "window_arched_01", "category": "window", "generator": "window_arched", "size": [1.0, 1.5], "tint": "#ffffff" },
+  { "id": "window_small_01", "category": "window", "generator": "window", "size": [0.62, 0.52], "tint": "#ffffff" },
+
+  { "id": "door_old_01", "category": "door", "generator": "door", "size": [0.92, 2.05], "tint": "#ffffff" },
+  { "id": "door_barn_01", "category": "door", "generator": "door_barn", "size": [1.05, 2.15], "tint": "#ffffff" },
+
+  {
+    "_note": "Мебель. shelf — единственный настоящий арт: art/shelf.png, он же стоит в игровой кладовой. Остальное — заглушки того же вида, что и материалы: появится PNG, в строке заполняется texture, и generator перестаёт использоваться.",
+    "id": "shelf_wood_01", "category": "furniture", "texture": "res://art/shelf.png", "size": [1.35, 1.80], "tint": "#ffffff"
+  },
+  { "id": "table_wood_01", "category": "furniture", "generator": "table", "size": [1.45, 0.88], "tint": "#ffffff", "seed": 12 },
+  { "id": "crate_wood_01", "category": "furniture", "generator": "crate", "size": [0.66, 0.56], "tint": "#ffffff", "seed": 34 },
+  { "id": "barrel_wood_01", "category": "furniture", "generator": "barrel", "size": [0.58, 0.82], "tint": "#ffffff" },
+
   { "id": "lamp_hanging_01", "category": "element", "generator": "lamp", "tint": "#ffffff" },
   { "id": "lamp_glow_01", "category": "decal", "generator": "glow", "tint": "#ffffff" },
-  { "id": "door_old_01", "category": "element", "generator": "door", "tint": "#ffffff" },
   { "id": "doorway_dark", "category": "element", "generator": "flat", "tint": "#1a1512" },
   { "id": "trim_wood_01", "category": "trim", "generator": "wood", "tile_size": [0.45, 0.45], "tint": "#d8ccb8", "seed": 61 },
 

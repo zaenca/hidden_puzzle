@@ -37,3 +37,12 @@ extends Resource
 
 func surface(surface_id: String) -> RoomSurfaceConfig:
 	return surfaces.get(surface_id)
+
+
+## Элемент по id. Нужен и редактору, и проверке сохранения: комнату сравнивают
+## не «на глаз по количеству», а по конкретной двери и конкретному шкафу.
+func element(element_id: String) -> RoomElement:
+	for el in elements:
+		if el.id == element_id:
+			return el
+	return null

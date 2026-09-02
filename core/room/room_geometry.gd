@@ -154,6 +154,38 @@ func homography(surface_id: String) -> RoomHomography:
 	return maps.get(surface_id)
 
 
+## Сколько экранных пикселей приходится на единицу комнаты в точке пола.
+##
+## На этом стоит вся мебель. Предмет, стоящий на полу, — не прямоугольник на
+## какой-то плоскости: он вертикальный, повёрнут к зрителю и должен уменьшаться
+## по мере удаления. Масштаб у камеры-обскуры один и тот же по обеим осям и
+## равен focal / глубина, поэтому шкаф в глубине комнаты выходит меньше такого
+## же шкафа у ног — без единого отдельного правила.
+func scale_at_floor(uv: Vector2) -> float:
+	var p := surface_point(SURFACE_FLOOR, uv)
+	return _focal / maxf(MIN_DEPTH, tpl.cam_distance - p.z)
+
+
+## На какую поверхность комнаты попала точка экрана. Нужно перетаскиванию: куда
+## игрок отпустил предмет, решает не палитра, а сама комната — окно уезжает на
+## стену, шкаф на пол.
+##
+## Стены проверяются раньше пола: они рисуются поверх него, и точка, попавшая
+## в обе, принадлежит той, которую видно.
+func surface_at_point(p: Vector2) -> String:
+	for surface_id in [SURFACE_RIGHT, SURFACE_LEFT, SURFACE_CEILING, SURFACE_FLOOR]:
+		var poly: PackedVector2Array = polygons.get(surface_id, PackedVector2Array())
+		if poly.size() >= 3 and Geometry2D.is_point_in_polygon(p, poly):
+			return surface_id
+	return ""
+
+
+## Точка экрана → координаты на поверхности.
+func screen_to_uv(surface_id: String, p: Vector2) -> Vector2:
+	var h: RoomHomography = maps.get(surface_id)
+	return h.map_screen(p) if h != null else Vector2.ZERO
+
+
 func extent(surface_id: String) -> Vector2:
 	return extents.get(surface_id, Vector2.ONE)
 

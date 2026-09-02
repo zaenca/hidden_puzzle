@@ -112,6 +112,121 @@ func has_element(id: String) -> bool:
 	return _element_rects.has(id)
 
 
+func element(id: String) -> RoomElement:
+	return _elements.get(id)
+
+
+## --- редактор: поставить, подвинуть, убрать ----------------------------------
+##
+## Элементы кладутся В САМО ОПИСАНИЕ комнаты, а не в отдельный список сцены.
+## Поэтому поставленный шкаф переживает смену шаблона геометрии, попадает в
+## сохранение и ничем не отличается от написанного руками в JSON: редактор
+## правит контент, а не рисует поверх него.
+
+## Куда именно попал предмет и во что это превращается. Решает комната, а не
+## палитра: окно уезжает на стену, шкаф встаёт на пол, а промах по кадру —
+## это промах, а не «поставим куда-нибудь».
+func place_material(material_id: String, world_pos: Vector2,
+		move_id: String = "") -> String:
+	var mat: RoomMaterial = _materials.get(material_id)
+	if mat == null:
+		return ""
+	var surface_id := geom.surface_at_point(world_pos)
+	if surface_id.is_empty():
+		return ""
+
+	var el: RoomElement = _elements.get(move_id) if not move_id.is_empty() else null
+	var moving := el != null
+	if not moving:
+		el = RoomElement.new()
+		el.id = _free_element_id(material_id)
+		el.material_id = material_id
+		el.placed_in_editor = true
+		el.type = mat.category
+
+	var item_size := mat.size if mat.size != Vector2.ZERO else Vector2(1.0, 1.0)
+	if surface_id == RoomGeometry.SURFACE_FLOOR:
+		## Мебель на полу: якорь — основание, размер в единицах комнаты.
+		el.placement = RoomElement.PLACE_STAND
+		el.surface = RoomGeometry.SURFACE_FLOOR
+		el.anchor = geom.screen_to_uv(RoomGeometry.SURFACE_FLOOR, world_pos)
+		el.size = item_size
+	else:
+		## Окно и дверь — прямоугольник на поверхности. Размер тот же, в
+		## единицах комнаты: окно 1.2 м остаётся окном 1.2 м на любой стене,
+		## а доля поверхности растянула бы его вместе с ней.
+		var extent := geom.extent(surface_id)
+		var uv := geom.screen_to_uv(surface_id, world_pos)
+		var w: float = item_size.x / maxf(0.01, extent.x)
+		var h: float = item_size.y / maxf(0.01, extent.y)
+		el.placement = RoomElement.PLACE_SURFACE
+		el.surface = surface_id
+		el.rect = Rect2(uv.x - w * 0.5, uv.y - h * 0.5, w, h)
+		el.layer = RoomElement.LAYER_STRUCTURE
+
+	if moving:
+		_free_element_nodes(el.id)
+	else:
+		_def.elements.append(el)
+	_build_element(el)
+	return el.id
+
+
+## Что стоит под точкой экрана. Нужно перетаскиванию уже поставленного: чтобы
+## подвинуть шкаф, его сперва надо опознать.
+func element_at(world_pos: Vector2) -> String:
+	var best := ""
+	var best_layer := -9999
+	for id in _element_quads:
+		var el: RoomElement = _elements.get(id)
+		if el == null or not el.placed_in_editor:
+			continue
+		if not Geometry2D.is_point_in_polygon(world_pos, _element_quads[id]):
+			continue
+		var layer: int = _stand_layer(el) if el.stands() else el.layer
+		if layer >= best_layer:
+			best_layer = layer
+			best = id
+	return best
+
+
+func remove_element(id: String) -> void:
+	var el: RoomElement = _elements.get(id)
+	if el == null:
+		return
+	_free_element_nodes(id)
+	_def.elements.erase(el)
+	_elements.erase(id)
+
+
+## Последний поставленный в редакторе — то, что уберёт «отменить».
+func last_placed_id() -> String:
+	for i in range(_def.elements.size() - 1, -1, -1):
+		var el: RoomElement = _def.elements[i]
+		if el.placed_in_editor:
+			return el.id
+	return ""
+
+
+func definition() -> RoomDefinition:
+	return _def
+
+
+func _free_element_nodes(id: String) -> void:
+	for node in _element_nodes.get(id, []):
+		node.queue_free()
+	_element_nodes.erase(id)
+	_element_rects.erase(id)
+	_element_quads.erase(id)
+
+
+func _free_element_id(material_id: String) -> String:
+	var n := 1
+	while _elements.has("%s_%d" % [material_id, n]):
+		n += 1
+	return "%s_%d" % [material_id, n]
+
+
 ## Подменить материал поверхности на лету — для debug-переключателя.
 func set_surface_material(surface_id: String, material_id: String) -> void:
 	var cfg: RoomSurfaceConfig = _surface_cfg.get(surface_id)
@@ -208,11 +323,15 @@ func _build_element(el: RoomElement) -> void:
 			% [el.id, el.surface])
 		return
 	var nodes: Array[Node2D] = []
-	var quad := _quad_for(el.surface, el.rect, el.rotation_deg)
+	var stands := el.stands()
+	var quad := _stand_quad(el) if stands else _quad_for(el.surface, el.rect, el.rotation_deg)
+	var layer := _stand_layer(el) if stands else el.layer
 
 	## Тень вокруг проёма рисуется ПОД элементом и шире его: это она делает
 	## окно утопленным в стену, а не наклеенным на неё.
-	if el.shadow > 0.0:
+	## Тень, наличник и откос описывают ПРОЁМ в стене — у предмета на полу
+	## проёма нет, и подкладывать ему тень «вокруг рамы» нечего.
+	if el.shadow > 0.0 and not stands:
 		var grown := el.rect.grow_individual(
 			el.rect.size.x * el.shadow, el.rect.size.y * el.shadow,
 			el.rect.size.x * el.shadow, el.rect.size.y * el.shadow)
@@ -221,10 +340,10 @@ func _build_element(el: RoomElement) -> void:
 		nodes.append(_quad_node("%s_shadow" % el.id,
 			_quad_for(el.surface, grown, el.rotation_deg),
 			RoomTextures.generate("soft_shadow"), el.shadow_color,
-			el.layer - 2, Vector2.ZERO))
+			layer - 2, Vector2.ZERO))
 
 	## Наличник — под самим элементом, но над тенью.
-	if el.frame > 0.0:
+	if el.frame > 0.0 and not stands:
 		var frame_rect := el.rect.grow_individual(
 			el.rect.size.x * el.frame, el.rect.size.y * el.frame,
 			el.rect.size.x * el.frame, el.rect.size.y * el.frame)
@@ -239,7 +358,7 @@ func _build_element(el: RoomElement) -> void:
 		nodes.append(_quad_node("%s_frame" % el.id,
 			_quad_for(el.surface, frame_rect, el.rotation_deg),
 			RoomTextures.resolve(frame_path, frame_gen, _seed_for(el.id)),
-			el.frame_tint, el.layer - 1, Vector2.ZERO))
+			el.frame_tint, layer - 1, Vector2.ZERO))
 
 	if el.has_art():
 		var mat: RoomMaterial = _materials.get(el.material_id)
@@ -252,14 +371,14 @@ func _build_element(el: RoomElement) -> void:
 			tint = tint * mat.tint
 		tint.a *= el.opacity
 		nodes.append(_quad_node(el.id, quad,
-			RoomTextures.resolve(path, gen, _seed_for(el.id)), tint, el.layer,
+			RoomTextures.resolve(path, gen, _seed_for(el.id)), tint, layer,
 			Vector2(1.0 if el.flip_h else 0.0, 1.0 if el.flip_v else 0.0)))
 
 	## Внутренняя тень — поверх картинки: это откос проёма, а не грязь на стекле.
-	if el.inset > 0.0:
+	if el.inset > 0.0 and not stands:
 		nodes.append(_quad_node("%s_inset" % el.id, quad,
 			RoomTextures.generate("inner_shadow"),
-			Color(1, 1, 1, clampf(el.inset, 0.0, 1.0)), el.layer + 1, Vector2.ZERO))
+			Color(1, 1, 1, clampf(el.inset, 0.0, 1.0)), layer + 1, Vector2.ZERO))
 
 	if nodes.is_empty():
 		return
@@ -402,6 +521,32 @@ func _build_vignette(screen: Vector2) -> void:
 ## Поворот делается В ПЛОСКОСТИ СТЕНЫ, а не на экране, и в пропорциях комнаты,
 ## а не в долях: наклонённая трещина обязана наклоняться вместе со стеной,
 ## иначе она читается как наклейка на стекле поверх кадра.
+## Четырёхугольник предмета, стоящего на полу.
+##
+## Он вертикальный и повёрнут к зрителю: у камеры нет наклона, поэтому вертикали
+## комнаты остаются вертикалями, и шкаф не должен ни падать вбок, ни ложиться на
+## пол вместе с плиткой. Уменьшается он не «на глаз», а по той же перспективе,
+## что и всё остальное: экранный масштаб в точке пола — focal / глубина.
+func _stand_quad(el: RoomElement) -> PackedVector2Array:
+	var base := geom.uv_to_screen(RoomGeometry.SURFACE_FLOOR, el.anchor)
+	var s := geom.scale_at_floor(el.anchor)
+	var w := el.size.x * s * 0.5
+	var h := el.size.y * s
+	return PackedVector2Array([
+		Vector2(base.x - w, base.y - h),
+		Vector2(base.x + w, base.y - h),
+		Vector2(base.x + w, base.y),
+		Vector2(base.x - w, base.y),
+	])
+
+
+## Слой предмета — по его месту на полу: ближний рисуется поверх дальнего.
+## Без этого шкаф в глубине комнаты закрывал бы ящик, стоящий у ног.
+func _stand_layer(el: RoomElement) -> int:
+	var t: float = clampf((el.anchor.x + el.anchor.y) * 0.5, 0.0, 1.0)
+	return RoomElement.LAYER_FURNITURE + int(t * float(RoomElement.LAYER_FURNITURE_SPAN))
+
+
 func _quad_for(surface_id: String, rect: Rect2, rotation_deg: float) -> PackedVector2Array:
 	var corners := [
 		rect.position,
