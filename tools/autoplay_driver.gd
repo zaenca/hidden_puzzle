@@ -9,9 +9,6 @@ extends RefCounted
 ## буферизуется, и до завершения процесса ничего не видно.
 const REPORT_PATH := "res://autoplay_report.txt"
 
-## Мусор в кладовой. Порядок как в content/shops/bakery_storeroom.json.
-const TRASH_IDS := ["spiderweb", "flour_spill", "bootprints", "scrap_paper", "puddle"]
-
 var _tree: SceneTree
 var _checks: Array = []
 var _log: PackedStringArray = PackedStringArray()
@@ -35,10 +32,7 @@ func run(tree: SceneTree) -> void:
 	Game.hard_reset()
 	await tree.create_timer(0.3).timeout
 
-	# --- завязка: вступление → диалог → пазл → площадь ----------------------
-	_check("старт: задача осмотра района доступна",
-		Game.meta.task_state("task_survey_district") == MetaService.TaskState.AVAILABLE)
-
+	# --- завязка: вступление → мэр → КАРТА ---------------------------------
 	_check("старт: новая игра открывается вступлением", Game.screen == Game.Screen.INTRO)
 	## Заставку пропускаем кнопкой, а не вызовом finish_intro: у игрока есть
 	## только кнопка, и «метод отработал» ничего не говорит о том, что до неё
@@ -48,50 +42,37 @@ func run(tree: SceneTree) -> void:
 	_check("после вступления — диалог с мэром", Game.screen == Game.Screen.DIALOG)
 	_check_dialog_runs()
 	await tree.create_timer(0.5).timeout
-	_check("после диалога — сразу пазл, а не карта", Game.screen == Game.Screen.LEVEL)
+
+	## Главное утверждение новой завязки. Раньше после мэра запускался пазл
+	## «собери план района» — уровень, существовавший ровно затем, чтобы после
+	## него было что применить в мете. Теперь мэр называет пекарню, и следующий
+	## ход делает игрок.
+	_check("после мэра — карта, а не уровень", Game.screen == Game.Screen.MAP)
 	_check("завязка отмечена просмотренной",
 		bool(Game.meta.flags.get(Game.INTRO_FLAG, false)))
+	_check("после мэра не пройдено ни одного уровня",
+		Game.meta.levels_completed_total == 0)
 
-	# --- уровень 1: план района, только пазл из 6 частей --------------------
-	_check("L1: пазл собирается из 9 частей",
-		ContentDB.level("bakery_01").puzzle.piece_count() == 9)
-	await _finish_current_level()
-	_check("после пазла — сразу городская площадь, без экрана результата",
-		Game.screen == Game.Screen.MAP)
-	## Осмотр района — часть разговора с мэром, а не добыча: предмета в
-	## инвентаре после него нет. Монеты приходят, но за ЗАДАЧУ, а не за уровень:
-	## кошелёк стартует пустым, и 10 монет в нём — ровно то, что обещал журнал.
-	_check("L1: инвентарь после первого пазла пуст", _bag_size() == 0)
-	_check("L1: за задачу начислено 10 монет", PlayerState.amount_of("coins") == 10)
-	## Награда выдаётся один раз: пересчёт состояний задач идёт на каждом
-	## refresh, и платить по факту «задача выполнена» значило бы платить всегда.
-	Game.meta.refresh()
-	_check("L1: повторный пересчёт не удваивает награду",
-		PlayerState.amount_of("coins") == 10)
-
-	_check("L1: задача осмотра закрылась сама",
-		Game.meta.task_state("task_survey_district") == MetaService.TaskState.COMPLETED)
-	## Плашку копим, пока идёт уровень, и показываем уже в мете: поздравлять
-	## поверх раскрытия сцены значит перебивать ровно тот кадр, ради которого
-	## уровень и собирали.
-	_check_task_notification("Собрать план района")
-	_check_journal("Собрать план района", "Осмотреть пекарню")
-	_check("мета: пекарня выбрана", Game.meta.shop_state("bakery") == "in_restoration")
-
-	# --- площадь: ровно одна активная задача и указатель на неё -------------
+	# --- площадь: пекарня открыта из данных, без фиктивного уровня ---------
+	_check("площадь: пекарня открыта с самого начала",
+		Game.meta.shop_state("bakery") == "in_restoration")
+	_check("площадь: открытость пришла из контента, а не от действия",
+		ContentDB.shop("bakery").initial_state == "in_restoration")
 	_check("площадь: задача «Осмотреть пекарню» открыта",
 		Game.meta.task_state("task_visit_bakery") == MetaService.TaskState.AVAILABLE)
+	_check("площадь: задача про завал ещё закрыта",
+		Game.meta.task_state("task_clear_facade") == MetaService.TaskState.LOCKED)
 	_check_map_task_bar(["task_visit_bakery"])
+	_check_journal_hides_locked()
+
 	## До обучения рука ведёт к журналу, а не к зданию: список объясняет, зачем
 	## вообще идти в пекарню. К зданию она переезжает, когда объяснение доиграно.
 	_check_hint_points_at_journal()
 	await _play_journal_coach()
 	_check_map_hint_points_at("bakery")
-
-	# --- карта: закрытые объекты тоже кликабельны --------------------------
 	_check_map_hit_areas()
 
-	# --- первый вход в пекарню: фасад → знакомство с хозяйкой --------------
+	# --- первый вход: фасад → знакомство с Марго → СРАЗУ уровень -----------
 	_check("до первого визита хозяйка незнакома",
 		not bool(Game.meta.flags.get("met_baker", false)))
 	Game.enter_shop("bakery")
@@ -105,129 +86,316 @@ func run(tree: SceneTree) -> void:
 		await tree.create_timer(0.4).timeout
 	_check("после фасада — разговор с хозяйкой", Game.screen == Game.Screen.DIALOG)
 	_check_dialog_runs()
-	await tree.create_timer(0.4).timeout
-	## После знакомства игрок остаётся в зале, а не проваливается в уровень:
-	## сперва он видит комнату, о которой шла речь, и уже сам решает начать.
-	_check("после разговора игрок попадает в локацию, а не в уровень",
-		Game.screen == Game.Screen.SHOP)
+	await tree.create_timer(0.6).timeout
+
+	_check("после разговора с Марго уровень начинается сам",
+		Game.screen == Game.Screen.LEVEL)
 	_check("знакомство отмечено", bool(Game.meta.flags.get("met_baker", false)))
 	_check("задача «Осмотреть пекарню» закрылась знакомством",
 		Game.meta.task_state("task_visit_bakery") == MetaService.TaskState.COMPLETED)
-	_check_journal_hides_locked()
 
-	# --- уровень 2: пазл зала и уборка нажатием ----------------------------
-	## Уборку запускает игрок кнопкой из списка задач — прогон делает то же.
-	Game.play_task("task_clear_hall")
-	await tree.create_timer(0.5).timeout
-	_check("уборка зала запускается из списка задач", Game.screen == Game.Screen.LEVEL)
-	_check_hall_scene()
-	await _play_hall_to_cleanup()
-	_check("после уборки — локация пекарни", Game.screen == Game.Screen.SHOP)
-	_check("зал: задача уборки закрылась сама",
-		Game.meta.task_state("task_clear_hall") == MetaService.TaskState.COMPLETED)
-	_check("зал: флаг hall_clean выставлен", bool(Game.meta.flags.get("hall_clean", false)))
-	_check_task_notification("Прибраться в торговом зале")
-	## Предметы уборки живут внутри уровня и там же расходуются — в инвентарь
-	## игрока они не попадают.
-	_check("уборочный инвентарь не осел в сумке", _bag_size() == 0)
+	# --- уровень 1: Sort на фасаде -----------------------------------------
+	_check_sort_scene()
+	await _check_sort_fail_and_restart()
+	await _finish_current_level()
 
-	# --- дверь в цех: заперто, ключ, применение ключа -----------------------
-	_check("зал: дверь заперта", Game.meta.current_slot_state("bakery", "door") == "locked")
-	_check("зал: вход в цех пока закрыт", not bool(Game.meta.flags.get("door_open", false)))
-	## Задача про кладовую открывается ПОСЛЕ уборки зала, а не после открытия
-	## двери: игрок должен видеть цель, пока ищет ключ, иначе он ищет наугад.
-	_check("кладовая: задача открылась сразу после уборки зала",
-		Game.meta.task_state("task_open_storeroom") == MetaService.TaskState.AVAILABLE)
-	_check("кладовая: пазлов у задачи нет",
-		ContentDB.task("task_open_storeroom").level_ids.is_empty())
-	_check("кладовая: собирать нечего — уровней в индексе только два",
-		ContentDB.level_ids.size() == 2)
+	_check("после уровня — карта, без экрана результата", Game.screen == Game.Screen.MAP)
+	_check("L1: уровень записан пройденным",
+		Game.meta.completed_levels.has("bakery_01"))
+	_check("L1: постоянное состояние фасада сохранено",
+		bool(Game.meta.flags.get("facade_cleared", false)))
+	_check("L1: задача про завал закрылась сама",
+		Game.meta.task_state("task_clear_facade") == MetaService.TaskState.COMPLETED)
+	_check("L1: обучение Sort отмечено пройденным",
+		bool(Game.meta.flags.get(Game.SORT_FLAG, false)))
+	## Монеты приходят и за уровень, и за задачу — и ровно по одному разу.
+	_check("L1: начислено 40 (уровень) + 10 + 15 (задачи) монет",
+		PlayerState.amount_of("coins") == 65)
+	Game.meta.refresh()
+	_check("L1: повторный пересчёт не удваивает награду",
+		PlayerState.amount_of("coins") == 65)
+	_check("L1: разбор завала ничего не положил в сумку", _bag_size() == 0)
+	_check_task_notification("Разобрать завал у входа")
+	_check_journal_all_done(["Осмотреть пекарню", "Разобрать завал у входа"])
 
-	var take := Game.meta.interact("bakery", "door", "")
-	_check("тап по двери сработал: %s" % take.get("text", ""), bool(take.get("ok", false)))
-	_check("ключ попал в инвентарь", PlayerState.amount_of("bakery_key") == 1)
-	_check("дверь всё ещё заперта", Game.meta.current_slot_state("bakery", "door") == "locked")
+	## Пекарня не открывается целиком после первого шага: убран вход, и только.
+	_check("после L1 пекарня всё ещё в восстановлении",
+		Game.meta.shop_state("bakery") == "in_restoration")
 
-	var again := Game.meta.interact("bakery", "door", "")
-	_check("повторный тап не выдаёт второй ключ", PlayerState.amount_of("bakery_key") == 1)
-	_check("повторный тап подсказывает, а не открывает",
-		not bool(again.get("narrative", false)))
-
-	var wrong := Game.meta.interact("bakery", "door", Game.BOOSTER_ID)
-	_check("чужой предмет дверь не открывает",
-		not bool(wrong.get("ok", false)) and Game.meta.current_slot_state("bakery", "door") == "locked")
-
-	var used := Game.meta.interact("bakery", "door", "bakery_key")
-	_check("ключ применён к двери", bool(used.get("ok", false)))
-	_check("мета: дверь открыта", Game.meta.current_slot_state("bakery", "door") == "open")
-	_check("ключ израсходован", PlayerState.amount_of("bakery_key") == 0)
-	_check("флаг door_open выставлен", bool(Game.meta.flags.get("door_open", false)))
-
-	var closed := Game.meta.interact("bakery", "door", "")
-	_check("открытая дверь больше не выдаёт ключ", PlayerState.amount_of("bakery_key") == 0)
-	_check("открытая дверь отвечает текстом", not String(closed.get("text", "")).is_empty())
-
-	# --- кладовая: открылась ключом, без сборки -----------------------------
-	## Задача закрывается сама тем же действием, которым игрок открыл дверь.
-	## Отдельной кнопки «подтвердить» после этого нет: она бы ничего не решала.
-	_check("кладовая: задача закрылась открытой дверью, без сборки",
-		Game.meta.task_state("task_open_storeroom") == MetaService.TaskState.COMPLETED)
-	_check("кладовая: ни один уровень не проходился",
-		not Game.meta.completed_levels.has("storeroom_01")
-		and not Game.meta.completed_levels.has("storeroom_02"))
-	_check("флаг storeroom_ready выставлен",
-		bool(Game.meta.flags.get("storeroom_ready", false)))
-	_check("мета: кладовая перешла в восстановление",
-		Game.meta.shop_state("bakery_storeroom") == "in_restoration")
-	_check_task_notification("Открыть кладовую")
-
-	Game.open_shop("bakery_storeroom")
-	await tree.create_timer(0.4).timeout
-	_check("кладовая открывается своей сценой", Game.screen == Game.Screen.SHOP)
-	_check_storeroom_scene()
-
-	var shelf_tap := Game.meta.interact("bakery_storeroom", "shelf", "")
-	_check("шкаф отвечает на тап: %s" % shelf_tap.get("text", ""), bool(shelf_tap.get("ok", false)))
-
-	_check("кладовая: задача уборки открылась",
-		Game.meta.task_state("task_clear_storeroom") == MetaService.TaskState.AVAILABLE)
-	_check_trash_pickup()
-	await tree.create_timer(0.4).timeout
-	_check_inventory_shows(TRASH_IDS)
-	_check("весь мусор собран — задачу можно применить",
-		Game.meta.task_state("task_clear_storeroom") == MetaService.TaskState.READY_TO_APPLY)
-
-	_apply("task_clear_storeroom")
-	var left := 0
-	for id in TRASH_IDS:
-		left += PlayerState.amount_of(String(id))
-	_check("мусор вынесен из инвентаря", left == 0)
-	_check("флаг storeroom_clean выставлен",
-		bool(Game.meta.flags.get("storeroom_clean", false)))
+	_check_no_jigsaw()
 
 	# --- сохранение / загрузка ---------------------------------------------
 	SaveService.save_game()
 	var levels_done: int = Game.meta.levels_completed_total
-	var distinct_levels: int = Game.meta.completed_levels.size()
 	PlayerState.reset()
 	CooldownService.reset()
 	Game.meta.reset()
-	_check("состояние в памяти очищено", Game.meta.current_slot_state("bakery", "door") != "open")
+	_check("состояние в памяти очищено",
+		not bool(Game.meta.flags.get("facade_cleared", false)))
 	SaveService.load_game()
 	Game.meta.refresh()
-	_check("сейв: дверь осталась открытой", Game.meta.current_slot_state("bakery", "door") == "open")
-	_check("сейв: флаг door_open на месте", bool(Game.meta.flags.get("door_open", false)))
-	_check("сейв: кладовая осталась разобранной", bool(Game.meta.flags.get("storeroom_ready", false)))
-	_check("сейв: ключ не воскрес", PlayerState.amount_of("bakery_key") == 0)
-	_check("сейв: пройдено уровней = %d" % levels_done, Game.meta.levels_completed_total == levels_done)
-	_check("сейв: пройдено разных уровней = %d" % distinct_levels,
-		Game.meta.completed_levels.size() == distinct_levels)
+	_check("сейв: фасад остался разобранным",
+		bool(Game.meta.flags.get("facade_cleared", false)))
+	_check("сейв: завязка не запустится заново",
+		bool(Game.meta.flags.get(Game.INTRO_FLAG, false)))
+	_check("сейв: знакомство с Марго не повторится",
+		bool(Game.meta.flags.get("met_baker", false)))
+	_check("сейв: уровень остался пройденным",
+		Game.meta.completed_levels.has("bakery_01"))
+	_check("сейв: пройдено уровней = %d" % levels_done,
+		Game.meta.levels_completed_total == levels_done)
+	_check("сейв: задача про завал осталась выполненной",
+		Game.meta.task_state("task_clear_facade") == MetaService.TaskState.COMPLETED)
+
+	_check_v1_migration()
 
 	await _check_procedural_room()
 	await _check_procedural_ceiling()
 	await _check_dialog_skip()
 
 	_report()
+
+
+## --- уровень 1: Sort --------------------------------------------------------
+
+## Игровой модуль текущего уровня. Экран уровня — маршрутизатор: он выбирает
+## модуль по режиму из данных и больше ничего про геймплей не знает.
+func _sort_module() -> Node:
+	var level: Node = Game.current()
+	if level == null or not ("module" in level):
+		return null
+	return level.module
+
+
+## Что игрок видит, войдя в первый Sort. Проверяется не «красиво», а то, что
+## ломается молча: сколько предметов на поле, сколько ячеек в лотке, и не
+## заехал ли завал под интерфейс.
+func _check_sort_scene() -> void:
+	var def: LevelDefinition = ContentDB.level("bakery_01")
+	_check("L1: уровень идёт в режиме sort", def != null and def.mode == "sort")
+	if def == null or def.sort == null:
+		_check("L1: раскладка Sort загрузилась", false)
+		return
+	_check("L1: на поле 12 предметов", def.sort.items.size() == 12)
+	_check("L1: четыре категории по три", def.sort.categories.size() == 4
+		and def.sort.category_counts().values().all(func(n): return int(n) == 3))
+	_check("L1: лоток на 7 ячеек", def.sort.tray_size == 7)
+	_check("L1: фон уровня — фасад пекарни",
+		def.art.background_path == "res://art/bakery.png")
+
+	var module := _sort_module()
+	if module == null:
+		_check("L1: игровой модуль построен", false)
+		return
+	_check("L1: экран уровня выбрал модуль Sort",
+		String(module.get_script().resource_path).ends_with("sort_module.gd"))
+	_check("L1: все 12 предметов на экране", module._views.size() == 12)
+	_check("L1: обучение показано на первом прохождении", module._tutorial != null)
+
+	## Лоток: ячейки должны быть различимы и попадать под палец.
+	var tray = module._tray
+	_check("L1: в лотке нарисовано 7 ячеек", tray.slot_count == 7)
+	_check("L1: ячейка лотка крупнее пальца (%d px)" % int(tray.slot_diameter),
+		tray.slot_diameter >= 96.0)
+	_check("L1: ячейки не наложены друг на друга",
+		tray.slot_center(1).x - tray.slot_center(0).x >= tray.slot_diameter)
+	_check("L1: лоток стоит в нижней части экрана",
+		module.tray_rect.position.y > 1200.0 and module.tray_rect.end.y <= 1920.0)
+
+	## Предметы: крупные, внутри поля и не под лотком.
+	var small := 0
+	var outside := 0
+	for id in module._views:
+		var view: SortItemView = module._views[id]
+		if view.diameter < 120.0:
+			small += 1
+		var r: float = view.hit_radius()
+		if view.position.y + r > module.tray_rect.position.y \
+				or view.position.y - r < module.play_rect.position.y \
+				or view.position.x - r < module.play_rect.position.x \
+				or view.position.x + r > module.play_rect.end.x:
+			outside += 1
+	_check("L1: предметы крупные — под палец, а не под пиксель", small == 0)
+	_check("L1: ни один предмет не заехал под HUD или лоток", outside == 0)
+
+	## Тап попадает туда, куда смотрит игрок: хит-тест обязан вернуть тот же
+	## предмет, в центр которого целятся.
+	var mismatched := 0
+	for id in module._views:
+		if module._hit_test(module._views[id].position) != String(id):
+			mismatched += 1
+	_check("L1: тап по предмету попадает именно в него", mismatched == 0)
+
+
+## Проигрыш и мгновенный перезапуск. Проверяем и то, чего игрок не видит:
+## неудача не должна оставить в мете ни следа.
+func _check_sort_fail_and_restart() -> void:
+	var module := _sort_module()
+	if module == null:
+		_check("L1: модуль доступен для проверки проигрыша", false)
+		return
+
+	## Раскладку снимаем ДО первого тапа: после проигрыша семь предметов лежат
+	## в ячейках лотка, и сравнивать с их положением там значит проверять не
+	## раскладку уровня, а расстановку лотка.
+	var layout_before := {}
+	for id in module._views:
+		layout_before[String(id)] = module._views[id].position
+
+	## Семь предметов, ни одной тройки: по две штуки трёх категорий и одна
+	## четвёртой. Это и есть единственный способ проиграть в Sort.
+	var dead_end := ["i01", "i02", "i03", "i04", "i05", "i06", "i08"]
+	var before: int = module._views.size()
+	for id in dead_end:
+		module._on_pick(String(id))
+		await _tree.create_timer(0.06).timeout
+	_check("L1: лоток заполнился семью предметами", module._state.tray.size() == 7)
+	_check("L1: ни одна группа при этом не закрылась",
+		module._views.size() == before)
+	await _tree.create_timer(0.5).timeout
+
+	_check("L1: переполненный лоток — это проигрыш", module._state.is_failed())
+	_check("L1: после проигрыша ввод заблокирован", module._input_locked)
+	_check("L1: игрок остался на уровне, а не уехал на карту",
+		Game.screen == Game.Screen.LEVEL)
+	_check("L1: проигрыш не записал победу",
+		not Game.meta.completed_levels.has("bakery_01"))
+	_check("L1: проигрыш не тронул мету",
+		not bool(Game.meta.flags.get("facade_cleared", false)))
+	_check("L1: проигрыш не выдал награду", PlayerState.amount_of("coins") == 10)
+
+	## Перезапуск — кнопкой, а не вызовом restart(): у игрока есть только
+	## кнопка, и уровень, который перезапускается лишь изнутри, для него
+	## перезапустить нельзя.
+	var again := _find_button(Game.current(), "Заново")
+	_check("L1: на проигрыше есть кнопка «Заново»", again != null)
+	if again == null:
+		return
+	again.pressed.emit()
+	await _tree.create_timer(0.3).timeout
+
+	_check("L1: после перезапуска все 12 предметов на месте", module._views.size() == 12)
+	_check("L1: лоток пуст", module._state.tray.size() == 0)
+	_check("L1: ввод снова принимается", not module._input_locked)
+	## Тот же seed — та же раскладка. Иначе «Заново» даёт не второй заход, а
+	## другой уровень, и проверить свою догадку игрок не может.
+	var moved := 0
+	for id in layout_before:
+		var view = module._views.get(String(id))
+		if view == null or view.position.distance_to(layout_before[id]) > 0.5:
+			moved += 1
+	_check("L1: раскладка после перезапуска та же самая", moved == 0)
+
+
+## Сейв старой версии. Проверяем то, ради чего миграция вообще написана: игрок,
+## который проходил прежнюю цепочку, не должен ни потерять завязку, ни получить
+## новый уровень «уже пройденным» — id `bakery_01` в старом сейве означал другой
+## уровень.
+func _check_v1_migration() -> void:
+	var old := {
+		"version": 1,
+		"player": {"currencies": {"coins": 120, "hard": 60, "xp": 30},
+			"items": {"bakery_key": 1, "spiderweb": 1, "booster_hint": 3}},
+		"meta": {
+			"shops": {"bakery": {"state": "locked", "slots": {"door": "open"}}},
+			"tasks": {"task_survey_district": "completed", "task_clear_hall": "completed"},
+			"completed_levels": {"bakery_01": 1, "bakery_02": 1},
+			"levels_completed_total": 2,
+			"flags": {"intro_seen": true, "met_baker": true, "journal_seen": true,
+				"bakery_chosen": true, "hall_clean": true, "door_open": true},
+			"rewarded_tasks": {"task_survey_district": true},
+		},
+	}
+	var f := FileAccess.open(SaveService.SAVE_PATH, FileAccess.WRITE)
+	if f == null:
+		_check("миграция: старый сейв записан", false)
+		return
+	f.store_string(JSON.stringify(old, "  "))
+	f.close()
+
+	PlayerState.reset()
+	CooldownService.reset()
+	Game.meta.reset()
+	_check("миграция: старый сейв прочитан", SaveService.load_game())
+	Game.meta.refresh()
+
+	_check("миграция: завязка не проигрывается заново",
+		bool(Game.meta.flags.get(Game.INTRO_FLAG, false)))
+	_check("миграция: знакомство с Марго сохранено",
+		bool(Game.meta.flags.get("met_baker", false)))
+	## 120 из старого сейва плюс 10 за «Осмотреть пекарню»: этой задачи в старой
+	## цепочке не было, и она честно закрывается знакомством, которое уже
+	## состоялось. Всё, за что игроку платили раньше, лежит в rewarded_tasks и
+	## второй раз не оплачивается.
+	_check("миграция: кошелёк переехал целиком", PlayerState.amount_of("coins") == 130)
+	_check("миграция: новый первый уровень не засчитан пройденным",
+		not Game.meta.completed_levels.has("bakery_01"))
+	_check("миграция: задача про завал снова ждёт игрока",
+		Game.meta.task_state("task_clear_facade") == MetaService.TaskState.AVAILABLE)
+	_check("миграция: флаги старой цепочки сняты",
+		not bool(Game.meta.flags.get("hall_clean", false))
+			and not bool(Game.meta.flags.get("door_open", false)))
+	_check("миграция: пекарня открыта по данным, а не по старому состоянию",
+		Game.meta.shop_state("bakery") == "in_restoration")
+	_check("миграция: предметы мёртвой цепочки убраны из сумки",
+		PlayerState.amount_of("bakery_key") == 0
+			and PlayerState.amount_of("spiderweb") == 0)
+	_check("миграция: сейв перезаписывается уже новой версией",
+		SaveService.CURRENT_VERSION == 2)
+
+
+## Пазла в новом обязательном пути нет ни одного — ни на экране, ни в контенте.
+func _check_no_jigsaw() -> void:
+	_check("jigsaw ни разу не появился в дереве сцен",
+		_find_jigsaw(_tree.root) == null)
+	var legacy := PackedStringArray()
+	for id in ContentDB.level_ids:
+		var def: LevelDefinition = ContentDB.level(String(id))
+		if def != null and def.mode != "sort":
+			legacy.append(String(id))
+	_check("в активном контенте нет уровней старого режима", legacy.is_empty())
+	_check("модуль jigsaw остался в проекте как legacy",
+		PuzzleRegistry.is_known("jigsaw"))
+
+
+func _find_jigsaw(node: Node) -> Node:
+	if node.get_script() != null \
+			and String(node.get_script().resource_path).contains("jigsaw_module"):
+		return node
+	for child in node.get_children():
+		var found := _find_jigsaw(child)
+		if found != null:
+			return found
+	return null
+
+
+func _find_button(node: Node, text: String) -> Button:
+	if node == null:
+		return null
+	if node is Button and (node as Button).text == text:
+		return node
+	for child in node.get_children():
+		var found := _find_button(child, text)
+		if found != null:
+			return found
+	return null
+
+
+## Журнал в конце пути: обе задачи выполнены и обе с галочкой.
+func _check_journal_all_done(titles: Array) -> void:
+	var node: Node = _tree.root.find_child("TaskJournal", true, false)
+	if node == null:
+		_check("журнал: виджет на месте", false)
+		return
+	node.call("open")
+	var done: PackedStringArray = node.call("done_titles")
+	for title in titles:
+		var found := false
+		for d in done:
+			if String(d).contains(String(title)):
+				found = true
+		_check("журнал: у «%s» стоит галочка" % title, found)
+	node.call("close")
 
 
 ## Пропуск проверяем нажатием на настоящую кнопку. Кнопка тут — единственное,
@@ -289,168 +457,6 @@ func _check_dialog_runs() -> void:
 	_check("диалог: реплики есть у обоих собеседников", speakers.size() >= 2)
 
 
-## Начислить предмет и показать его игроку — разные вещи. Полоса инвентаря
-## живёт в оверлее Boot и обязана быть на виду сразу после возврата с уровня.
-func _check_inventory_shows(item_ids: Array) -> void:
-	var bar = Game.inventory
-	if bar == null:
-		_check("инвентарь: полоса существует", false)
-		return
-	_check("инвентарь: полоса видна после возврата с уровня", bar.visible)
-	for id in item_ids:
-		_check("инвентарь: '%s' попал в полосу" % ContentDB.item_name(String(id)),
-			bar.shows(String(id)))
-
-
-## Зал — пазл, потом уборка перетаскиванием. Проверяем структуру уровня: что
-## именно там происходит и в каком порядке. Сам drag прогон не эмулирует —
-## он форсирует шаги, а вот что шагов три и у каждого свой кадр, ломается
-## незаметно.
-func _check_hall_scene() -> void:
-	var def: LevelDefinition = ContentDB.level("bakery_02")
-	if def == null:
-		_check("зал: уровень bakery_02 загружается", false)
-		return
-
-	## В зале пазла нет: игрок пришёл убираться, а не собирать ту же комнату.
-	_check("зал: сборки перед уборкой нет", def.puzzle.module_id.is_empty())
-	_check("зал: предметы не ищут — фазы поиска нет",
-		def.hidden_object.targets.is_empty())
-	var steps := def.cleanup
-	_check("зал: три шага уборки", steps.size() == 3)
-	var order := PackedStringArray()
-	for s in steps:
-		order.append(s.item_id)
-	_check("зал: порядок уборки — метла, щётка, мешок",
-		"/".join(order) == "broom/brush/trash_bag")
-
-	## Каждый шаг обязан менять кадр: без нового состояния комнаты игрок тащит
-	## предмет и не видит результата.
-	var arts := {}
-	var arts_ok := true
-	for s in steps:
-		if s.art_path.is_empty() or arts.has(s.art_path) or not ResourceLoader.exists(s.art_path):
-			arts_ok = false
-		arts[s.art_path] = true
-	_check("зал: у каждого шага свой кадр комнаты", arts_ok and arts.size() == 3)
-
-	_check("зал: экран результата не показывается", not def.show_result)
-	_check("зал: предметы уборки известны уровню",
-		Game.items_for_level(def).size() >= 3)
-
-	_check("зал: пазл собирается по интерьеру пекарни",
-		def.art.background_path == "res://art/bakery_interior.jpg")
-	_check("зал: предметы лежат отдельным слоем, а не запечены в пазл",
-		def.art.objects_background_path == "res://art/bakery_interior_objects.png")
-
-	## Каждый предмет надо сперва найти. Шаг без find_rect молча превратился бы
-	## в «предмет выдали», и поиска в уровне бы не осталось.
-	var findable := 0
-	for s in steps:
-		if s.needs_finding():
-			findable += 1
-	_check("зал: у каждого шага размечено, где искать предмет", findable == steps.size())
-
-
-
-## Уборка идёт в два захода и целиком на нажатии: сперва найти предмет в кадре,
-## потом нажать туда, где он нужен. Прогон делает это руками игрока — иначе
-## проверка «уборка на нажатии» осталась бы проверкой сигнатуры метода.
-func _check_hall_cleanup_is_tap() -> void:
-	var level: Node = Game.current()
-	if level == null or not ("_cleanup" in level):
-		_check("зал: фаза уборки доступна прогону", false)
-		return
-	var cleanup = level._cleanup
-	var view = level._view
-	if cleanup == null or view == null:
-		_check("зал: фаза уборки началась", false)
-		return
-	var steps: Array = ContentDB.level("bakery_02").cleanup
-	if steps.size() < 3:
-		_check("зал: шаги уборки загрузились", false)
-		return
-
-	_check("зал: уборка на нажатии, а не на перетаскивании",
-		cleanup.has_method("handle_tap") and not cleanup.has_method("handle_release"))
-	_check("зал: фаза начинается с поиска, а не с применения",
-		cleanup.current() == null)
-
-	## Подсказку игрок вызывает сам, кнопкой, и она тратит бустер. Рука по
-	## таймеру отвечала бы на вопрос, которого игрок ещё не задал.
-	_check("зал: рука сама по себе не выскакивает", cleanup._hand == null)
-	var boosters: int = level._boosters_left
-	level._on_booster()
-	_check("зал: кнопка подсказки показывает палец", cleanup._hand != null)
-	_check("зал: подсказка потратила один бустер",
-		int(level._boosters_left) == boosters - 1)
-
-	## Применить то, чего ещё не нашли, нельзя — иначе поиск был бы декорацией.
-	var use_spot: Vector2 = view.norm_to_world(steps[0].centroid())
-	cleanup.handle_tap(use_spot)
-	_check("зал: ненайденный предмет применить нельзя", cleanup.current() == null)
-
-	var missed: Vector2 = view.norm_to_world(_point_outside(steps[0].find_rect))
-	cleanup.handle_tap(missed)
-	_check("зал: тап мимо предмета ничего не находит", cleanup.current() == null)
-
-	for step in steps:
-		var spot: Vector2 = view.norm_to_world(step.find_centroid())
-		cleanup.handle_tap(spot)
-	_check("зал: все три предмета находятся тапом", cleanup.current() != null)
-	_check("зал: найденное стёрто из кадра",
-		view.patches != null and view.patches.get_child_count() == steps.size())
-
-	var before := String(steps[0].item_id)
-	var off_target: Vector2 = view.norm_to_world(_point_outside(steps[0].rect))
-	cleanup.handle_tap(off_target)
-	_check("зал: тап мимо места применения ничего не меняет",
-		cleanup.current() != null and String(cleanup.current().item_id) == before)
-
-	cleanup.handle_tap(use_spot)
-	_check("зал: тап по месту засчитывает шаг «%s»" % before,
-		cleanup.current() == null or String(cleanup.current().item_id) != before)
-	_check("зал: применённый предмет ушёл из полосы",
-		Rect2(level._hud.chip_rect(before)) == Rect2())
-
-
-## Точка заведомо вне области шага — по той стороне кадра, где её нет.
-func _point_outside(rect: Rect2) -> Vector2:
-	if rect.position.x > 0.1:
-		return Vector2(rect.position.x * 0.5, rect.get_center().y)
-	if rect.end.x < 0.9:
-		return Vector2((rect.end.x + 1.0) * 0.5, rect.get_center().y)
-	if rect.position.y > 0.1:
-		return Vector2(rect.get_center().x, rect.position.y * 0.5)
-	return Vector2(rect.get_center().x, (rect.end.y + 1.0) * 0.5)
-
-
-## Зал прогон проходит не одним force'ом: до фазы уборки доводит пазл, а сами
-## шаги делает нажатием, как игрок. Иначе проверка «уборка на нажатии» осталась
-## бы проверкой сигнатуры метода, а не поведения.
-func _play_hall_to_cleanup() -> void:
-	var level: Node = Game.current()
-	if level == null or not level.has_method("debug_autoplay"):
-		_check("зал: уровень доступен и управляем", false)
-		return
-	if level._puzzle == null:
-		level._start_puzzle()
-		await _tree.create_timer(0.3).timeout
-	if level._puzzle != null:
-		level._puzzle.force_solve()
-
-	var deadline := Time.get_ticks_msec() + 8000
-	while Time.get_ticks_msec() < deadline:
-		if level._cleanup != null and level._cleanup.current() != null:
-			break
-		await _tree.process_frame
-	_check_hall_cleanup_is_tap()
-
-	if level._cleanup != null:
-		level._cleanup.force_complete()
-	await _await_left_level()
-
-
 
 ## «Задача закрыта» и «игрок про это узнал» — разные утверждения. Плашка живёт
 ## в оверлее Boot, поэтому ищем её там, а не в текущей сцене.
@@ -477,44 +483,6 @@ func _check_journal_hides_locked() -> void:
 			leaked = task.title
 	_check("журнал: закрытых задач на экране нет (закрыто — %d)" % locked.size(),
 		locked.size() > 0 and leaked.is_empty())
-	node.call("close")
-
-
-func _check_journal(done_title: String, current_title: String) -> void:
-	var node: Node = _tree.root.find_child("TaskJournal", true, false)
-	if node == null:
-		_check("журнал: виджет на месте", false)
-		return
-	node.call("open")
-	_check("журнал: открывается кнопкой", bool(node.call("is_open")))
-
-	var lines: PackedStringArray = node.call("lines")
-	_check("журнал: показывает пройденное и текущее", lines.size() >= 2)
-
-	var done_at := -1
-	var current_at := -1
-	for i in lines.size():
-		var line := String(lines[i])
-		if line.contains(done_title):
-			done_at = i
-		elif line.contains(current_title):
-			current_at = i
-	## Порядок, а не просто наличие: журнал существует ради «что после чего»,
-	## и список, где пройденное стоит после текущего, врёт именно об этом.
-	_check("журнал: пройденное стоит перед текущим",
-		done_at >= 0 and current_at > done_at)
-
-	## Галочка читается из картинки чекбокса: по ней игрок и судит о прогрессе.
-	var done: PackedStringArray = node.call("done_titles")
-	var done_marked := false
-	var current_marked := false
-	for title in done:
-		if String(title).contains(done_title):
-			done_marked = true
-		if String(title).contains(current_title):
-			current_marked = true
-	_check("журнал: у «%s» стоит галочка" % done_title, done_marked)
-	_check("журнал: у «%s» галочки нет" % current_title, not current_marked)
 	node.call("close")
 
 
@@ -626,80 +594,6 @@ func _check_map_hint_points_at(shop_id: String) -> void:
 		rect.size.x > 0.0 and rect.has_point(map._hand.position))
 
 
-## Кладовая: собранная сцена из двух картинок плюс то, ради чего она собрана.
-## Проверяем не «красиво», а то, что ломает игру молча: шкаф справа, мусор
-## попадает под палец и НЕ обведён рамкой заранее — иначе искать нечего.
-func _check_storeroom_scene() -> void:
-	var scene: Node = Game.current()
-	if scene == null or not ("_slots" in scene):
-		_check("кладовая: сцена локации доступна", false)
-		return
-	var slot = scene._slots.get("shelf")
-	if slot == null:
-		_check("кладовая: слот шкафа построен", false)
-		return
-	_check("кладовая: шкаф стоит справа",
-		slot.world_rect.get_center().x > 540.0)
-	_check("кладовая: у шкафа есть площадь под палец",
-		slot.world_rect.size.x > 100.0 and slot.world_rect.size.y > 100.0)
-
-	var built := 0
-	var ringed := 0
-	var small := 0
-	for id in TRASH_IDS:
-		var s = scene._slots.get(String(id))
-		if s == null:
-			continue
-		built += 1
-		if s._highlight != null:
-			ringed += 1
-		if s.world_rect.size.x < 96.0 or s.world_rect.size.y < 96.0:
-			small += 1
-	_check("кладовая: весь мусор построен на сцене — %d/%d" % [built, TRASH_IDS.size()],
-		built == TRASH_IDS.size())
-	_check("кладовая: мусор не обведён рамкой заранее", ringed == 0)
-	_check("кладовая: по каждому предмету можно попасть пальцем", small == 0)
-
-	var with_art := 0
-	for id in TRASH_IDS:
-		if ContentDB.item(String(id)) != null and ContentDB.item(String(id)).icon != null:
-			with_art += 1
-	_check("кладовая: у мусора настоящие иконки, а не заглушки",
-		with_art == TRASH_IDS.size())
-
-	_check("кладовая: лампочка-подсказка на экране", scene._hint_button != null)
-	_check("кладовая: подсказка знает, что показывать",
-		not String(scene._next_searchable()).is_empty())
-	_check("кладовая: полоска ячеек показана",
-		scene._collection_panel != null and scene._collection_panel.visible)
-	if scene._collection_row != null:
-		_check("кладовая: ячеек ровно %d" % TRASH_IDS.size(),
-			scene._collection_row.get_child_count() == TRASH_IDS.size())
-
-
-## Каждый предмет мусора убирается ОДНИМ тапом пустой рукой и оказывается в
-## инвентаре. Перетаскивания здесь нет и быть не должно.
-func _check_trash_pickup() -> void:
-	var scene: Node = Game.current()
-	for id in TRASH_IDS:
-		var item_id := String(id)
-		var before := PlayerState.amount_of(item_id)
-		var take := Game.meta.interact("bakery_storeroom", item_id, "")
-		_check("мусор '%s' убирается тапом" % ContentDB.item_name(item_id),
-			bool(take.get("ok", false)) and PlayerState.amount_of(item_id) == before + 1)
-		_check("мусор '%s' пропал со сцены" % ContentDB.item_name(item_id),
-			Game.meta.current_slot_state("bakery_storeroom", item_id) == "taken")
-		var again := Game.meta.interact("bakery_storeroom", item_id, "")
-		## Убранное место отвечает текстом — это нормально; не нормально было бы
-		## выдать второй такой же предмет.
-		_check("повторный тап по '%s' не выдаёт второй" % ContentDB.item_name(item_id),
-			PlayerState.amount_of(item_id) == before + 1
-				and String(again.get("granted", "")).is_empty())
-	if scene != null and scene.has_method("_next_searchable"):
-		_check("подсказке больше нечего показывать",
-			String(scene._next_searchable()).is_empty())
-
-
 ## Мэрия и другие «пока закрытые» здания обязаны попадать в хит-тест: игрок
 ## должен получать ответ на тап, а не тишину.
 func _check_map_hit_areas() -> void:
@@ -715,15 +609,6 @@ func _check_map_hit_areas() -> void:
 	_check("карта: кликабельны все %d зданий" % ContentDB.map_data.get("buildings", []).size(),
 		areas.size() == ContentDB.map_data.get("buildings", []).size())
 	_check("карта: здание без магазина (мэрия) тоже кликабельно", without_shop >= 1)
-
-
-## --- вспомогательное --------------------------------------------------------
-
-func _play(task_id: String) -> void:
-	Game.play_task(task_id)
-	await _tree.create_timer(0.4).timeout
-	_check("уровень для '%s' запустился" % task_id, Game.screen == Game.Screen.LEVEL)
-	await _finish_current_level()
 
 
 ## Пройти уровень, который УЖЕ открыт. Отдельно от _play: после диалога игрок
@@ -748,11 +633,6 @@ func _await_left_level(timeout_sec: float = 6.0) -> void:
 	await _tree.create_timer(0.4).timeout
 
 
-func _apply(task_id: String) -> void:
-	var ok := Game.meta.start_action(task_id)
-	_check("meta action задачи '%s' применён" % task_id, ok)
-
-
 func _check(title: String, ok: bool) -> void:
 	_checks.append({"title": title, "ok": ok})
 	_say(("  [ OK ] " if ok else "  [FAIL] ") + title)
@@ -765,7 +645,7 @@ func _report() -> void:
 			failed += 1
 	_say("=== AUTOPLAY: %d проверок, провалено %d ===" % [_checks.size(), failed])
 	if failed == 0:
-		_say("Полный цикл puzzle -> hidden object -> quest item -> meta change работает.")
+		_say("Новый путь работает: мэр -> карта -> фасад -> Марго -> Sort -> мета.")
 	_tree.quit(1 if failed > 0 else 0)
 
 

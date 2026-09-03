@@ -37,7 +37,10 @@ func _init(p: Node, content: Node, cd: Node) -> void:
 func ensure_defaults() -> void:
 	for shop_id in db.shops:
 		if not shop_states.has(shop_id):
-			shop_states[shop_id] = {"state": "locked", "slots": db.shop(shop_id).default_states()}
+			shop_states[shop_id] = {
+				"state": db.shop(shop_id).initial_state,
+				"slots": db.shop(shop_id).default_states(),
+			}
 		else:
 			var slots: Dictionary = shop_states[shop_id]["slots"]
 			for slot_id in db.shop(shop_id).default_states():

@@ -1,0 +1,71 @@
+[
+  {
+    "id": "task_survey_district",
+    "reward": { "coins": 10 },
+    "play_label": "Собрать",
+    "order": 1,
+    "shop_id": "bakery",
+    "room_id": "hall",
+    "location": "map",
+    "title": "Собрать план района",
+    "hint": "Мэр просит выбрать первый объект для восстановления.",
+    "unlock": [],
+    "level_ids": ["bakery_01"],
+    "action_id": "choose_bakery",
+    "hotspot": "door"
+  },
+  {
+    "id": "task_visit_bakery",
+    "order": 2,
+    "shop_id": "bakery",
+    "room_id": "hall",
+    "location": "map",
+    "title": "Осмотреть пекарню",
+    "hint": "Хозяйка всё ещё живёт неподалёку — загляни к ней.",
+    "unlock": [{ "type": "flag", "flag": "bakery_chosen" }],
+    "level_ids": [],
+    "action_id": "visit_bakery",
+    "hotspot": ""
+  },
+  {
+    "id": "task_clear_hall",
+    "play_label": "Прибраться",
+    "order": 3,
+    "shop_id": "bakery",
+    "room_id": "hall",
+    "location": "shop",
+    "title": "Прибраться в торговом зале",
+    "hint": "",
+    "unlock": [{ "type": "flag", "flag": "met_baker" }],
+    "level_ids": ["bakery_02"],
+    "action_id": "clear_hall",
+    "hotspot": ""
+  },
+  {
+    "_note": "Пазлов здесь больше нет. Кладовая и шкаф собирались из кусков ровно затем, чтобы задержать игрока перед дверью, — а показывали при этом ту же комнату, в которую он и так войдёт. Работа осталась настоящая: найти ключ и открыть им дверь. Задача открывается после уборки зала, чтобы игрок видел цель, пока ищет ключ, и закрывается сама, когда дверь поддалась (open_storeroom, auto_apply).",
+    "id": "task_open_storeroom",
+    "order": 4,
+    "shop_id": "bakery",
+    "room_id": "storeroom",
+    "location": "shop",
+    "title": "Открыть кладовую",
+    "hint": "В глубине зала — запертая дверь. Нажми на неё: ключ где-то рядом.",
+    "unlock": [{ "type": "flag", "flag": "hall_clean" }],
+    "level_ids": [],
+    "action_id": "open_storeroom",
+    "hotspot": "door"
+  },
+  {
+    "id": "task_clear_storeroom",
+    "order": 5,
+    "shop_id": "bakery_storeroom",
+    "room_id": "storeroom",
+    "location": "shop",
+    "title": "Вынести мусор",
+    "hint": "Найди в кладовой всё, что валяется, и нажми на это. Не видно — жми лампочку.",
+    "unlock": [{ "type": "flag", "flag": "storeroom_ready" }],
+    "level_ids": [],
+    "action_id": "haul_out_trash",
+    "hotspot": "shelf"
+  }
+]

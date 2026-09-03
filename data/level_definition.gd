@@ -1,7 +1,7 @@
 class_name LevelDefinition
 extends Resource
-## Полное описание гибридного уровня. Уровень не имеет собственного скрипта:
-## двадцать уровней — это двадцать таких определений и ноль контроллеров.
+## Полное описание уровня. Уровень не имеет собственного скрипта: двадцать
+## уровней — это двадцать таких определений и ноль контроллеров.
 
 @export var id: String = ""
 @export var shop_id: String = ""
@@ -11,6 +11,15 @@ extends Resource
 @export var title: String = ""
 @export var narrative: PackedStringArray = PackedStringArray()
 @export var art: SceneArt
+
+## Каким режимом играется уровень: "sort" — основной core, "legacy" — прежний
+## гибрид «пазл → поиск → уборка». Режим выбирает игровой модуль (см.
+## GameplayRegistry) и потому обязан жить в данных: иначе новая механика
+## означала бы правку маршрутизации, а не новый JSON.
+@export var mode: String = "sort"
+## Раскладка Sort. Заполнена ровно у уровней с mode == "sort".
+@export var sort: SortDefinition = null
+
 @export var puzzle: PuzzleParams
 @export var hidden_object: HOConfig
 @export var rewards: RewardTable

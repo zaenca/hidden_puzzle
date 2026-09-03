@@ -5,7 +5,9 @@
 # Отладочные артефакты dev-запусков
 autoplay_report.txt
 room_shot_*.png
+level_shot_*.png
 room_shot_*.png.import
+level_shot_*.png.import
 boot_log.txt
 
 # Экспорт

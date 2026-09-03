@@ -1,0 +1,84 @@
+[
+  {
+    "id": "choose_bakery",
+    "title": "Выбрать пекарню",
+    "description": "Отметить пекарню первым объектом восстановления.",
+    "button_label": "Выбрать пекарню",
+    "_auto_note": "Выбора у игрока здесь нет — мэр уже назвал пекарню в диалоге. Задача закрывается сама, как только план собран.",
+    "auto_apply": true,
+    "requirements": [{ "type": "level", "level_id": "bakery_01" }],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "set_shop_state", "shop_id": "bakery", "state": "in_restoration" },
+      { "type": "set_flag", "flag": "bakery_chosen" }
+    ]
+  },
+  {
+    "id": "visit_bakery",
+    "title": "Осмотреть пекарню",
+    "description": "Познакомиться с хозяйкой пекарни.",
+    "button_label": "Осмотреть пекарню",
+    "_auto_note": "Закрывается знакомством с хозяйкой: флаг met_baker ставит диалог bakery_owner.",
+    "auto_apply": true,
+    "requirements": [{ "type": "flag", "flag": "met_baker" }],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "set_flag", "flag": "bakery_visited" }
+    ]
+  },
+  {
+    "id": "clear_hall",
+    "title": "Прибраться в торговом зале",
+    "description": "Пол вымыт, витрина обметена, мусор собран.",
+    "button_label": "Прибраться в зале",
+    "_auto_note": "Уборка целиком происходит внутри уровня: игрок нажимает на пол, витрину и зал. Задача закрывается сама по факту пройденного уровня — кнопки, дублирующей уже сделанное, быть не должно.",
+    "auto_apply": true,
+    "requirements": [{ "type": "level", "level_id": "bakery_02" }],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "set_flag", "flag": "hall_clean" }
+    ]
+  },
+  {
+    "_note": "auto_apply: задача закрывается сама, как только дверь поддалась. Работа игрока — найти ключ и применить его; отдельная кнопка «подтвердить» после этого ничего бы не решала, а такую задачу лучше не показывать вовсе, чем показывать с мёртвой кнопкой. Текста здесь нет намеренно: что за дверью, рассказывает сама дверь, и второе модальное окно подряд читалось бы как сбой.",
+    "id": "open_storeroom",
+    "title": "Открыть кладовую",
+    "description": "Дверь поддалась — за ней кладовая.",
+    "button_label": "Войти",
+    "auto_apply": true,
+    "requirements": [{ "type": "flag", "flag": "door_open" }],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "set_shop_state", "shop_id": "bakery_storeroom", "state": "in_restoration" },
+      { "type": "set_flag", "flag": "storeroom_ready" }
+    ]
+  },
+  {
+    "id": "haul_out_trash",
+    "title": "Вынести мусор",
+    "description": "Всё, что валялось в кладовой, собрано — осталось вынести.",
+    "button_label": "Вынести мусор",
+    "requirements": [
+      { "type": "item", "item_id": "spiderweb",   "amount": 1 },
+      { "type": "item", "item_id": "flour_spill", "amount": 1 },
+      { "type": "item", "item_id": "bootprints",  "amount": 1 },
+      { "type": "item", "item_id": "scrap_paper", "amount": 1 },
+      { "type": "item", "item_id": "puddle",      "amount": 1 }
+    ],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "consume", "id": "spiderweb",   "amount": 1 },
+      { "type": "consume", "id": "flour_spill", "amount": 1 },
+      { "type": "consume", "id": "bootprints",  "amount": 1 },
+      { "type": "consume", "id": "scrap_paper", "amount": 1 },
+      { "type": "consume", "id": "puddle",      "amount": 1 },
+      { "type": "set_flag", "flag": "storeroom_clean" },
+      { "type": "narrative", "text": "Кладовая убрана: пол вымыт, полки протёрты, паутины нет. Пахнет деревом, а не подвалом." }
+    ]
+  }
+]

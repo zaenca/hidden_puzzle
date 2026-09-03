@@ -47,6 +47,14 @@
   { "id": "door_handle", "name": "Дверная ручка", "kind": "quest", "color": "#e0b04f", "shape": "rect" },
   { "id": "glass_pane",  "name": "Стекло витрины", "kind": "quest", "color": "#a8e0f0", "shape": "rect" },
 
+  { "_note": "Предметы Sort. Пока у них нет PNG, они рисуются цветом и формой — теми же, что у остальных заглушек. Логика уровня ссылается на эти id, а не на картинки, поэтому подмена иконки не потребует ни строчки в SortModule.",
+    "id": "crumpled_can",  "name": "Смятая банка",       "color": "#9aa39a", "shape": "circle" },
+  { "id": "old_newspaper", "name": "Старая газета",      "color": "#ded8c4", "shape": "rect" },
+  { "id": "cardboard_box", "name": "Картонная коробка",  "color": "#b5813f", "shape": "rect" },
+  { "id": "tin_can",       "name": "Жестянка",           "color": "#b5b5c2", "shape": "circle" },
+  { "id": "wooden_crate",  "name": "Деревянный ящик",    "color": "#8a6234", "shape": "rect" },
+  { "id": "wrench",        "name": "Гаечный ключ",       "color": "#8a8f9c", "shape": "cross" },
+
   { "id": "spiderweb",   "name": "Паутина",           "kind": "quest", "icon": "res://art/garbage/spiderweb.png",   "color": "#d8d8e0", "shape": "triangle" },
   { "id": "flour_spill", "name": "Рассыпанная мука",  "kind": "quest", "icon": "res://art/garbage/flour_spill.png", "color": "#f0e6d2", "shape": "triangle" },
   { "id": "scrap_paper", "name": "Обрывки бумаги",    "kind": "quest", "icon": "res://art/garbage/scrap_paper.png", "color": "#e6ddc8", "shape": "rect" },

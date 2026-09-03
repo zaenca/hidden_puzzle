@@ -115,6 +115,12 @@ static func puzzle_params(d: Dictionary) -> PuzzleParams:
 			return base
 
 
+static func _no_puzzle() -> PuzzleParams:
+	var p := PuzzleParams.new()
+	p.module_id = ""
+	return p
+
+
 static func ho_config(d: Dictionary) -> HOConfig:
 	var c := HOConfig.new()
 	var list: Array[HOTarget] = []
@@ -126,6 +132,50 @@ static func ho_config(d: Dictionary) -> HOConfig:
 	c.miss_penalty_sec = float(d.get("miss_penalty_sec", 0.0))
 	c.allow_zoom = bool(d.get("allow_zoom", true))
 	return c
+
+
+## --- Sort -------------------------------------------------------------------
+
+static func sort_category(d: Dictionary) -> SortCategory:
+	var c := SortCategory.new()
+	c.id = String(d.get("id", ""))
+	c.display_name = String(d.get("name", c.id))
+	c.color = to_color(d.get("color", "#cccccc"))
+	return c
+
+
+static func sort_item_instance(d: Dictionary) -> SortItemInstance:
+	var i := SortItemInstance.new()
+	i.id = String(d.get("id", ""))
+	i.item_id = String(d.get("item_id", ""))
+	i.category = String(d.get("category", ""))
+	i.position = to_vec2(d.get("pos", null), Vector2(0.5, 0.5))
+	i.size = float(d.get("size", 0.14))
+	i.rotation_deg = float(d.get("rotation", 0.0))
+	i.layer = int(d.get("layer", 0))
+	i.blocked_by = PackedStringArray(d.get("blocked_by", []))
+	return i
+
+
+static func sort_definition(d: Dictionary) -> SortDefinition:
+	var s := SortDefinition.new()
+	s.tray_size = int(d.get("tray_size", 7))
+	s.group_size = int(d.get("group_size", 3))
+	s.seed = int(d.get("seed", 0))
+	s.tutorial_id = String(d.get("tutorial", ""))
+	s.fail_on_full_tray = bool(d.get("fail_on_full_tray", true))
+	s.zones = d.get("zones", [])
+
+	var cats: Array[SortCategory] = []
+	for raw in d.get("categories", []):
+		cats.append(sort_category(raw))
+	s.categories = cats
+
+	var items_out: Array[SortItemInstance] = []
+	for raw in d.get("items", []):
+		items_out.append(sort_item_instance(raw))
+	s.items = items_out
+	return s
 
 
 static func rewards(d: Dictionary) -> RewardTable:
@@ -157,7 +207,17 @@ static func level(d: Dictionary) -> LevelDefinition:
 	l.title = String(d.get("title", l.id))
 	l.narrative = PackedStringArray(d.get("narrative", []))
 	l.art = scene_art(d.get("art", {}))
-	l.puzzle = puzzle_params(d.get("puzzle", {}))
+	if d.has("sort"):
+		l.sort = sort_definition(d["sort"])
+	## Режим либо назван явно, либо выводится из того, что в файле лежит.
+	## Вывод нужен ровно затем, чтобы уровни, написанные до появления Sort,
+	## продолжали играться без единой правки их JSON.
+	l.mode = String(d.get("mode", ""))
+	if l.mode.is_empty():
+		l.mode = "sort" if l.sort != null else "legacy"
+	## Секции `puzzle` нет — сборки на уровне нет. Пустой словарь дал бы
+	## «jigsaw» по умолчанию, и любой Sort-уровень тихо считался бы пазловым.
+	l.puzzle = puzzle_params(d["puzzle"]) if d.has("puzzle") else _no_puzzle()
 	l.hidden_object = ho_config(d.get("hidden_object", {}))
 	l.rewards = rewards(d.get("rewards", {}))
 	l.quest_grants = PackedStringArray(d.get("quest_grants", []))
@@ -327,6 +387,7 @@ static func shop(d: Dictionary) -> ShopDefinition:
 	s.background_path = String(d.get("background", ""))
 	s.room_id = String(d.get("room", ""))
 	s.map_rect = to_rect(d.get("map_rect", [0.1, 0.4, 0.3, 0.2]))
+	s.initial_state = String(d.get("initial_state", "locked"))
 	s.rooms = d.get("rooms", [])
 	s.enter = d.get("enter", {})
 	s.back = d.get("back", {})

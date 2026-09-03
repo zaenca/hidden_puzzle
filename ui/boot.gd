@@ -12,6 +12,7 @@ var _journal: TaskJournal
 var _wallet: WalletBar
 var _autoplay: AutoplayDriver = null
 var _room_shot: RoomShot = null
+var _level_shot: LevelShot = null
 
 
 var _dbg_lines: PackedStringArray = PackedStringArray()
@@ -40,6 +41,7 @@ func _ready() -> void:
 	_dbg("Game.boot ok; screen=%d" % Game.screen)
 
 	var shot := _room_shot_target()
+	var level_shot := _cmdline_value("--level-shot=")
 	if _wants_autoplay():
 		_dbg("autoplay start")
 		# Ссылку надо держать: RefCounted-драйвер иначе освобождается сразу
@@ -50,6 +52,10 @@ func _ready() -> void:
 		_dbg("room shot: " + shot)
 		_room_shot = RoomShot.new()
 		_room_shot.run(get_tree(), shot, _cmdline_value("--room-template="))
+	elif not level_shot.is_empty():
+		_dbg("level shot: " + level_shot)
+		_level_shot = LevelShot.new()
+		_level_shot.run(get_tree(), level_shot, int(_cmdline_value("--shot-picks=")))
 	else:
 		_dbg("autoplay NOT requested")
 

@@ -148,6 +148,9 @@ func _check_levels() -> void:
 		var lvl: LevelDefinition = lvl_v
 		if not tasks.has(lvl.task_id):
 			_err("%s: неизвестная задача '%s'" % [lvl.id, lvl.task_id])
+		if not GameplayRegistry.is_known(lvl.mode):
+			_err("%s: неизвестный режим геймплея '%s'" % [lvl.id, lvl.mode])
+		_check_sort(lvl)
 		## Пустой модуль — это «уровень без сборки», а не опечатка: в зале игрок
 		## убирается, и пазла там нет по замыслу.
 		if not lvl.puzzle.module_id.is_empty() and not PuzzleRegistry.is_known(lvl.puzzle.module_id):
@@ -204,6 +207,130 @@ func _check_levels() -> void:
 		for q in quest_ids:
 			if not lvl.quest_grants.has(q):
 				_warn("%s: quest-цель '%s' не указана в quest_grants" % [lvl.id, q])
+
+
+## Sort-уровень. Самый дорогой баг здесь — непроходимая раскладка: она
+## выглядит нормальным уровнем ровно до того хода, после которого игрок уже
+## ничего не может сделать. Поэтому проходимость не осматривается глазами, а
+## доказывается солвером — тем же, которым уровень проходит headless-прогон.
+func _check_sort(lvl: LevelDefinition) -> void:
+	if lvl.mode != "sort":
+		if lvl.sort != null:
+			_warn("%s: раскладка Sort описана, но режим уровня '%s'" % [lvl.id, lvl.mode])
+		return
+	var s := lvl.sort
+	if s == null:
+		_err("%s: режим sort, но раскладки нет" % lvl.id)
+		return
+
+	if s.tray_size <= 0:
+		_err("%s: лоток на %d ячеек" % [lvl.id, s.tray_size])
+		return
+	if s.group_size < 2:
+		_err("%s: группа из %d предметов — закрывать нечего" % [lvl.id, s.group_size])
+		return
+	## Лоток обязан вмещать больше одной незакрытой группы, иначе игрок
+	## проигрывает механически, а не по ошибке.
+	if s.tray_size <= s.group_size:
+		_err("%s: лоток (%d) не больше группы (%d) — ошибиться невозможно, проиграть неизбежно"
+			% [lvl.id, s.tray_size, s.group_size])
+	## Первый уровень задаёт ритм всей игре: семь ячеек — это обещание, и
+	## менять его в туториале нельзя.
+	if lvl.order == 1 and s.tray_size != 7:
+		_err("%s: первый уровень обязан идти с лотком на 7 ячеек, а не на %d"
+			% [lvl.id, s.tray_size])
+	if s.seed == 0:
+		_err("%s: нет seed — «Заново» вернёт не тот же уровень" % lvl.id)
+	if not s.zones.is_empty():
+		_err("%s: zones пока не поддерживаются модулем — уровень с ними не сыграется" % lvl.id)
+	if not s.tutorial_id.is_empty() \
+			and not FileAccess.file_exists("%stutorial/%s.json" % [ROOT, s.tutorial_id]):
+		_err("%s: обучение '%s' не найдено в content/tutorial" % [lvl.id, s.tutorial_id])
+	if s.items.is_empty():
+		_err("%s: на поле нет ни одного предмета" % lvl.id)
+		return
+
+	var ids := {}
+	for inst in s.items:
+		var who := "%s / %s" % [lvl.id, inst.id]
+		if inst.id.is_empty():
+			_err("%s: предмет без id" % lvl.id)
+			continue
+		if ids.has(inst.id):
+			_err("%s: дубль id предмета" % who)
+		ids[inst.id] = inst
+		if not items.has(inst.item_id):
+			_err("%s: нет предмета '%s' в items.json" % [who, inst.item_id])
+		if not s.has_category(inst.category):
+			_err("%s: категории '%s' нет в списке категорий уровня" % [who, inst.category])
+		## Позиция — центр, поэтому за край уезжает половина размера.
+		var half := inst.size * 0.5
+		if inst.position.x - half < 0.0 or inst.position.y - half < 0.0 \
+				or inst.position.x + half > 1.0 or inst.position.y + half > 1.0:
+			_err("%s: предмет выходит за игровое поле" % who)
+		if inst.size < MIN_TARGET_SIDE * 2.0:
+			_warn("%s: предмет мельче удобного touch-таргета (%.3f)" % [who, inst.size])
+
+	for inst in s.items:
+		for blocker in inst.blocked_by:
+			if not ids.has(String(blocker)):
+				_err("%s / %s: накрыт несуществующим предметом '%s'"
+					% [lvl.id, inst.id, blocker])
+			elif String(blocker) == inst.id:
+				_err("%s / %s: предмет накрывает сам себя" % [lvl.id, inst.id])
+
+	## Категория, которая не делится на группы, оставляет на поле предметы,
+	## которые невозможно закрыть НИКОГДА, — и уровень не заканчивается.
+	for category_id in s.category_counts():
+		var n := int(s.category_counts()[category_id])
+		if n % s.group_size != 0:
+			_err("%s: в категории '%s' %d предметов — не делится на группы по %d"
+				% [lvl.id, category_id, n, s.group_size])
+	for c in s.categories:
+		if not s.category_counts().has(c.id):
+			_warn("%s: категория '%s' описана, но на поле её нет" % [lvl.id, c.id])
+
+	_check_sort_solvable(lvl, s)
+
+
+## Проходимость и достижимость. Первое доказывает солвер; второе — обход графа
+## блокировок: предмет, накрытый кольцом других, солвер тоже не достанет, но
+## сказать об этом словами «уровень не решается» значит спрятать причину.
+func _check_sort_solvable(lvl: LevelDefinition, s: SortDefinition) -> void:
+	var reachable := {}
+	var changed := true
+	while changed:
+		changed = false
+		for inst in s.items:
+			if reachable.has(inst.id):
+				continue
+			var free := true
+			for blocker in inst.blocked_by:
+				if not reachable.has(String(blocker)):
+					free = false
+					break
+			if free:
+				reachable[inst.id] = true
+				changed = true
+	for inst in s.items:
+		if not reachable.has(inst.id):
+			_err("%s / %s: до предмета нельзя добраться — блокировки замкнуты в кольцо"
+				% [lvl.id, inst.id])
+			return
+
+	var plan := SortSolver.solve(s)
+	if bool(plan["exhausted"]):
+		_warn("%s: перебор не доказал проходимость за %d состояний" % [lvl.id, int(plan["nodes"])])
+		return
+	if not bool(plan["solved"]):
+		_err("%s: уровень непроходим — ни один порядок не разбирает поле" % lvl.id)
+		return
+	var path: PackedStringArray = plan["path"]
+	if path.size() != s.items.size():
+		_err("%s: решение разбирает %d предметов из %d" % [lvl.id, path.size(), s.items.size()])
+	if int(plan["max_tray"]) > s.tray_size:
+		_err("%s: известное решение переполняет лоток (%d при %d ячейках)"
+			% [lvl.id, int(plan["max_tray"]), s.tray_size])
 
 
 func _check_actions() -> void:

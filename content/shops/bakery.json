@@ -2,53 +2,14 @@
   "id": "bakery",
   "display_name": "Пекарня «Тёплый угол»",
   "palette": "bakery",
-  "_art_note": "Игрок попадает сюда только после уборки, поэтому комната сразу в чистом состоянии. Грязные состояния живут в уровне и переключаются его шагами, а не слотами.",
-  "background": "res://art/bakery_interior_clean.jpg",
+  "_state_note": "Пекарня открыта на карте с первой минуты: мэр называет её в завязке, и заставлять игрока «заслуживать» право туда подойти нечем. Раньше это состояние выставлял пазл «собери план района» — уровень, который существовал ровно затем, чтобы после него было что применить.",
+  "initial_state": "in_restoration",
+  "_art_note": "Локация — фасад, а не интерьер: восстановление начинается снаружи, и внутрь игрок попадёт, когда там будет что делать. Тот же кадр служит фоном первого уровня, поэтому убранный вход виден и после уровня.",
+  "background": "res://art/bakery.png",
   "map_rect": [0.0, 0.293, 0.347, 0.25],
   "rooms": [
-    { "id": "hall", "title": "Торговый зал" },
-    { "id": "storeroom", "title": "Кладовая" }
+    { "id": "facade", "title": "Вход" }
   ],
   "first_visit": { "intro": "bakery_facade", "flag": "met_baker" },
-  "enter": {
-    "label": "Зайти в кладовую",
-    "requires_flag": "storeroom_ready",
-    "locked_text": "Кладовая за дверью ещё не разобрана.",
-    "open_shop": "bakery_storeroom"
-  },
-  "slots": [
-    {
-      "id": "door",
-      "rect": [0.790, 0.222, 0.180, 0.335],
-      "default": "locked",
-      "states": [
-        { "id": "locked", "label": "", "hidden": true },
-        { "id": "open",   "label": "", "color": "#ffd98a", "shape": "rect", "overlay": "#ffd98a26" }
-      ],
-      "interactions": [
-        {
-          "state": "locked",
-          "use_item": "bakery_key",
-          "consume": true,
-          "set_state": "open",
-          "set_flag": "door_open",
-          "text": "Ключ со скрипом провернулся в замке. За дверью кладовая: полки в паутине, на полу мука и мусор."
-        },
-        {
-          "state": "locked",
-          "once_flag": "bakery_key_found",
-          "grant_item": "bakery_key",
-          "text": "Заперто. Под ковриком у порога лежал ключ — он в инвентаре."
-        },
-        {
-          "state": "locked",
-          "text": "Дверь заперта. Возьми ключ в инвентаре и нажми на дверь."
-        },
-        {
-          "state": "open",
-          "text": "Дверь в кладовую открыта — можно входить."
-        }
-      ]
-    }
-  ]
+  "slots": []
 }

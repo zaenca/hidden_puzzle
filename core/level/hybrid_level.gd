@@ -65,8 +65,11 @@ var _boosters_spent: int = 0
 var _started_msec: int = 0
 
 
-func setup(payload: Dictionary) -> void:
-	context = payload.get("context")
+## Принимает и сам контекст, и старый словарь-полезную нагрузку: уровень теперь
+## запускает LevelController и передаёт контекст напрямую, а прежний вызов из
+## Game.goto остался в отладочных путях.
+func setup(payload) -> void:
+	context = payload if payload is LevelContext else payload.get("context")
 	if context == null or context.definition == null:
 		push_error("HybridLevel: пустой LevelContext")
 		return

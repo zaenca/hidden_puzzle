@@ -1,23 +1,50 @@
 {
+  "_note": "Первый уровень новой игры и первый Sort. Двенадцать предметов, четыре категории по три, лоток на семь ячеек. Слоёв и блокировок нет намеренно: игрока учат одному правилу — три одинаковых уходят сами, — и второе правило в том же уровне помешало бы первому.",
   "id": "bakery_01",
   "shop_id": "bakery",
-  "task_id": "task_survey_district",
+  "task_id": "task_clear_facade",
   "order": 1,
   "difficulty": 1,
-  "title": "Собери план района",
-  "narrative": [
-    "Мэр отдал план района — правда, по дороге он рассыпался на части. Собери его."
-  ],
+  "mode": "sort",
+  "title": "Вход в пекарню",
   "art": {
-    "reference_size": [720, 1280],
-    "background": "res://art/puzzle_district.jpg",
-    "palette": "street",
-    "seed": 1011
+    "reference_size": [576, 1024],
+    "background": "res://art/bakery.png",
+    "palette": "bakery",
+    "seed": 1101
   },
-  "puzzle": { "module_id": "jigsaw", "cols": 3, "rows": 3, "seed": 1101, "tab_ratio": 0.2, "snap_distance_px": 110 },
-  "hidden_object": { "targets": [] },
-  "_reward_note": "Первый пазл — часть завязки, а не заработок: ни экрана результата, ни начислений. План района остаётся сюжетом и в инвентарь не падает.",
+  "_layout_note": "pos нормализован к ИГРОВОМУ ПОЛЮ (экран без верхней полосы, лотка и safe area), а не к картинке фасада: фон кладётся по обрезке и на другом соотношении сторон уезжает за края, а предметы обязаны остаться видимыми и нажимаемыми. Раскладка выставлена руками, а не случайна: обучающий уровень должен выглядеть одинаково хорошо у всех. size — доля ширины поля, 0.14 ≈ 144 px, крупнее минимального touch-таргета вдвое.",
+  "sort": {
+    "tray_size": 7,
+    "group_size": 3,
+    "seed": 1101,
+    "tutorial": "sort_basics",
+    "categories": [
+      { "id": "trash",    "name": "Мусор",      "color": "#7a6a4f" },
+      { "id": "cleaning", "name": "Уборка",     "color": "#4f9bd1" },
+      { "id": "storage",  "name": "Тара",       "color": "#c0873f" },
+      { "id": "tools",    "name": "Инструмент", "color": "#8a8f9c" }
+    ],
+    "_order_note": "Категории намеренно перемешаны по сетке: разложенные рядами, они превратили бы уровень в чтение сверху вниз, а не в поиск одинакового.",
+    "items": [
+      { "id": "i01", "item_id": "crumpled_can",  "category": "trash",    "pos": [0.150, 0.270], "size": 0.14, "rotation": -8 },
+      { "id": "i02", "item_id": "hammer",        "category": "tools",    "pos": [0.385, 0.245], "size": 0.14, "rotation": 6 },
+      { "id": "i03", "item_id": "cardboard_box", "category": "storage",  "pos": [0.620, 0.275], "size": 0.14, "rotation": -4 },
+      { "id": "i04", "item_id": "bucket",        "category": "cleaning", "pos": [0.850, 0.250], "size": 0.14, "rotation": 9 },
+
+      { "id": "i05", "item_id": "sponge",        "category": "cleaning", "pos": [0.145, 0.510], "size": 0.14, "rotation": 5 },
+      { "id": "i06", "item_id": "tin_can",       "category": "storage",  "pos": [0.380, 0.535], "size": 0.14, "rotation": -10 },
+      { "id": "i07", "item_id": "bottle",        "category": "trash",    "pos": [0.615, 0.505], "size": 0.14, "rotation": 7 },
+      { "id": "i08", "item_id": "wrench",        "category": "tools",    "pos": [0.855, 0.530], "size": 0.14, "rotation": -6 },
+
+      { "id": "i09", "item_id": "screwdriver",   "category": "tools",    "pos": [0.155, 0.760], "size": 0.14, "rotation": 4 },
+      { "id": "i10", "item_id": "old_newspaper", "category": "trash",    "pos": [0.390, 0.780], "size": 0.14, "rotation": -7 },
+      { "id": "i11", "item_id": "rag",           "category": "cleaning", "pos": [0.625, 0.755], "size": 0.14, "rotation": 8 },
+      { "id": "i12", "item_id": "wooden_crate",  "category": "storage",  "pos": [0.845, 0.785], "size": 0.14, "rotation": -5 }
+    ]
+  },
+  "_reward_note": "Экрана результата у Sort нет: после последнего предмета игрок секунду смотрит на разобранный вход, и это и есть отчёт о работе.",
   "show_result": false,
-  "rewards": { "coins": 0, "xp": 0 },
+  "rewards": { "coins": 40, "xp": 10 },
   "quest_grants": []
 }

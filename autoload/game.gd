@@ -10,7 +10,10 @@ const SCENE_PATHS := {
 	Screen.DIALOG: "res://ui/dialog_scene.tscn",
 	Screen.MAP: "res://meta/map/map_scene.tscn",
 	Screen.SHOP: "res://meta/shop/shop_scene.tscn",
-	Screen.LEVEL: "res://core/level/hybrid_level.tscn",
+	## Экран уровня один на все режимы: какой геймплей запускать, решает сам
+	## контроллер по данным уровня. Иначе Game пришлось бы знать список
+	## механик, и каждая новая правила бы автолоад.
+	Screen.LEVEL: "res://core/level/level_controller.tscn",
 }
 
 ## Партия начинается с пустым кошельком: монеты приходят за задания и уровни,
@@ -29,6 +32,10 @@ const SEARCH_FLAG := "search_taught"
 ## «Игрок уже видел журнал заданий». Пока флага нет, указатель на карте ведёт к
 ## кнопке журнала, а первое его открытие объясняет, как список устроен.
 const JOURNAL_FLAG := "journal_seen"
+## «Игрок уже понял Sort». Пока флага нет, уровень получает шаги обучения из
+## своего же контента; после первого доигранного объяснения — не получает
+## никогда. Флаг живёт в мете, потому что это факт об игроке, а не о уровне.
+const SORT_FLAG := "sort_taught"
 const INTRO_ID := "opening"
 
 signal screen_changed(screen: int)
@@ -297,7 +304,20 @@ func play_level(level_id: String, replay: bool = false) -> void:
 	ctx.boosters_available = PlayerState.amount_of(BOOSTER_ID)
 	ctx.show_drag_hint = is_first_time_player()
 	ctx.show_tap_hint = not bool(meta.flags.get(SEARCH_FLAG, false))
+	ctx.tutorial_steps = _tutorial_steps_for(def)
 	goto(Screen.LEVEL, {"context": ctx})
+
+
+## Обучение уровня: какой файл читать — написано в самом уровне, а показывать
+## ли его вообще — знает мета. Ни того, ни другого игровой модуль решать не
+## может: первое сделало бы его знающим про конкретный уровень, второе — про
+## прогресс игрока.
+func _tutorial_steps_for(def: LevelDefinition) -> Array:
+	if def.sort == null or def.sort.tutorial_id.is_empty():
+		return []
+	if bool(meta.flags.get(SORT_FLAG, false)):
+		return []
+	return ContentDB.tutorial(def.sort.tutorial_id).get("steps", [])
 
 
 ## Обучающие подсказки показываем, пока игрок не прошёл ни одного уровня.
@@ -309,6 +329,13 @@ func is_first_time_player() -> bool:
 
 func items_for_level(def: LevelDefinition) -> Dictionary:
 	var out := {}
+	## Предметы Sort не ищут и не выдают — их разбирают. Уровню нужны их иконки
+	## и названия, в инвентарь игрока они не попадают.
+	if def.sort != null:
+		for inst in def.sort.items:
+			var sort_item: ItemDefinition = ContentDB.item(inst.item_id)
+			if sort_item != null:
+				out[inst.item_id] = sort_item
 	for t in def.hidden_object.targets:
 		var item: ItemDefinition = ContentDB.item(t.item_id)
 		if item != null:
@@ -336,6 +363,10 @@ func _on_level_finished(result: LevelResult) -> void:
 			+ int(result.stats.get("normal_found", 0))
 		if found > 0:
 			meta.set_flag(SEARCH_FLAG, true)
+		## Объяснение Sort доиграно до конца — второй раз его показывать не за
+		## что. Флаг ставит мета, а не уровень: уровень только сообщает факт.
+		if bool(result.stats.get("tutorial_done", false)):
+			meta.set_flag(SORT_FLAG, true)
 	var focus := meta.apply_level_result(result)
 	SaveService.save_game()
 	if focus.location == "map":
