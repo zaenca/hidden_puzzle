@@ -86,6 +86,15 @@ func _show(step: Dictionary, targets: Dictionary) -> void:
 	_hand.play_tap(targets[target])
 
 
+## Место, которое занимает плашка подсказки. Нужно проверкам: подсказка
+## временная, а раскладка постоянная, и предмет, спрятанный под объяснением,
+## обнаруживается ровно в тот момент, когда объяснение читают впервые.
+func plate_rect() -> Rect2:
+	if _plate == null:
+		return Rect2()
+	return Rect2(_plate.position, _plate.size)
+
+
 ## Все шаги показаны — обучение можно считать пройденным и больше не заводить.
 func is_done() -> bool:
 	return _pending <= 0

@@ -55,9 +55,10 @@
   { "id": "wooden_crate",  "name": "Деревянный ящик",    "color": "#8a6234", "shape": "rect" },
   { "id": "wrench",        "name": "Гаечный ключ",       "color": "#8a8f9c", "shape": "cross" },
 
-  { "id": "spiderweb",   "name": "Паутина",           "kind": "quest", "icon": "res://art/garbage/spiderweb.png",   "color": "#d8d8e0", "shape": "triangle" },
+  { "_kind_note": "Паутина, обрывки и лужа больше не quest: их не выдают и не носят в сумке, их разбирают в Sort. Пометка quest осталась от кладовой, где они падали в инвентарь; вернётся вместе с ней, если она вернётся.",
+    "id": "spiderweb",   "name": "Паутина",           "icon": "res://art/garbage/spiderweb.png",   "color": "#d8d8e0", "shape": "triangle" },
   { "id": "flour_spill", "name": "Рассыпанная мука",  "kind": "quest", "icon": "res://art/garbage/flour_spill.png", "color": "#f0e6d2", "shape": "triangle" },
-  { "id": "scrap_paper", "name": "Обрывки бумаги",    "kind": "quest", "icon": "res://art/garbage/scrap_paper.png", "color": "#e6ddc8", "shape": "rect" },
-  { "id": "puddle",      "name": "Лужа",              "kind": "quest", "icon": "res://art/garbage/puddle.png",      "color": "#7fb3d5", "shape": "circle" },
+  { "id": "scrap_paper", "name": "Обрывки бумаги",    "icon": "res://art/garbage/scrap_paper.png", "color": "#e6ddc8", "shape": "rect" },
+  { "id": "puddle",      "name": "Лужа",              "icon": "res://art/garbage/puddle.png",      "color": "#7fb3d5", "shape": "circle" },
   { "id": "bootprints",  "name": "Следы обуви",       "kind": "quest", "icon": "res://art/garbage/bootprints.png",  "color": "#6b5a44", "shape": "rect" }
 ]

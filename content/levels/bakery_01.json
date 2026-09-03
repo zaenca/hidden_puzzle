@@ -8,39 +8,46 @@
   "mode": "sort",
   "title": "Вход в пекарню",
   "art": {
+    "_note": "bakery_door.png — вход крупным планом. Сейчас там лежит ВРЕМЕННАЯ копия общего плана фасада: как только придёт настоящая картинка двери, файл перезаписывается и раскладку надо будет подогнать под нарисованные пол и стены.",
     "reference_size": [576, 1024],
-    "background": "res://art/bakery.png",
+    "background": "res://art/bakery_door.png",
     "palette": "bakery",
     "seed": 1101
   },
-  "_layout_note": "pos нормализован к ИГРОВОМУ ПОЛЮ (экран без верхней полосы, лотка и safe area), а не к картинке фасада: фон кладётся по обрезке и на другом соотношении сторон уезжает за края, а предметы обязаны остаться видимыми и нажимаемыми. Раскладка выставлена руками, а не случайна: обучающий уровень должен выглядеть одинаково хорошо у всех. size — доля ширины поля, 0.14 ≈ 144 px, крупнее минимального touch-таргета вдвое.",
+  "_layout_note": "pos нормализован к ИГРОВОМУ ПОЛЮ (экран без верхней полосы, лотка и safe area), а не к картинке: фон кладётся по обрезке и на другом соотношении сторон уезжает за края, а предметы обязаны остаться видимыми и нажимаемыми. Раскладка выставлена руками, а не случайна: обучающий уровень должен выглядеть одинаково хорошо у всех. size — доля ширины поля, 0.14 ≈ 144 px, крупнее минимального touch-таргета вдвое.",
+  "_placement_note": "Паутина висит на стенах — это верхняя полоса поля по краям от двери. Всё остальное валяется на полу: нижняя треть. Точные координаты подогнаны под временный фон и пересматриваются вместе с настоящей картинкой двери.",
   "sort": {
     "tray_size": 7,
     "group_size": 3,
     "seed": 1101,
     "tutorial": "sort_basics",
     "categories": [
-      { "id": "trash",    "name": "Мусор",      "color": "#7a6a4f" },
-      { "id": "cleaning", "name": "Уборка",     "color": "#4f9bd1" },
-      { "id": "storage",  "name": "Тара",       "color": "#c0873f" },
-      { "id": "tools",    "name": "Инструмент", "color": "#8a8f9c" }
+      { "id": "litter",  "name": "Бумага",  "color": "#d4a24c" },
+      { "id": "cobweb",  "name": "Паутина", "color": "#a89ab8" },
+      { "id": "puddle",  "name": "Лужи",    "color": "#4f9bd1" },
+      { "id": "storage", "name": "Тара",    "color": "#8a6234" }
     ],
-    "_order_note": "Категории намеренно перемешаны по сетке: разложенные рядами, они превратили бы уровень в чтение сверху вниз, а не в поиск одинакового.",
+    "_order_note": "Категории намеренно перемешаны по полу: разложенные рядами, они превратили бы уровень в чтение сверху вниз, а не в поиск одинакового.",
     "items": [
-      { "id": "i01", "item_id": "crumpled_can",  "category": "trash",    "pos": [0.150, 0.270], "size": 0.14, "rotation": -8 },
-      { "id": "i02", "item_id": "hammer",        "category": "tools",    "pos": [0.385, 0.245], "size": 0.14, "rotation": 6 },
-      { "id": "i03", "item_id": "cardboard_box", "category": "storage",  "pos": [0.620, 0.275], "size": 0.14, "rotation": -4 },
-      { "id": "i04", "item_id": "bucket",        "category": "cleaning", "pos": [0.850, 0.250], "size": 0.14, "rotation": 9 },
+      { "_row": "стены: паутина по углам над входом",
+        "id": "w1", "item_id": "spiderweb",   "category": "cobweb",  "pos": [0.110, 0.140], "size": 0.14, "rotation": 0 },
+      { "id": "w2", "item_id": "spiderweb",   "category": "cobweb",  "pos": [0.890, 0.140], "size": 0.14, "rotation": 0 },
+      { "id": "w3", "item_id": "spiderweb",   "category": "cobweb",  "pos": [0.120, 0.320], "size": 0.14, "rotation": 0 },
 
-      { "id": "i05", "item_id": "sponge",        "category": "cleaning", "pos": [0.145, 0.510], "size": 0.14, "rotation": 5 },
-      { "id": "i06", "item_id": "tin_can",       "category": "storage",  "pos": [0.380, 0.535], "size": 0.14, "rotation": -10 },
-      { "id": "i07", "item_id": "bottle",        "category": "trash",    "pos": [0.615, 0.505], "size": 0.14, "rotation": 7 },
-      { "id": "i08", "item_id": "wrench",        "category": "tools",    "pos": [0.855, 0.530], "size": 0.14, "rotation": -6 },
+      { "_row": "пол, дальний край",
+        "id": "p1", "item_id": "scrap_paper", "category": "litter",  "pos": [0.180, 0.545], "size": 0.14, "rotation": -8 },
+      { "id": "c1", "item_id": "cardboard_box", "category": "storage", "pos": [0.500, 0.545], "size": 0.14, "rotation": -4 },
+      { "id": "d1", "item_id": "puddle",      "category": "puddle",  "pos": [0.820, 0.545], "size": 0.14, "rotation": 0 },
 
-      { "id": "i09", "item_id": "screwdriver",   "category": "tools",    "pos": [0.155, 0.760], "size": 0.14, "rotation": 4 },
-      { "id": "i10", "item_id": "old_newspaper", "category": "trash",    "pos": [0.390, 0.780], "size": 0.14, "rotation": -7 },
-      { "id": "i11", "item_id": "rag",           "category": "cleaning", "pos": [0.625, 0.755], "size": 0.14, "rotation": 8 },
-      { "id": "i12", "item_id": "wooden_crate",  "category": "storage",  "pos": [0.845, 0.785], "size": 0.14, "rotation": -5 }
+      { "_row": "пол, середина",
+        "id": "d2", "item_id": "puddle",      "category": "puddle",  "pos": [0.140, 0.678], "size": 0.14, "rotation": 0 },
+      { "id": "p2", "item_id": "scrap_paper", "category": "litter",  "pos": [0.460, 0.678], "size": 0.14, "rotation": 7 },
+      { "id": "c2", "item_id": "tin_can",     "category": "storage", "pos": [0.800, 0.678], "size": 0.14, "rotation": -10 },
+
+      { "_row": "пол, у самого порога",
+        "id": "c3", "item_id": "wooden_crate", "category": "storage", "pos": [0.200, 0.812], "size": 0.14, "rotation": 5 },
+      { "id": "d3", "item_id": "puddle",      "category": "puddle",  "pos": [0.520, 0.812], "size": 0.14, "rotation": 0 },
+      { "id": "p3", "item_id": "scrap_paper", "category": "litter",  "pos": [0.840, 0.812], "size": 0.14, "rotation": -6 }
     ]
   },
   "_reward_note": "Экрана результата у Sort нет: после последнего предмета игрок секунду смотрит на разобранный вход, и это и есть отчёт о работе.",

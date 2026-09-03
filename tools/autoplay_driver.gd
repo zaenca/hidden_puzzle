@@ -180,8 +180,8 @@ func _check_sort_scene() -> void:
 	_check("L1: четыре категории по три", def.sort.categories.size() == 4
 		and def.sort.category_counts().values().all(func(n): return int(n) == 3))
 	_check("L1: лоток на 7 ячеек", def.sort.tray_size == 7)
-	_check("L1: фон уровня — фасад пекарни",
-		def.art.background_path == "res://art/bakery.png")
+	_check("L1: фон уровня — вход в пекарню",
+		def.art.background_path == "res://art/bakery_door.png")
 
 	var module := _sort_module()
 	if module == null:
@@ -218,6 +218,19 @@ func _check_sort_scene() -> void:
 	_check("L1: предметы крупные — под палец, а не под пиксель", small == 0)
 	_check("L1: ни один предмет не заехал под HUD или лоток", outside == 0)
 
+	## Плашка обучения стоит над лотком и накрывает часть поля. Предмет под ней
+	## не виден и не нажимается ровно на первом прохождении — там, где это
+	## больнее всего.
+	if module._tutorial != null:
+		var plate: Rect2 = module._tutorial.plate_rect()
+		var covered := 0
+		for id in module._views:
+			var view: SortItemView = module._views[id]
+			var r: float = view.hit_radius()
+			if plate.intersects(Rect2(view.position - Vector2(r, r), Vector2(r, r) * 2.0)):
+				covered += 1
+		_check("L1: подсказка обучения не накрывает предметы", covered == 0)
+
 	## Тап попадает туда, куда смотрит игрок: хит-тест обязан вернуть тот же
 	## предмет, в центр которого целятся.
 	var mismatched := 0
@@ -244,7 +257,7 @@ func _check_sort_fail_and_restart() -> void:
 
 	## Семь предметов, ни одной тройки: по две штуки трёх категорий и одна
 	## четвёртой. Это и есть единственный способ проиграть в Sort.
-	var dead_end := ["i01", "i02", "i03", "i04", "i05", "i06", "i08"]
+	var dead_end := ["p1", "p2", "w1", "w2", "d1", "d2", "c1"]
 	var before: int = module._views.size()
 	for id in dead_end:
 		module._on_pick(String(id))
