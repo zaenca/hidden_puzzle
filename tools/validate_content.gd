@@ -263,7 +263,11 @@ func _check_sort(lvl: LevelDefinition) -> void:
 			_err("%s: нет предмета '%s' в items.json" % [who, inst.item_id])
 		if not s.has_category(inst.category):
 			_err("%s: категории '%s' нет в списке категорий уровня" % [who, inst.category])
-		## Позиция — центр, поэтому за край уезжает половина размера.
+		## Позиция — центр, поэтому за край уезжает половина размера. Половина
+		## считается одинаковой по обеим осям, хотя `size` — доля ШИРИНЫ поля:
+		## пропорций поля контент не знает (их задаёт экран), и запас в пользу
+		## отступа от края здесь дешевле, чем предмет, срезанный на телефоне с
+		## другим соотношением сторон.
 		var half := inst.size * 0.5
 		if inst.position.x - half < 0.0 or inst.position.y - half < 0.0 \
 				or inst.position.x + half > 1.0 or inst.position.y + half > 1.0:

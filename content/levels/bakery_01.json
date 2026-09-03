@@ -8,14 +8,13 @@
   "mode": "sort",
   "title": "Вход в пекарню",
   "art": {
-    "_note": "bakery_door.png — вход крупным планом. Сейчас там лежит ВРЕМЕННАЯ копия общего плана фасада: как только придёт настоящая картинка двери, файл перезаписывается и раскладку надо будет подогнать под нарисованные пол и стены.",
-    "reference_size": [576, 1024],
+    "reference_size": [941, 1672],
     "background": "res://art/bakery_door.png",
     "palette": "bakery",
     "seed": 1101
   },
   "_layout_note": "pos нормализован к ИГРОВОМУ ПОЛЮ (экран без верхней полосы, лотка и safe area), а не к картинке: фон кладётся по обрезке и на другом соотношении сторон уезжает за края, а предметы обязаны остаться видимыми и нажимаемыми. Раскладка выставлена руками, а не случайна: обучающий уровень должен выглядеть одинаково хорошо у всех. size — доля ширины поля, 0.14 ≈ 144 px, крупнее минимального touch-таргета вдвое.",
-  "_placement_note": "Паутина висит на стенах — это верхняя полоса поля по краям от двери. Всё остальное валяется на полу: нижняя треть. Точные координаты подогнаны под временный фон и пересматриваются вместе с настоящей картинкой двери.",
+  "_placement_note": "Паутина висит на каменной стене по краям от двери, выше дверной коробки. Всё остальное валяется на ступенях и мостовой у порога. Низ кадра прижат к лотку (SortModule кладёт фон по игровому полю, а не по экрану) — поэтому ступени и мостовая целиком попадают в игровую зону, и «на полу» значит именно на полу.",
   "sort": {
     "tray_size": 7,
     "group_size": 3,
@@ -27,27 +26,27 @@
       { "id": "puddle",  "name": "Лужи",    "color": "#4f9bd1" },
       { "id": "storage", "name": "Тара",    "color": "#8a6234" }
     ],
-    "_order_note": "Категории намеренно перемешаны по полу: разложенные рядами, они превратили бы уровень в чтение сверху вниз, а не в поиск одинакового.",
+    "_order_note": "Категории намеренно перемешаны: разложенные рядами, они превратили бы уровень в чтение сверху вниз, а не в поиск одинакового.",
     "items": [
-      { "_row": "стены: паутина по углам над входом",
-        "id": "w1", "item_id": "spiderweb",   "category": "cobweb",  "pos": [0.110, 0.140], "size": 0.14, "rotation": 0 },
-      { "id": "w2", "item_id": "spiderweb",   "category": "cobweb",  "pos": [0.890, 0.140], "size": 0.14, "rotation": 0 },
-      { "id": "w3", "item_id": "spiderweb",   "category": "cobweb",  "pos": [0.120, 0.320], "size": 0.14, "rotation": 0 },
+      { "_row": "стена по краям от двери, ниже подсказки обучения",
+        "id": "w1", "item_id": "spiderweb",   "category": "cobweb",  "pos": [0.101, 0.187], "size": 0.16, "rotation": 0 },
+      { "id": "w2", "item_id": "spiderweb",   "category": "cobweb",  "pos": [0.899, 0.215], "size": 0.16, "rotation": 0 },
+      { "id": "w3", "item_id": "spiderweb",   "category": "cobweb",  "pos": [0.101, 0.379], "size": 0.16, "rotation": 0 },
 
-      { "_row": "пол, дальний край",
-        "id": "p1", "item_id": "scrap_paper", "category": "litter",  "pos": [0.180, 0.545], "size": 0.14, "rotation": -8 },
-      { "id": "c1", "item_id": "cardboard_box", "category": "storage", "pos": [0.500, 0.545], "size": 0.14, "rotation": -4 },
-      { "id": "d1", "item_id": "puddle",      "category": "puddle",  "pos": [0.820, 0.545], "size": 0.14, "rotation": 0 },
+      { "_row": "верхняя ступень",
+        "id": "p1", "item_id": "scrap_paper", "category": "litter",  "pos": [0.218, 0.721], "size": 0.14, "rotation": -8 },
+      { "id": "c1", "item_id": "cardboard_box", "category": "storage", "pos": [0.500, 0.721], "size": 0.14, "rotation": -4 },
+      { "id": "d1", "item_id": "puddle",      "category": "puddle",  "pos": [0.782, 0.721], "size": 0.16, "rotation": 0 },
 
-      { "_row": "пол, середина",
-        "id": "d2", "item_id": "puddle",      "category": "puddle",  "pos": [0.140, 0.678], "size": 0.14, "rotation": 0 },
-      { "id": "p2", "item_id": "scrap_paper", "category": "litter",  "pos": [0.460, 0.678], "size": 0.14, "rotation": 7 },
-      { "id": "c2", "item_id": "tin_can",     "category": "storage", "pos": [0.800, 0.678], "size": 0.14, "rotation": -10 },
+      { "_row": "нижняя ступень",
+        "id": "d2", "item_id": "puddle",      "category": "puddle",  "pos": [0.218, 0.813], "size": 0.16, "rotation": 0 },
+      { "id": "p2", "item_id": "scrap_paper", "category": "litter",  "pos": [0.500, 0.813], "size": 0.14, "rotation": 7 },
+      { "id": "c2", "item_id": "tin_can",     "category": "storage", "pos": [0.782, 0.813], "size": 0.14, "rotation": -10 },
 
-      { "_row": "пол, у самого порога",
-        "id": "c3", "item_id": "wooden_crate", "category": "storage", "pos": [0.200, 0.812], "size": 0.14, "rotation": 5 },
-      { "id": "d3", "item_id": "puddle",      "category": "puddle",  "pos": [0.520, 0.812], "size": 0.14, "rotation": 0 },
-      { "id": "p3", "item_id": "scrap_paper", "category": "litter",  "pos": [0.840, 0.812], "size": 0.14, "rotation": -6 }
+      { "_row": "мостовая перед порогом",
+        "id": "c3", "item_id": "wooden_crate", "category": "storage", "pos": [0.218, 0.906], "size": 0.14, "rotation": 5 },
+      { "id": "d3", "item_id": "puddle",      "category": "puddle",  "pos": [0.500, 0.906], "size": 0.16, "rotation": 0 },
+      { "id": "p3", "item_id": "scrap_paper", "category": "litter",  "pos": [0.782, 0.906], "size": 0.14, "rotation": -6 }
     ]
   },
   "_reward_note": "Экрана результата у Sort нет: после последнего предмета игрок секунду смотрит на разобранный вход, и это и есть отчёт о работе.",

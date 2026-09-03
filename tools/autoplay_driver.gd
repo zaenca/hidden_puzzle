@@ -207,13 +207,13 @@ func _check_sort_scene() -> void:
 	var outside := 0
 	for id in module._views:
 		var view: SortItemView = module._views[id]
-		if view.diameter < 120.0:
+		if view.span < 120.0:
 			small += 1
-		var r: float = view.hit_radius()
-		if view.position.y + r > module.tray_rect.position.y \
-				or view.position.y - r < module.play_rect.position.y \
-				or view.position.x - r < module.play_rect.position.x \
-				or view.position.x + r > module.play_rect.end.x:
+		var box: Rect2 = view.hit_rect()
+		if box.end.y > module.tray_rect.position.y \
+				or box.position.y < module.play_rect.position.y \
+				or box.position.x < module.play_rect.position.x \
+				or box.end.x > module.play_rect.end.x:
 			outside += 1
 	_check("L1: предметы крупные — под палец, а не под пиксель", small == 0)
 	_check("L1: ни один предмет не заехал под HUD или лоток", outside == 0)
@@ -226,8 +226,7 @@ func _check_sort_scene() -> void:
 		var covered := 0
 		for id in module._views:
 			var view: SortItemView = module._views[id]
-			var r: float = view.hit_radius()
-			if plate.intersects(Rect2(view.position - Vector2(r, r), Vector2(r, r) * 2.0)):
+			if plate.intersects(view.hit_rect()):
 				covered += 1
 		_check("L1: подсказка обучения не накрывает предметы", covered == 0)
 

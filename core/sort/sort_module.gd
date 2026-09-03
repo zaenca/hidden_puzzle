@@ -15,6 +15,9 @@ const TRAY_HEIGHT := 290.0
 const TRAY_BOTTOM_PAD := 36.0
 const EDGE_PAD := 26.0
 const PLAY_TRAY_GAP := 22.0
+## Насколько фон заходит под лоток. Лоток нарисован плашкой со скруглениями, и
+## ровно по его верхней кромке под ним просвечивал бы пустой экран.
+const BACKGROUND_UNDER_TRAY := 90.0
 
 const FLY_SEC := 0.30
 const GROUP_FLASH_SEC := 0.30
@@ -93,10 +96,14 @@ func _layout() -> void:
 		tray_top - PLAY_TRAY_GAP - top)
 
 
+## Фон встаёт по игровому полю, а не по экрану: низ картинки прижат к лотку.
+## Внизу кадра нарисовано то, на чём предметы лежат — ступени, пол, мостовая, —
+## и при выравнивании по экрану эта часть уезжает под интерфейс. Тогда «на
+## полу» становится негде, и предметы приходится вешать в воздухе.
 func _build_background() -> void:
 	var tex := Backdrop.load_texture(definition.art.background_path)
 	if tex != null:
-		Backdrop.cover(_background, tex, SCREEN)
+		Backdrop.cover_above(_background, tex, SCREEN, tray_rect.position.y + BACKGROUND_UNDER_TRAY)
 	else:
 		Backdrop.gradient(_background, definition.art.palette, SCREEN)
 
@@ -226,7 +233,10 @@ func _build_tutorial() -> void:
 		return
 	_tutorial = SortTutorial.new()
 	add_child(_tutorial)
-	_tutorial.setup(context.tutorial_steps, _fx, _hud, tray_rect.position.y - 152.0)
+	## Подсказка стоит вверху, под заголовком. Над лотком её ставить нельзя:
+	## нижняя часть кадра — это пол, там лежит половина предметов, и объяснение
+	## накрывало бы ровно то, что объясняет.
+	_tutorial.setup(context.tutorial_steps, _fx, _hud, play_rect.position.y + 12.0)
 	_tutorial.finished.connect(func(): _tutorial_done = true)
 	_tutorial.notify_event("level_started", _tutorial_targets())
 

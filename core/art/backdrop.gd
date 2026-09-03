@@ -56,6 +56,28 @@ static func cover_bottom(sprite: Sprite2D, tex: Texture2D, screen: Vector2) -> R
 	return Rect2(sprite.position, size)
 
 
+## Покрытие с прижатием низа картинки к заданной черте, а не к низу экрана.
+##
+## Нужно там, где часть экрана занята интерфейсом, а низ кадра — это игровое
+## место. У входа в пекарню внизу нарисованы ступени и мостовая: при обычном
+## `cover` они уезжают под лоток, и предметы «на полу» приходится вешать на
+## дверь. Здесь картинка сдвигается вверх ровно настолько, чтобы её низ встал
+## на `bottom`; сверху при этом срезается то, что и так фон.
+##
+## Масштаб берётся наибольшим из двух: покрыть ширину экрана и покрыть высоту
+## до `bottom`. Иначе картинка, которая ниже этой черты, оставила бы под собой
+## пустую полосу в видимой части экрана.
+static func cover_above(sprite: Sprite2D, tex: Texture2D, screen: Vector2, bottom: float) -> Rect2:
+	sprite.centered = false
+	sprite.texture = tex
+	var tex_size := Vector2(tex.get_size())
+	var s: float = maxf(screen.x / tex_size.x, bottom / tex_size.y)
+	var size := tex_size * s
+	sprite.scale = Vector2(s, s)
+	sprite.position = Vector2((screen.x - size.x) * 0.5, bottom - size.y)
+	return Rect2(sprite.position, size)
+
+
 ## Запасной фон без арта — градиент по палитре во весь экран.
 static func gradient(sprite: Sprite2D, palette: String, screen: Vector2) -> void:
 	sprite.centered = false
