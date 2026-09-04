@@ -78,6 +78,26 @@ func press_feedback() -> void:
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
+## «Не могу»: предмет придавлен и никуда не летит. Короткое покачивание на
+## месте, а не отсутствие реакции: молчание игрок читает как промах и бьёт в ту
+## же точку ещё раз. Качается сам предмет, потому что вопрос игрока — про него.
+func refuse_feedback() -> void:
+	var base := rotation_degrees
+	var tw := create_tween()
+	tw.tween_property(self, "rotation_degrees", base - 5.0, 0.05)
+	tw.tween_property(self, "rotation_degrees", base + 5.0, 0.08)
+	tw.tween_property(self, "rotation_degrees", base, 0.07)
+
+
+## Ответ на вопрос «а кто мешает»: то, что лежит сверху, коротко подсвечивается.
+## Слабее, чем вспышка закрытой группы: это подсказка, а не событие.
+func hint_flash() -> void:
+	var base := modulate
+	var tw := create_tween()
+	tw.tween_property(self, "modulate", Color(1.45, 1.45, 1.45, base.a), 0.12)
+	tw.tween_property(self, "modulate", base, 0.24)
+
+
 ## Перелёт в ячейку лотка. Дуга, а не прямая: по прямой предмет читается как
 ## подставленный движком, по дуге — как брошенный.
 func fly_to(target: Vector2, target_span: float, duration: float) -> void:

@@ -44,5 +44,21 @@
       { "type": "set_visual_state", "shop_id": "bakery", "slot_id": "hall", "state_id": "stage_1" },
       { "type": "dialog", "dialog": "hall_done" }
     ]
+  },
+  {
+    "id": "clear_showcase",
+    "title": "Освободить витрину",
+    "description": "Витрина свободна, и к дальней двери можно подойти.",
+    "button_label": "Освободить витрину",
+    "_auto_note": "Как и на двух прошлых шагах, вся работа происходит в уровне, поэтому задача закрывается сама по факту пройденного bakery_03. Здесь же зал переходит во второе восстановленное состояние: витрина цела и подход к двери в кладовую открыт. Пекарня при этом всё ещё в восстановлении — за дверью не убрано, и последним этот шаг не является.",
+    "auto_apply": true,
+    "requirements": [{ "type": "level", "level_id": "bakery_03" }],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "set_flag", "flag": "hall_showcase_cleared" },
+      { "type": "set_visual_state", "shop_id": "bakery", "slot_id": "hall", "state_id": "stage_2" },
+      { "type": "dialog", "dialog": "showcase_done" }
+    ]
   }
 ]

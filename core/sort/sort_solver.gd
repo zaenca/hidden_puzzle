@@ -55,7 +55,7 @@ static func _search(state: SortState, seen: Dictionary, path: PackedStringArray,
 		var res := state.pick(String(id))
 		if not bool(res["ok"]):
 			continue
-		stats["max_tray"] = maxi(int(stats["max_tray"]), state.tray.size())
+		stats["max_tray"] = maxi(int(stats["max_tray"]), int(res["peak"]))
 		path.append(String(id))
 		if _search(state, seen, path, stats):
 			return true

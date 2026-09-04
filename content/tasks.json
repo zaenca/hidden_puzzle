@@ -45,5 +45,21 @@
     "level_ids": ["bakery_02"],
     "action_id": "clear_hall",
     "hotspot": ""
+  },
+  {
+    "_note": "Третий уровень. Открывается расчищенным залом и запускается сразу после разговора «Витрина цела» (play_task в dialogs/hall_done.json). Работа идёт в той же пекарне, поэтому location=shop: после победы игрок остаётся смотреть на освобождённую витрину.",
+    "id": "task_clear_showcase",
+    "reward": { "coins": 35 },
+    "play_label": "Освободить",
+    "order": 4,
+    "shop_id": "bakery",
+    "room_id": "showcase",
+    "location": "shop",
+    "title": "Освободить витрину",
+    "hint": "Витрина завалена, и к дальней двери не подойти. Разберём этот угол.",
+    "unlock": [{ "type": "flag", "flag": "hall_cleared_stage_1" }],
+    "level_ids": ["bakery_03"],
+    "action_id": "clear_showcase",
+    "hotspot": ""
   }
 ]

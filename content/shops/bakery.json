@@ -9,7 +9,8 @@
   "map_rect": [0.0, 0.293, 0.347, 0.25],
   "rooms": [
     { "id": "facade", "title": "Вход" },
-    { "id": "hall", "title": "Торговый зал" }
+    { "id": "hall", "title": "Торговый зал" },
+    { "id": "showcase", "title": "Витрина" }
   ],
   "first_visit": { "intro": "bakery_facade", "flag": "met_baker" },
   "_slot_note": "Слот `hall` — не объект, а картинка всей локации: он подменяет фасад видом зала, когда зал становится частью пекарни, до которой игрок дошёл. Правил взаимодействия у него нет намеренно — слот без interactions не ловит тапы и не подсвечивается, то есть остаётся чистым фоном. Так локация показывает последнее достигнутое состояние, а не то, с которого всё началось: уровень рисует свой фон сам, и повторное прохождение bakery_02 зал заново не пачкает.",
@@ -20,7 +21,8 @@
       "default": "facade",
       "states": [
         { "id": "facade",  "label": "", "hidden": true },
-        { "id": "stage_1", "label": "", "texture": "res://art/bakery_interior_floor.jpg" }
+        { "id": "stage_1", "label": "", "texture": "res://art/bakery_interior_floor.jpg" },
+        { "id": "stage_2", "label": "", "texture": "res://art/bakery_interior_showcase.png" }
       ],
       "interactions": []
     }

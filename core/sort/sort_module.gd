@@ -58,6 +58,7 @@ var _fail_panel: Control
 var _input_locked: bool = false    ## проигрыш, победа, уход в мету
 var _animations: int = 0           ## идущих схлопываний группы
 var _picks: int = 0
+var _refused: int = 0              ## тапов по придавленным предметам
 var _restarts: int = 0
 var _tutorial_done: bool = false
 var _started_msec: int = 0
@@ -251,7 +252,10 @@ func _build_tutorial() -> void:
 ## данных — это порядок авторской записи, и первым там легко оказывается
 ## предмет у самого края: палец, ткнувший в угол экрана, читается как «нажми
 ## куда-нибудь там», а не как «нажми вот на это».
-func _tutorial_targets() -> Dictionary:
+## blocked_id — предмет, по которому игрок только что не смог тапнуть. Тогда в
+## целях появляется "blocker": рука показывает не на то, что игрок хотел взять,
+## а на то, что ему мешает, — потому что нажимать надо именно туда.
+func _tutorial_targets(blocked_id: String = "") -> Dictionary:
 	var out := {"tray": _tray.slot_center(0)}
 	var view := _hint_view()
 	if view != null:
@@ -259,6 +263,12 @@ func _tutorial_targets() -> Dictionary:
 		## от нажатия расходятся вниз-вправо от кончика пальца, и поставленный в
 		## середину палец закрывает собой ровно то, на что показывает.
 		out["item"] = view.position + view.drawn_size() * HINT_AIM_OFFSET
+	if not blocked_id.is_empty():
+		var blockers := _blockers_of(blocked_id)
+		if not blockers.is_empty():
+			var top: SortItemView = _views.get(String(blockers[0]))
+			if top != null:
+				out["blocker"] = top.position + top.drawn_size() * HINT_AIM_OFFSET
 	return out
 
 
@@ -319,6 +329,13 @@ func _on_pick(instance_id: String) -> void:
 	var view: SortItemView = _views.get(instance_id)
 	if view == null:
 		return
+
+	## Придавленный предмет отвечает отказом, а не сжатием: сжатие — это «взял»,
+	## и одинаковая реакция на взятое и на невзятое врёт игроку о правилах.
+	if _state.on_board(instance_id) and not _state.is_available(instance_id):
+		_refuse(instance_id, view)
+		return
+
 	view.press_feedback()
 
 	var res := _state.pick(instance_id)
@@ -341,6 +358,35 @@ func _on_pick(instance_id: String) -> void:
 		_finish_success()
 	elif bool(res["failed"]):
 		_fail()
+
+
+## Тап по накрытому предмету. Ход не проходит, но ответ игрок получает, и
+## ответ этот показывает ПРИЧИНУ: качается придавленный, подсвечивается тот,
+## кто его держит. Двойная блокировка подсвечивает обоих — иначе игрок уберёт
+## одного и снова упрётся, не понимая, почему.
+func _refuse(instance_id: String, view: SortItemView) -> void:
+	view.refuse_feedback()
+	for id in _blockers_of(instance_id):
+		var blocker: SortItemView = _views.get(String(id))
+		if blocker != null:
+			blocker.hint_flash()
+	_refused += 1
+	if _tutorial != null and _refused == 1:
+		_tutorial.notify_event("first_blocked_item_attempt", _tutorial_targets(instance_id))
+
+
+## Кто прямо сейчас держит предмет: из накрывающих его берутся только те, что
+## ещё лежат на поле. Ушедшие в лоток уже ничего не держат, и подсвечивать
+## пустое место значит показывать не на того.
+func _blockers_of(instance_id: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	var inst := sort.item(instance_id)
+	if inst == null:
+		return out
+	for blocker in inst.blocked_by:
+		if _state.on_board(String(blocker)):
+			out.append(String(blocker))
+	return out
 
 
 func _notify_tutorial() -> void:

@@ -277,13 +277,28 @@ func _check_sort(lvl: LevelDefinition) -> void:
 		if inst.size < MIN_TARGET_SIDE * 2.0:
 			_warn("%s: предмет мельче удобного touch-таргета (%.3f)" % [who, inst.size])
 
+	## Слоёв ровно два: что лежит сверху и что под ним. Третий слой означал бы
+	## цепочку «убери, чтобы убрать, чтобы взять» — правило, которого игроку
+	## никто не объяснял, и которое с экрана не читается.
+	var layers := {}
+	for inst in s.items:
+		if inst.layer < 0:
+			_err("%s / %s: отрицательный слой %d" % [lvl.id, inst.id, inst.layer])
+		layers[inst.layer] = true
+	if layers.size() > 2:
+		_err("%s: слоёв %d, а поддерживаются два — верхний и нижний"
+			% [lvl.id, layers.size()])
+
 	for inst in s.items:
 		for blocker in inst.blocked_by:
 			if not ids.has(String(blocker)):
 				_err("%s / %s: накрыт несуществующим предметом '%s'"
 					% [lvl.id, inst.id, blocker])
-			elif String(blocker) == inst.id:
+				continue
+			if String(blocker) == inst.id:
 				_err("%s / %s: предмет накрывает сам себя" % [lvl.id, inst.id])
+				continue
+			_check_overlap_is_honest(lvl, inst, ids[String(blocker)])
 
 	## Категория, которая не делится на группы, оставляет на поле предметы,
 	## которые невозможно закрыть НИКОГДА, — и уровень не заканчивается.
@@ -297,6 +312,36 @@ func _check_sort(lvl: LevelDefinition) -> void:
 			_warn("%s: категория '%s' описана, но на поле её нет" % [lvl.id, c.id])
 
 	_check_sort_solvable(lvl, s)
+
+
+## Перекрытие обязано быть честным: предмет, который нельзя взять, должен
+## ВЫГЛЯДЕТЬ придавленным. Запрет, нарисованный где-то в стороне от предмета,
+## игрок читает не как правило, а как поломку ввода, и правил из него не
+## выводит. Поэтому блокер проверяется дважды: он рисуется поверх и он
+## действительно накрывает — но не целиком, иначе накрытого не видно совсем.
+##
+## Считается по горизонтали в долях ширины поля, по вертикали — тоже в них:
+## пропорций поля контент не знает, а грубая оценка здесь честнее точной, но
+## опирающейся на выдуманное соотношение сторон.
+func _check_overlap_is_honest(lvl: LevelDefinition, blocked: SortItemInstance,
+		blocker: SortItemInstance) -> void:
+	var who := "%s / %s" % [lvl.id, blocked.id]
+	if blocker.layer <= blocked.layer:
+		_err("%s: накрыт предметом '%s' с не большим слоем (%d и %d) — сверху он не нарисуется"
+			% [who, blocker.id, blocker.layer, blocked.layer])
+	var reach := (blocked.size + blocker.size) * 0.5
+	var d := (blocked.position - blocker.position).abs()
+	if d.x >= reach or d.y >= reach:
+		_err("%s: блокер '%s' не накрывает его на картинке — запрет не виден с экрана"
+			% [who, blocker.id])
+		return
+	## Полностью скрытый предмет — тоже нечестно: игрок не знает, что он там
+	## есть, и не может планировать ход, который его откроет.
+	var hidden_x: float = 1.0 - d.x / maxf(0.001, reach)
+	var hidden_y: float = 1.0 - d.y / maxf(0.001, reach)
+	if minf(hidden_x, hidden_y) > 0.92:
+		_warn("%s: блокер '%s' закрывает его почти целиком — накрытого предмета не видно"
+			% [who, blocker.id])
 
 
 ## Проходимость и достижимость. Первое доказывает солвер; второе — обход графа
@@ -337,11 +382,27 @@ func _check_sort_solvable(lvl: LevelDefinition, s: SortDefinition) -> void:
 	if int(plan["max_tray"]) > s.tray_size:
 		_err("%s: известное решение переполняет лоток (%d при %d ячейках)"
 			% [lvl.id, int(plan["max_tray"]), s.tray_size])
+	## Раскладка обязана быть воспроизводимой, и решение вместе с ней: «Заново»
+	## возвращает тот же уровень, а найденным путём его проходит headless-прогон.
+	## Второй запуск солвера ловит недетерминизм — порядок обхода, зависящий от
+	## хеша словаря, разошёлся бы молча и только на чужой машине.
+	var again := SortSolver.solve(s)
+	var same_path: bool = bool(again["solved"]) \
+		and "|".join(again["path"]) == "|".join(path)
+	if not same_path:
+		_err("%s: солвер дважды нашёл разные решения — раскладка недетерминирована" % lvl.id)
+
+	var blocked_count := 0
+	for inst in s.items:
+		if not inst.blocked_by.is_empty():
+			blocked_count += 1
 	## Пиковая занятость — главная цифра уровня: по ней видно, насколько тесно
 	## игроку на найденном пути и остаётся ли ему запас на ошибку. Печатается
 	## всегда, даже когда всё в порядке: «ошибок нет» об этом не говорит.
-	notes.append("%s: решение из %d ходов, лоток в пике %d из %d"
-		% [lvl.id, path.size(), int(plan["max_tray"]), s.tray_size])
+	notes.append("%s: %d предметов, %d групп, %d накрыто; решение из %d ходов, лоток в пике %d из %d"
+		% [lvl.id, s.items.size(), s.items.size() / s.group_size, blocked_count,
+			path.size(), int(plan["max_tray"]), s.tray_size])
+	notes.append("%s: путь решения — %s" % [lvl.id, " ".join(path)])
 
 
 func _check_actions() -> void:

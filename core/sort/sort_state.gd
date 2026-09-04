@@ -113,11 +113,12 @@ func tray_free() -> int:
 ##   ok        — ход принят
 ##   cleared   — id предметов закрывшейся группы (пусто, если группы нет)
 ##   category  — категория закрывшейся группы
+##   peak      — сколько ячеек лоток занял на этом ходу ДО схлопывания группы
 ##   complete  — поле разобрано
 ##   failed    — лоток переполнен или поле встало
 func pick(instance_id: String) -> Dictionary:
 	var out := {"ok": false, "cleared": PackedStringArray(), "category": "",
-		"complete": false, "failed": false}
+		"peak": tray.size(), "complete": false, "failed": false}
 	if definition == null or is_failed() or is_complete():
 		return out
 	if not is_available(instance_id):
@@ -129,6 +130,10 @@ func pick(instance_id: String) -> Dictionary:
 	places[instance_id] = Place.TRAY
 	tray.insert(_insert_index(inst.category), instance_id)
 	out["ok"] = true
+	## Ровно этот момент игрок и видит как «лоток почти полон»: третий предмет
+	## сначала занимает ячейку и только потом уносит группу с собой. Замер
+	## после схлопывания занижал бы тесноту уровня на целую ячейку.
+	out["peak"] = tray.size()
 
 	var group := _full_group(inst.category)
 	if not group.is_empty():

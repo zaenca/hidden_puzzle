@@ -152,15 +152,49 @@ func run(tree: SceneTree) -> void:
 	_check("L2: начислено 40+70 за уровни и 10+15+25 за задачи",
 		PlayerState.amount_of("coins") == 160)
 
+	## Разговор про витрину и кладовую сам открывает следующий шаг: последняя
+	## реплика несёт play_task, и третий уровень начинается без единой строки
+	## маршрутизации в коде.
+	_check_dialog_runs()
+	await tree.create_timer(0.6).timeout
+	_check("после разговора про кладовую третий уровень начинается сам",
+		Game.screen == Game.Screen.LEVEL)
+
+	# --- уровень 3: Sort у витрины, перекрытия как содержание ---------------
+	_check_showcase_scene()
+	await _check_showcase_blockers()
+	await _check_showcase_roomy_path()
+	await _check_showcase_fail_and_restart()
+	await _finish_current_level()
+
+	_check("после L3 — две реплики про дверь в кладовую",
+		Game.screen == Game.Screen.DIALOG)
+	_check("L3: уровень записан пройденным",
+		Game.meta.completed_levels.has("bakery_03"))
+	_check("L3: постоянное состояние витрины сохранено",
+		bool(Game.meta.flags.get("hall_showcase_cleared", false)))
+	_check("L3: задача про витрину закрылась сама",
+		Game.meta.task_state("task_clear_showcase") == MetaService.TaskState.COMPLETED)
+	_check("L3: зал перешёл во второе восстановленное состояние",
+		Game.meta.current_slot_state("bakery", "hall") == "stage_2")
+	_check("L3: объяснение перекрытий отмечено показанным",
+		bool(Game.meta.flags.get(Game.tutorial_flag("sort_blockers"), false)))
+	_check("L3: начислено 40+70+95 за уровни и 10+15+25+35 за задачи",
+		PlayerState.amount_of("coins") == 290)
+	## Кладовая — следующий шаг, и его в этой партии ещё нет. Уровень четыре не
+	## должен появиться сам собой из-за того, что диалог что-то пообещал.
+	_check("L3: четвёртого уровня в контенте пока нет",
+		ContentDB.level("bakery_04") == null)
+
 	_check_dialog_runs()
 	await tree.create_timer(0.5).timeout
 	## Разговор о зале заканчивается в зале, а не на площади: задача жила в
 	## локации, и выкидывать оттуда значит отменять только что показанный кадр.
 	_check("после разговора игрок остаётся в пекарне", Game.screen == Game.Screen.SHOP)
-	_check_hall_repainted()
-	_check_task_notification("Расчистить торговый зал")
+	_check_hall_repainted("stage_2")
+	_check_task_notification("Освободить витрину")
 	_check_journal_all_done(["Осмотреть пекарню", "Разобрать завал у входа",
-		"Расчистить торговый зал"])
+		"Расчистить торговый зал", "Освободить витрину"])
 
 	_check_no_jigsaw()
 
@@ -188,10 +222,21 @@ func run(tree: SceneTree) -> void:
 		Game.meta.task_state("task_clear_facade") == MetaService.TaskState.COMPLETED)
 	_check("сейв: зал остался расчищенным",
 		bool(Game.meta.flags.get("hall_cleared_stage_1", false)))
-	_check("сейв: локация показывает восстановленный зал",
-		Game.meta.current_slot_state("bakery", "hall") == "stage_1")
+	## Слот у зала один, и он показывает ПОСЛЕДНЕЕ достигнутое состояние, а не
+	## каждое по очереди. После третьего уровня это stage_2, и проверять здесь
+	## надо не конкретный шаг, а то, что зал не откатился к завалу.
+	_check("сейв: локация не вернулась к заваленному залу",
+		Game.meta.current_slot_state("bakery", "hall") != "facade")
 	_check("сейв: второй уровень остался пройденным",
 		Game.meta.completed_levels.has("bakery_02"))
+	_check("сейв: витрина осталась освобождённой",
+		bool(Game.meta.flags.get("hall_showcase_cleared", false)))
+	_check("сейв: локация показывает зал с целой витриной",
+		Game.meta.current_slot_state("bakery", "hall") == "stage_2")
+	_check("сейв: третий уровень остался пройденным",
+		Game.meta.completed_levels.has("bakery_03"))
+	_check("сейв: объяснение перекрытий больше не повторится",
+		bool(Game.meta.flags.get(Game.tutorial_flag("sort_blockers"), false)))
 
 	_check_v1_migration()
 
@@ -291,7 +336,7 @@ func _check_sort_scene() -> void:
 ## Состояние в мете и картинка на экране — разные вещи, и расходятся они молча.
 ## Проверяем не «флаг стоит», а что локация действительно показывает другой зал:
 ## слот нашёл свою текстуру и включил именно её вариант.
-func _check_hall_repainted() -> void:
+func _check_hall_repainted(expected_state: String = "stage_1") -> void:
 	var slot := _find_node_named(Game.current(), "Slot_hall")
 	if slot == null:
 		_check("зал: слот вида локации есть в сцене", false)
@@ -306,7 +351,7 @@ func _check_hall_repainted() -> void:
 			if grand is Sprite2D and (grand as Sprite2D).texture != null:
 				textured = true
 	_check("зал: локация переключилась на восстановленный вид (%s)" % shown,
-		shown == "stage_1")
+		shown == expected_state)
 	_check("зал: у нового вида есть своя картинка, а не заглушка", textured)
 
 
@@ -454,6 +499,252 @@ func _check_hall_fail_and_restart() -> void:
 	_check("L2: после перезапуска поле снова полное",
 		module._views.size() == 18 and module._state.tray.is_empty())
 	_check("L2: ввод снова принимается", not module._input_locked)
+
+
+## --- уровень 3: тот же Sort, но перекрытия стали содержанием ---------------
+
+func _check_showcase_scene() -> void:
+	var def: LevelDefinition = ContentDB.level("bakery_03")
+	_check("L3: уровень идёт в режиме sort", def != null and def.mode == "sort")
+	if def == null or def.sort == null:
+		_check("L3: раскладка Sort загрузилась", false)
+		return
+	_check("L3: сборки из кусков у витрины нет", def.puzzle.module_id.is_empty())
+	_check("L3: старой уборки инструментами у витрины нет", def.cleanup.is_empty())
+	_check("L3: предметы не ищут — фазы поиска нет", def.hidden_object.targets.is_empty())
+	_check("L3: на поле 21 предмет", def.sort.items.size() == 21)
+	_check("L3: лоток по-прежнему на 7 ячеек", def.sort.tray_size == 7)
+	_check("L3: фон — зал в том состоянии, в котором его оставил второй уровень",
+		def.art.background_path == "res://art/bakery_interior_floor.jpg")
+
+	## Шесть категорий и семь троек: одна категория идёт двумя группами. Это и
+	## есть способ получить 21 предмет, не выдумывая седьмой смысл.
+	var counts := def.sort.category_counts()
+	_check("L3: шесть категорий, каждая делится на тройки",
+		def.sort.categories.size() == 6 and counts.size() == 6
+		and counts.values().all(func(n): return int(n) % 3 == 0))
+	var groups := 0
+	var doubled := ""
+	for cid in counts:
+		groups += int(counts[cid]) / 3
+		if int(counts[cid]) == 6:
+			doubled = String(cid)
+	_check("L3: всего семь групп", groups == 7)
+	_check("L3: удвоена ровно одна категория (%s)" % doubled, doubled == "trash")
+
+	## Два слоя, не три: «убери, чтобы убрать, чтобы взять» — правило, которого
+	## игроку никто не объяснял.
+	var layers := {}
+	var blocked := 0
+	for inst in def.sort.items:
+		layers[inst.layer] = true
+		if not inst.blocked_by.is_empty():
+			blocked += 1
+	_check("L3: слоёв ровно два", layers.size() == 2)
+	_check("L3: накрыто %d предметов из 21" % blocked, blocked == 8)
+
+	## Перекрытия — главная механика уровня, и её обязано быть заметно больше,
+	## чем во втором зале, иначе третий уровень ничему новому не учит.
+	var state := SortState.new()
+	state.setup(def.sort)
+	var open_now: int = state.available_ids().size()
+	_check("L3: сразу доступно %d предметов" % open_now, open_now == 13)
+
+	## Ни одной категории, кроме мусора, нельзя закрыть, ничего не разобрав:
+	## третий предмет всегда лежит под чужим блокером. Ровно отсюда берётся
+	## вопрос уровня — «что убрать, чтобы стало можно взять».
+	var open_by_category := {}
+	for id in state.available_ids():
+		var inst := def.sort.item(String(id))
+		open_by_category[inst.category] = int(open_by_category.get(inst.category, 0)) + 1
+	var closable := PackedStringArray()
+	for cid in open_by_category:
+		if int(open_by_category[cid]) >= 3:
+			closable.append(String(cid))
+	_check("L3: с ходу закрывается только мусор — остальное надо откапывать",
+		closable.size() == 1 and closable[0] == "trash")
+
+	var module := _sort_module()
+	if module == null:
+		_check("L3: модуль уровня доступен", false)
+		return
+	_check("L3: на экране ровно 21 предмет", module._views.size() == 21)
+	_check("L3: лоток нарисован на 7 ячеек", module._tray.slot_count == 7)
+
+	var small := 0
+	var outside := 0
+	for id in module._views:
+		var view: SortItemView = module._views[id]
+		if view.span < 120.0:
+			small += 1
+		var box: Rect2 = view.hit_rect()
+		if box.end.y > module.tray_rect.position.y \
+				or box.position.y < module.play_rect.position.y \
+				or box.position.x < module.play_rect.position.x \
+				or box.end.x > module.play_rect.end.x:
+			outside += 1
+	_check("L3: предметы крупные — под палец, а не под пиксель", small == 0)
+	_check("L3: ни один предмет не заехал под HUD или лоток", outside == 0)
+
+	## Двадцать один предмет на одном экране — место кончается раньше, чем это
+	## видно глазом. Пересекаться вправе только те, кто друг друга держит:
+	## случайное наложение делает тап лотереей.
+	var stray := PackedStringArray()
+	for a in def.sort.items:
+		for b in def.sort.items:
+			if a.id >= b.id:
+				continue
+			if a.blocked_by.has(b.id) or b.blocked_by.has(a.id):
+				continue
+			var va: SortItemView = module._views.get(a.id)
+			var vb: SortItemView = module._views.get(b.id)
+			if va != null and vb != null and va.hit_rect().intersects(vb.hit_rect()):
+				stray.append("%s+%s" % [a.id, b.id])
+	_check("L3: пересекаются только те предметы, что друг друга держат (%s)"
+		% ("нет лишних" if stray.is_empty() else " ".join(stray)), stray.is_empty())
+
+
+## Перекрытия в деле: накрытый предмет не берётся, отказ виден, подсказка
+## приходит ровно один раз, а двойная блокировка снимается только целиком.
+func _check_showcase_blockers() -> void:
+	var module := _sort_module()
+	if module == null:
+		return
+
+	## Гаечный ключ лежит под картонной коробкой — прямая одиночная блокировка.
+	_check("L3: накрытый предмет недоступен", not module._state.is_available("wrench"))
+	module._on_pick("wrench")
+	await _tree.create_timer(0.1).timeout
+	_check("L3: тап по накрытому предмету ничего не кладёт в лоток",
+		module._state.tray.is_empty() and module._views.size() == 21)
+	## Отказ — это событие, а не тишина: по нему приходит единственная подсказка
+	## уровня, и приходит она в тот момент, когда игрок в перекрытие упёрся.
+	_check("L3: отказ засчитан", module._refused == 1)
+	if module._tutorial != null:
+		_check("L3: подсказка про перекрытия показана первым же отказом",
+			module._tutorial._shown.has("first_blocked_item_attempt"))
+		## Плашка стоит над завалом, а не на нём: объяснение, накрывшее собой
+		## то, что объясняет, — худший вид подсказки.
+		var plate: Rect2 = module._tutorial.plate_rect()
+		var covered := 0
+		for id in module._views:
+			if plate.intersects((module._views[id] as SortItemView).hit_rect()):
+				covered += 1
+		_check("L3: подсказка не накрывает предметы", covered == 0)
+
+	## В перекрытии тап достаётся верхнему: иначе накрытый предмет можно было бы
+	## «прокликать» сквозь то, что на нём лежит.
+	var wrench_view: SortItemView = module._views.get("wrench")
+	var box_view: SortItemView = module._views.get("box")
+	if wrench_view != null and box_view != null:
+		_check("L3: в перекрытии тап достаётся верхнему предмету",
+			module._hit_test((wrench_view.position + box_view.position) * 0.5) == "box")
+
+	## Кружка придавлена сразу кастрюлей и ведром: одного блокера мало.
+	_check("L3: кружка под двумя предметами недоступна", not module._state.is_available("mug"))
+	module._on_pick("pot")
+	await _tree.create_timer(0.25).timeout
+	_check("L3: снят один блокер из двух — кружка всё ещё придавлена",
+		not module._state.is_available("mug"))
+	module._on_pick("bucket")
+	await _tree.create_timer(0.25).timeout
+	_check("L3: снят второй блокер — кружка открылась", module._state.is_available("mug"))
+	## Тряпку держала только кастрюля, и её хватило одной.
+	_check("L3: снятая кастрюля открыла и тряпку", module._state.is_available("rag"))
+
+	## Подсказка одноразовая: второй отказ её не повторяет.
+	module._on_pick("jam")
+	await _tree.create_timer(0.1).timeout
+	_check("L3: второй отказ подсказку не повторяет", module._refused == 2)
+
+	module.restart()
+	await _tree.create_timer(0.3).timeout
+	_check("L3: перезапуск вернул все 21 предмет", module._views.size() == 21)
+	_check("L3: все блокировки на месте",
+		not module._state.is_available("wrench") and not module._state.is_available("mug"))
+	var def: LevelDefinition = ContentDB.level("bakery_03")
+	var moved := 0
+	for inst in def.sort.items:
+		var view: SortItemView = module._views.get(inst.id)
+		if view == null:
+			moved += 1
+			continue
+		if absf(view.position.x - (module.play_rect.position.x
+				+ inst.position.x * module.play_rect.size.x)) > 0.5:
+			moved += 1
+	_check("L3: раскладка после перезапуска совпадает с данными", moved == 0)
+
+
+## У уровня обязан быть не только путь, найденный перебором, но и просторный
+## человеческий: тот, где каждая тройка закрывается сразу, а лоток не подходит
+## к краю. Иначе «проходим» означало бы «проходим ровно одним способом», а это
+## уже угадывание авторского замысла, а не игра.
+func _check_showcase_roomy_path() -> void:
+	var def: LevelDefinition = ContentDB.level("bakery_03")
+	if def == null or def.sort == null:
+		return
+	## Порядок человеческий: начать с мусора, который лежит открыто, и дальше
+	## каждый раз снимать блокера той группы, которую собираешься закрыть.
+	var human := ["news_top", "can_case", "bottle_floor",
+		"flour", "pin", "whisk",
+		"pot", "bucket", "sponge", "rag", "mug", "plate",
+		"box", "crate", "jam",
+		"hammer", "wrench", "screw",
+		"news_low", "bottle_low", "can_floor"]
+	var state := SortState.new()
+	state.setup(def.sort)
+	var peak := 0
+	var refused := PackedStringArray()
+	for id in human:
+		var res := state.pick(String(id))
+		if not bool(res["ok"]):
+			refused.append(String(id))
+			continue
+		peak = maxi(peak, int(res["peak"]))
+	_check("L3: человеческий порядок проходит без единого запрещённого хода (%s)"
+		% ("чисто" if refused.is_empty() else " ".join(refused)), refused.is_empty())
+	_check("L3: он разбирает поле целиком", state.is_complete())
+	_check("L3: и держит лоток на %d ячейках из 7 — запас на ошибку есть" % peak,
+		peak <= 4)
+
+	## Второй путь — тот, которым уровень проходит прогон. Он теснее, и это
+	## нормально: важно, что оба существуют и ни один не переполняет лоток.
+	var plan := SortSolver.solve(def.sort)
+	_check("L3: солвер тоже находит решение", bool(plan["solved"]))
+	_check("L3: решение солвера разбирает все 21 предмет",
+		(plan["path"] as PackedStringArray).size() == 21)
+	_check("L3: путь солвера держится в пределах лотка (пик %d из 7)"
+		% int(plan["max_tray"]), int(plan["max_tray"]) <= 7)
+
+
+## Проигрыш здесь достижим тем же способом, что и во втором зале, — набором
+## вразнобой. Шесть категорий на семь ячеек: седьмой предмет некуда положить.
+func _check_showcase_fail_and_restart() -> void:
+	var module := _sort_module()
+	if module == null:
+		return
+	var greedy := ["pin", "plate", "box", "screw", "sponge", "news_top", "crate"]
+	for id in greedy:
+		module._on_pick(String(id))
+		await _tree.create_timer(0.06).timeout
+	_check("L3: набор вразнобой заполнил лоток", module._state.tray.size() == 7)
+	await _tree.create_timer(0.5).timeout
+	_check("L3: переполненный лоток — проигрыш", module._state.is_failed())
+	_check("L3: после проигрыша ввод заблокирован", module._input_locked)
+	_check("L3: проигрыш не записал победу",
+		not Game.meta.completed_levels.has("bakery_03"))
+	_check("L3: проигрыш не тронул мету",
+		not bool(Game.meta.flags.get("hall_showcase_cleared", false)))
+
+	var again := _find_button(Game.current(), "Заново")
+	_check("L3: на проигрыше есть кнопка «Заново»", again != null)
+	if again == null:
+		return
+	again.pressed.emit()
+	await _tree.create_timer(0.3).timeout
+	_check("L3: после перезапуска поле снова полное",
+		module._views.size() == 21 and module._state.tray.is_empty())
+	_check("L3: ввод снова принимается", not module._input_locked)
 
 
 ## Правило проигрыша само по себе — на выдуманной раскладке, без сцены.
