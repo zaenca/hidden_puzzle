@@ -389,29 +389,29 @@ func _check_hall_blockers() -> void:
 	var def: LevelDefinition = ContentDB.level("bakery_02")
 
 	## Кастрюля лежит под смятой банкой — до банки её не взять.
-	_check("L2: накрытый предмет недоступен", not module._state.is_available("k3"))
-	module._on_pick("k3")
+	_check("L2: накрытый предмет недоступен", not module._state.is_available("f2"))
+	module._on_pick("f2")
 	await _tree.create_timer(0.1).timeout
 	_check("L2: тап по накрытому предмету ничего не делает",
 		module._state.tray.is_empty() and module._views.size() == 18)
 
 	## Верхний предмет забирает тап себе, даже если попали в перекрытие.
-	var pot_view: SortItemView = module._views.get("k3")
+	var pot_view: SortItemView = module._views.get("f2")
 	if pot_view != null:
-		var overlap: Vector2 = (pot_view.position + module._views["r3"].position) * 0.5
+		var overlap: Vector2 = (pot_view.position + module._views["s1"].position) * 0.5
 		_check("L2: в перекрытии тап достаётся верхнему предмету",
-			module._hit_test(overlap) == "r3")
+			module._hit_test(overlap) == "s1")
 
-	module._on_pick("r3")
+	module._on_pick("s1")
 	await _tree.create_timer(0.3).timeout
 	_check("L2: снятый блокер открывает предмет под собой",
-		module._state.is_available("k3"))
+		module._state.is_available("f2"))
 
 	## Возвращаем уровень в исходное состояние: дальше его проверяют с начала.
 	module.restart()
 	await _tree.create_timer(0.3).timeout
 	_check("L2: перезапуск вернул все 18 предметов", module._views.size() == 18)
-	_check("L2: все блокировки на месте", not module._state.is_available("k3"))
+	_check("L2: все блокировки на месте", not module._state.is_available("f2"))
 	## Раскладка та же самая — иначе «Заново» даёт другой уровень.
 	var moved := 0
 	for inst in def.sort.items:
@@ -432,7 +432,7 @@ func _check_hall_fail_and_restart() -> void:
 	if module == null:
 		return
 	## По одному предмету из шести категорий плюс седьмой: ни одной тройки.
-	var greedy := ["t1", "c2", "r2", "f1", "k1", "s1", "t2"]
+	var greedy := ["w1", "f1", "p1", "d1", "b1", "s1", "w2"]
 	for id in greedy:
 		module._on_pick(String(id))
 		await _tree.create_timer(0.06).timeout

@@ -16,7 +16,7 @@
   { "id": "can",         "name": "Банка",       "color": "#b5b5c2", "shape": "circle" },
   { "id": "leaf_pile",   "name": "Листья",      "color": "#8f9e4a", "shape": "triangle" },
   { "id": "broom",       "name": "Метла",  "kind": "quest", "icon": "res://art/items/broom.png",     "color": "#d98f3a", "shape": "cross" },
-  { "id": "trash_bag",   "name": "Мешок", "kind": "quest", "icon": "res://art/items/trash_bag.png", "color": "#4a4a55", "shape": "circle" },
+  { "id": "trash_bag",   "name": "Мешок", "icon": "res://art/items/trash_bag.png", "color": "#4a4a55", "shape": "circle" },
 
   { "id": "hammer",       "name": "Молоток",     "color": "#9b7653", "shape": "cross" },
   { "id": "nail",         "name": "Гвозди",      "color": "#c9ccd1", "shape": "rect" },
@@ -55,7 +55,7 @@
   { "id": "wooden_crate",  "name": "Деревянный ящик",    "color": "#8a6234", "shape": "rect" },
   { "id": "wrench",        "name": "Гаечный ключ",       "color": "#8a8f9c", "shape": "cross" },
 
-  { "_matrix_note": "Категории торгового зала: выпечка, посуда, тара. Цвета внутри одной категории намеренно близкие — пока нет PNG, только по ним игрок и различает группы.",
+  { "_matrix_note": "Заготовки под категории production-матрицы: выпечка, посуда, тара. В уровнях пока не участвуют — своих PNG у них нет, а завал из настоящих картинок вперемешку с цветными фигурами читается как недорисованный экран. Ждут арт: с ним они заменят повторяющийся мусор во втором зале и дальше.",
     "id": "flour",       "name": "Пакет муки",     "color": "#efe3cd", "shape": "rect" },
   { "id": "rolling_pin", "name": "Скалка",         "color": "#e0c79a", "shape": "rect" },
   { "id": "whisk",       "name": "Венчик",         "color": "#e8d9b5", "shape": "cross" },
