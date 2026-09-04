@@ -24,7 +24,7 @@
       { "id": "litter",  "name": "Бумага",  "color": "#d4a24c" },
       { "id": "cobweb",  "name": "Паутина", "color": "#a89ab8" },
       { "id": "puddle",  "name": "Лужи",    "color": "#4f9bd1" },
-      { "id": "storage", "name": "Тара",    "color": "#8a6234" }
+      { "id": "flour",   "name": "Мука",    "color": "#efe3cd" }
     ],
     "_order_note": "Категории намеренно перемешаны: разложенные рядами, они превратили бы уровень в чтение сверху вниз, а не в поиск одинакового.",
     "items": [
@@ -35,16 +35,16 @@
 
       { "_row": "верхняя ступень",
         "id": "p1", "item_id": "scrap_paper", "category": "litter",  "pos": [0.218, 0.721], "size": 0.14, "rotation": -8 },
-      { "id": "c1", "item_id": "cardboard_box", "category": "storage", "pos": [0.500, 0.721], "size": 0.14, "rotation": -4 },
+      { "id": "f1", "item_id": "flour_spill", "category": "flour",  "pos": [0.500, 0.721], "size": 0.15, "rotation": 0 },
       { "id": "d1", "item_id": "puddle",      "category": "puddle",  "pos": [0.782, 0.721], "size": 0.16, "rotation": 0 },
 
       { "_row": "нижняя ступень",
         "id": "d2", "item_id": "puddle",      "category": "puddle",  "pos": [0.218, 0.813], "size": 0.16, "rotation": 0 },
       { "id": "p2", "item_id": "scrap_paper", "category": "litter",  "pos": [0.500, 0.813], "size": 0.14, "rotation": 7 },
-      { "id": "c2", "item_id": "tin_can",     "category": "storage", "pos": [0.782, 0.813], "size": 0.14, "rotation": -10 },
+      { "id": "f2", "item_id": "flour_spill", "category": "flour",  "pos": [0.782, 0.813], "size": 0.15, "rotation": 0 },
 
       { "_row": "мостовая перед порогом",
-        "id": "c3", "item_id": "wooden_crate", "category": "storage", "pos": [0.218, 0.906], "size": 0.14, "rotation": 5 },
+        "id": "f3", "item_id": "flour_spill", "category": "flour",  "pos": [0.218, 0.906], "size": 0.15, "rotation": 0 },
       { "id": "d3", "item_id": "puddle",      "category": "puddle",  "pos": [0.500, 0.906], "size": 0.16, "rotation": 0 },
       { "id": "p3", "item_id": "scrap_paper", "category": "litter",  "pos": [0.782, 0.906], "size": 0.14, "rotation": -6 }
     ]

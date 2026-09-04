@@ -47,7 +47,7 @@
   { "id": "door_handle", "name": "Дверная ручка", "kind": "quest", "color": "#e0b04f", "shape": "rect" },
   { "id": "glass_pane",  "name": "Стекло витрины", "kind": "quest", "color": "#a8e0f0", "shape": "rect" },
 
-  { "_note": "Предметы Sort. Пока у них нет PNG, они рисуются цветом и формой — теми же, что у остальных заглушек. Логика уровня ссылается на эти id, а не на картинки, поэтому подмена иконки не потребует ни строчки в SortModule.",
+  { "_note": "Заготовки под будущие категории Sort. В первом уровне не участвуют: пока у предмета нет PNG, он рисуется цветной фигурой, а завал из настоящих картинок вперемешку с фигурами читается как недорисованный экран. Логика уровня ссылается на id, а не на картинки, поэтому появление PNG не потребует ни строчки в SortModule.",
     "id": "crumpled_can",  "name": "Смятая банка",       "color": "#9aa39a", "shape": "circle" },
   { "id": "old_newspaper", "name": "Старая газета",      "color": "#ded8c4", "shape": "rect" },
   { "id": "cardboard_box", "name": "Картонная коробка",  "color": "#b5813f", "shape": "rect" },
@@ -55,9 +55,9 @@
   { "id": "wooden_crate",  "name": "Деревянный ящик",    "color": "#8a6234", "shape": "rect" },
   { "id": "wrench",        "name": "Гаечный ключ",       "color": "#8a8f9c", "shape": "cross" },
 
-  { "_kind_note": "Паутина, обрывки и лужа больше не quest: их не выдают и не носят в сумке, их разбирают в Sort. Пометка quest осталась от кладовой, где они падали в инвентарь; вернётся вместе с ней, если она вернётся.",
+  { "_kind_note": "Паутина, мука, обрывки и лужа больше не quest: их не выдают и не носят в сумке, их разбирают в Sort. Пометка quest осталась от кладовой, где они падали в инвентарь; вернётся вместе с ней, если она вернётся.",
     "id": "spiderweb",   "name": "Паутина",           "icon": "res://art/garbage/spiderweb.png",   "color": "#d8d8e0", "shape": "triangle" },
-  { "id": "flour_spill", "name": "Рассыпанная мука",  "kind": "quest", "icon": "res://art/garbage/flour_spill.png", "color": "#f0e6d2", "shape": "triangle" },
+  { "id": "flour_spill", "name": "Рассыпанная мука",  "icon": "res://art/garbage/flour_spill.png", "color": "#f0e6d2", "shape": "triangle" },
   { "id": "scrap_paper", "name": "Обрывки бумаги",    "icon": "res://art/garbage/scrap_paper.png", "color": "#e6ddc8", "shape": "rect" },
   { "id": "puddle",      "name": "Лужа",              "icon": "res://art/garbage/puddle.png",      "color": "#7fb3d5", "shape": "circle" },
   { "id": "bootprints",  "name": "Следы обуви",       "kind": "quest", "icon": "res://art/garbage/bootprints.png",  "color": "#6b5a44", "shape": "rect" }

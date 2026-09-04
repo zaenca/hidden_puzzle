@@ -256,7 +256,7 @@ func _check_sort_fail_and_restart() -> void:
 
 	## Семь предметов, ни одной тройки: по две штуки трёх категорий и одна
 	## четвёртой. Это и есть единственный способ проиграть в Sort.
-	var dead_end := ["p1", "p2", "w1", "w2", "d1", "d2", "c1"]
+	var dead_end := ["p1", "p2", "w1", "w2", "d1", "d2", "f1"]
 	var before: int = module._views.size()
 	for id in dead_end:
 		module._on_pick(String(id))
