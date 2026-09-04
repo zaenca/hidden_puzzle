@@ -76,14 +76,40 @@ static func _ordered_moves(state: SortState) -> PackedStringArray:
 		if inst != null:
 			in_tray[inst.category] = int(in_tray.get(inst.category, 0)) + 1
 
+	## Сколько предметов каждой категории игрок может взять прямо сейчас. Без
+	## этого «начать категорию» и «начать категорию, которую тут же и закроешь»
+	## выглядят одинаково, а разница между ними — это весь лоток.
+	var open_now := {}
 	var moves := state.available_ids()
+	for id in moves:
+		var inst := state.definition.item(String(id))
+		open_now[inst.category] = int(open_now.get(inst.category, 0)) + 1
+
+	var need := state.definition.group_size
 	var scored := []
+	var order := 0
 	for id in moves:
 		var inst := state.definition.item(String(id))
 		var have := int(in_tray.get(inst.category, 0))
-		## Чем ближе категория к полной группе, тем раньше её пробуем.
-		scored.append({"id": String(id), "score": have})
-	scored.sort_custom(func(a, b): return int(a["score"]) > int(b["score"]))
+		var reachable: int = have + int(open_now.get(inst.category, 0))
+		var score := 0
+		if have + 1 >= need:
+			score = 400          ## этот ход закрывает группу
+		elif have > 0 and reachable >= need:
+			score = 300          ## начатую группу можно доложить не сходя с места
+		elif have > 0:
+			score = 200          ## группа начата, но третий предмет ещё под завалом
+		elif reachable >= need:
+			score = 100          ## новая группа, зато закрывается целиком
+		scored.append({"id": String(id), "score": score, "order": order})
+		order += 1
+	## Порядок при равных очках — порядок объявления в данных. Сортировка сама
+	## по себе стабильности не обещает, а путь обязан быть один и тот же: его
+	## печатает валидатор и им же проходит уровень headless-прогон.
+	scored.sort_custom(func(a, b):
+		if int(a["score"]) != int(b["score"]):
+			return int(a["score"]) > int(b["score"])
+		return int(a["order"]) < int(b["order"]))
 
 	var out := PackedStringArray()
 	for entry in scored:

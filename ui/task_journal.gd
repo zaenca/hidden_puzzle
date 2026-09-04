@@ -346,7 +346,7 @@ func open() -> void:
 			(child as TutorialHand).stop()
 	## Первое открытие журнала объясняет, как он устроен. Позже — только список:
 	## объяснение, которое повторяется, читается как поломка.
-	if not bool(Game.meta.flags.get(Game.JOURNAL_FLAG, false)):
+	if Game.journal_coach_pending():
 		## Кадром позже: подсказка встаёт под своей строкой, а размеры строк
 		## контейнер посчитает только после раскладки, и сейчас они нулевые.
 		await get_tree().process_frame

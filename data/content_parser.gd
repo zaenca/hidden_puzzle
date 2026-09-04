@@ -281,6 +281,9 @@ static func effect(d: Dictionary) -> MetaEffect:
 		"narrative":
 			e.kind = MetaEffect.Kind.NARRATIVE
 			e.text = String(d.get("text", ""))
+		"dialog":
+			e.kind = MetaEffect.Kind.DIALOG
+			e.dialog_id = String(d.get("dialog", ""))
 		_:
 			e.kind = MetaEffect.Kind.GRANT
 			e.id = String(d.get("id", ""))

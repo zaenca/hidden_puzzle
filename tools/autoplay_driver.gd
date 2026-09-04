@@ -65,10 +65,10 @@ func run(tree: SceneTree) -> void:
 	_check_map_task_bar(["task_visit_bakery"])
 	_check_journal_hides_locked()
 
-	## До обучения рука ведёт к журналу, а не к зданию: список объясняет, зачем
-	## вообще идти в пекарню. К зданию она переезжает, когда объяснение доиграно.
-	_check_hint_points_at_journal()
-	await _play_journal_coach()
+	## Объяснение журнала выключено в контенте, и указатель обязан это уважать:
+	## рука ведёт прямо к пекарне, а не к кнопке списка, за которой ничего не
+	## произойдёт.
+	_check("обучение журналу выключено контентом", not Game.journal_coach_pending())
 	_check_map_hint_points_at("bakery")
 	_check_map_hit_areas()
 
@@ -99,7 +99,10 @@ func run(tree: SceneTree) -> void:
 	await _check_sort_fail_and_restart()
 	await _finish_current_level()
 
-	_check("после уровня — карта, без экрана результата", Game.screen == Game.Screen.MAP)
+	## После победы игрок попадает не в мету, а в разговор: эффект выполненного
+	## действия попросил показать сцену. Кто что говорит — написано в контенте,
+	## Game про это не знает.
+	_check("после L1 — две реплики, а не сразу мета", Game.screen == Game.Screen.DIALOG)
 	_check("L1: уровень записан пройденным",
 		Game.meta.completed_levels.has("bakery_01"))
 	_check("L1: постоянное состояние фасада сохранено",
@@ -107,7 +110,7 @@ func run(tree: SceneTree) -> void:
 	_check("L1: задача про завал закрылась сама",
 		Game.meta.task_state("task_clear_facade") == MetaService.TaskState.COMPLETED)
 	_check("L1: обучение Sort отмечено пройденным",
-		bool(Game.meta.flags.get(Game.SORT_FLAG, false)))
+		bool(Game.meta.flags.get(Game.tutorial_flag("sort_basics"), false)))
 	## Монеты приходят и за уровень, и за задачу — и ровно по одному разу.
 	_check("L1: начислено 40 (уровень) + 10 + 15 (задачи) монет",
 		PlayerState.amount_of("coins") == 65)
@@ -115,12 +118,49 @@ func run(tree: SceneTree) -> void:
 	_check("L1: повторный пересчёт не удваивает награду",
 		PlayerState.amount_of("coins") == 65)
 	_check("L1: разбор завала ничего не положил в сумку", _bag_size() == 0)
-	_check_task_notification("Разобрать завал у входа")
-	_check_journal_all_done(["Осмотреть пекарню", "Разобрать завал у входа"])
 
 	## Пекарня не открывается целиком после первого шага: убран вход, и только.
 	_check("после L1 пекарня всё ещё в восстановлении",
 		Game.meta.shop_state("bakery") == "in_restoration")
+	_check("после L1 зал ещё завален",
+		Game.meta.current_slot_state("bakery", "hall") == "facade")
+
+	# --- разговор между уровнями и сразу второй уровень ---------------------
+	_check_dialog_runs()
+	await tree.create_timer(0.6).timeout
+	_check("после разговора второй уровень начинается сам",
+		Game.screen == Game.Screen.LEVEL)
+
+	# --- уровень 2: Sort в торговом зале ------------------------------------
+	_check_hall_scene()
+	await _check_hall_blockers()
+	await _check_hall_fail_and_restart()
+	await _finish_current_level()
+
+	_check("после L2 — две реплики про витрину и кладовую",
+		Game.screen == Game.Screen.DIALOG)
+	_check("L2: уровень записан пройденным",
+		Game.meta.completed_levels.has("bakery_02"))
+	_check("L2: постоянное состояние зала сохранено",
+		bool(Game.meta.flags.get("hall_cleared_stage_1", false)))
+	_check("L2: задача про зал закрылась сама",
+		Game.meta.task_state("task_clear_hall") == MetaService.TaskState.COMPLETED)
+	_check("L2: зал перешёл в первое восстановленное состояние",
+		Game.meta.current_slot_state("bakery", "hall") == "stage_1")
+	_check("L2: предупреждение про лоток отмечено показанным",
+		bool(Game.meta.flags.get(Game.tutorial_flag("sort_tray_risk"), false)))
+	_check("L2: начислено 40+70 за уровни и 10+15+25 за задачи",
+		PlayerState.amount_of("coins") == 160)
+
+	_check_dialog_runs()
+	await tree.create_timer(0.5).timeout
+	## Разговор о зале заканчивается в зале, а не на площади: задача жила в
+	## локации, и выкидывать оттуда значит отменять только что показанный кадр.
+	_check("после разговора игрок остаётся в пекарне", Game.screen == Game.Screen.SHOP)
+	_check_hall_repainted()
+	_check_task_notification("Расчистить торговый зал")
+	_check_journal_all_done(["Осмотреть пекарню", "Разобрать завал у входа",
+		"Расчистить торговый зал"])
 
 	_check_no_jigsaw()
 
@@ -146,6 +186,12 @@ func run(tree: SceneTree) -> void:
 		Game.meta.levels_completed_total == levels_done)
 	_check("сейв: задача про завал осталась выполненной",
 		Game.meta.task_state("task_clear_facade") == MetaService.TaskState.COMPLETED)
+	_check("сейв: зал остался расчищенным",
+		bool(Game.meta.flags.get("hall_cleared_stage_1", false)))
+	_check("сейв: локация показывает восстановленный зал",
+		Game.meta.current_slot_state("bakery", "hall") == "stage_1")
+	_check("сейв: второй уровень остался пройденным",
+		Game.meta.completed_levels.has("bakery_02"))
 
 	_check_v1_migration()
 
@@ -240,6 +286,174 @@ func _check_sort_scene() -> void:
 		if module._hit_test(module._views[id].position) != String(id):
 			mismatched += 1
 	_check("L1: тап по предмету попадает именно в него", mismatched == 0)
+
+
+## Состояние в мете и картинка на экране — разные вещи, и расходятся они молча.
+## Проверяем не «флаг стоит», а что локация действительно показывает другой зал:
+## слот нашёл свою текстуру и включил именно её вариант.
+func _check_hall_repainted() -> void:
+	var slot := _find_node_named(Game.current(), "Slot_hall")
+	if slot == null:
+		_check("зал: слот вида локации есть в сцене", false)
+		return
+	var shown := ""
+	var textured := false
+	for child in slot.get_children():
+		if not (child is Node2D) or not (child as Node2D).visible:
+			continue
+		shown = child.name
+		for grand in child.get_children():
+			if grand is Sprite2D and (grand as Sprite2D).texture != null:
+				textured = true
+	_check("зал: локация переключилась на восстановленный вид (%s)" % shown,
+		shown == "stage_1")
+	_check("зал: у нового вида есть своя картинка, а не заглушка", textured)
+
+
+func _find_node_named(node: Node, wanted: String) -> Node:
+	if node == null:
+		return null
+	if node.name == wanted:
+		return node
+	for child in node.get_children():
+		var found := _find_node_named(child, wanted)
+		if found != null:
+			return found
+	return null
+
+
+## --- уровень 2: тот же Sort, но с порядком ходов ---------------------------
+
+func _check_hall_scene() -> void:
+	var def: LevelDefinition = ContentDB.level("bakery_02")
+	_check("L2: уровень идёт в режиме sort", def != null and def.mode == "sort")
+	if def == null or def.sort == null:
+		_check("L2: раскладка Sort загрузилась", false)
+		return
+	_check("L2: сборки из кусков в зале нет", def.puzzle.module_id.is_empty())
+	_check("L2: старой уборки инструментами в зале нет", def.cleanup.is_empty())
+	_check("L2: предметы не ищут — фазы поиска нет", def.hidden_object.targets.is_empty())
+	_check("L2: на поле 18 предметов", def.sort.items.size() == 18)
+	_check("L2: шесть категорий по три",
+		def.sort.categories.size() == 6
+		and def.sort.category_counts().size() == 6
+		and def.sort.category_counts().values().all(func(n): return int(n) == 3))
+	_check("L2: лоток по-прежнему на 7 ячеек", def.sort.tray_size == 7)
+
+	var blocked := 0
+	for inst in def.sort.items:
+		if not inst.blocked_by.is_empty():
+			blocked += 1
+	_check("L2: часть предметов накрыта (%d из 18)" % blocked, blocked >= 5 and blocked <= 8)
+
+	## Доступных с самого начала должно быть много: уровень про выбор порядка, а
+	## не про поиск единственного возможного хода.
+	var state := SortState.new()
+	state.setup(def.sort)
+	var open_now: int = state.available_ids().size()
+	_check("L2: сразу доступно %d предметов" % open_now, open_now >= 10 and open_now <= 13)
+
+	var module := _sort_module()
+	if module == null:
+		_check("L2: модуль уровня доступен", false)
+		return
+	_check("L2: на экране ровно 18 предметов", module._views.size() == 18)
+	_check("L2: лоток нарисован на 7 ячеек", module._tray.slot_count == 7)
+
+	## Восемнадцать предметов тесно стоят на одном экране, и проверка «не уехал
+	## под интерфейс» здесь нужнее, чем на первом уровне: место кончается раньше,
+	## чем это заметно глазом на одном разрешении.
+	var small := 0
+	var outside := 0
+	for id in module._views:
+		var view: SortItemView = module._views[id]
+		if view.span < 120.0:
+			small += 1
+		var box: Rect2 = view.hit_rect()
+		if box.end.y > module.tray_rect.position.y \
+				or box.position.y < module.play_rect.position.y \
+				or box.position.x < module.play_rect.position.x \
+				or box.end.x > module.play_rect.end.x:
+			outside += 1
+	_check("L2: предметы крупные — под палец, а не под пиксель", small == 0)
+	_check("L2: ни один предмет не заехал под HUD или лоток", outside == 0)
+
+
+## Блокировки: накрытый предмет не берётся, а после ухода блокера — берётся.
+## Проверяется через модуль, а не через голое состояние: тап игрока проходит
+## через попадание и через запрет, и сломаться может любой из двух.
+func _check_hall_blockers() -> void:
+	var module := _sort_module()
+	if module == null:
+		return
+	var def: LevelDefinition = ContentDB.level("bakery_02")
+
+	## Кастрюля лежит под смятой банкой — до банки её не взять.
+	_check("L2: накрытый предмет недоступен", not module._state.is_available("k3"))
+	module._on_pick("k3")
+	await _tree.create_timer(0.1).timeout
+	_check("L2: тап по накрытому предмету ничего не делает",
+		module._state.tray.is_empty() and module._views.size() == 18)
+
+	## Верхний предмет забирает тап себе, даже если попали в перекрытие.
+	var pot_view: SortItemView = module._views.get("k3")
+	if pot_view != null:
+		var overlap: Vector2 = (pot_view.position + module._views["r3"].position) * 0.5
+		_check("L2: в перекрытии тап достаётся верхнему предмету",
+			module._hit_test(overlap) == "r3")
+
+	module._on_pick("r3")
+	await _tree.create_timer(0.3).timeout
+	_check("L2: снятый блокер открывает предмет под собой",
+		module._state.is_available("k3"))
+
+	## Возвращаем уровень в исходное состояние: дальше его проверяют с начала.
+	module.restart()
+	await _tree.create_timer(0.3).timeout
+	_check("L2: перезапуск вернул все 18 предметов", module._views.size() == 18)
+	_check("L2: все блокировки на месте", not module._state.is_available("k3"))
+	## Раскладка та же самая — иначе «Заново» даёт другой уровень.
+	var moved := 0
+	for inst in def.sort.items:
+		var view: SortItemView = module._views.get(inst.id)
+		if view == null:
+			moved += 1
+			continue
+		if absf(view.position.x - (module.play_rect.position.x
+				+ inst.position.x * module.play_rect.size.x)) > 0.5:
+			moved += 1
+	_check("L2: раскладка после перезапуска совпадает с данными", moved == 0)
+
+
+## Проигрыш во втором уровне достижим гораздо легче первого: шесть категорий
+## против четырёх, и «беру всё подряд» упирается в лоток уже на седьмом ходу.
+func _check_hall_fail_and_restart() -> void:
+	var module := _sort_module()
+	if module == null:
+		return
+	## По одному предмету из шести категорий плюс седьмой: ни одной тройки.
+	var greedy := ["t1", "c2", "r2", "f1", "k1", "s1", "t2"]
+	for id in greedy:
+		module._on_pick(String(id))
+		await _tree.create_timer(0.06).timeout
+	_check("L2: набор вразнобой заполнил лоток", module._state.tray.size() == 7)
+	await _tree.create_timer(0.5).timeout
+	_check("L2: переполненный лоток — проигрыш", module._state.is_failed())
+	_check("L2: после проигрыша ввод заблокирован", module._input_locked)
+	_check("L2: проигрыш не записал победу",
+		not Game.meta.completed_levels.has("bakery_02"))
+	_check("L2: проигрыш не тронул мету",
+		not bool(Game.meta.flags.get("hall_cleared_stage_1", false)))
+
+	var again := _find_button(Game.current(), "Заново")
+	_check("L2: на проигрыше есть кнопка «Заново»", again != null)
+	if again == null:
+		return
+	again.pressed.emit()
+	await _tree.create_timer(0.3).timeout
+	_check("L2: после перезапуска поле снова полное",
+		module._views.size() == 18 and module._state.tray.is_empty())
+	_check("L2: ввод снова принимается", not module._input_locked)
 
 
 ## Правило проигрыша само по себе — на выдуманной раскладке, без сцены.
@@ -402,8 +616,49 @@ func _check_v1_migration() -> void:
 	_check("миграция: предметы мёртвой цепочки убраны из сумки",
 		PlayerState.amount_of("bakery_key") == 0
 			and PlayerState.amount_of("spiderweb") == 0)
+	_check("миграция: новый второй уровень тоже не засчитан пройденным",
+		not Game.meta.completed_levels.has("bakery_02"))
 	_check("миграция: сейв перезаписывается уже новой версией",
-		SaveService.CURRENT_VERSION == 2)
+		SaveService.CURRENT_VERSION == 3)
+	await _check_tutorial_flag_migration()
+
+
+## Сейв версии 2 знал один флаг на весь Sort. Теперь у каждого объяснения свой,
+## и старый флаг обязан переехать на новое имя — иначе игрок, прошедший первый
+## уровень, увидит его объяснение заново.
+func _check_tutorial_flag_migration() -> void:
+	var old := {
+		"version": 2,
+		"saved_at": 0,
+		"player": {"currencies": {"coins": 65, "hard": 60, "xp": 10}, "items": {}},
+		"meta": {
+			"completed_levels": {"bakery_01": 1},
+			"levels_completed_total": 1,
+			"flags": {"intro_seen": true, "met_baker": true, "facade_cleared": true,
+				"sort_taught": true},
+			"rewarded_tasks": {"task_visit_bakery": true, "task_clear_facade": true},
+		},
+	}
+	var f := FileAccess.open(SaveService.SAVE_PATH, FileAccess.WRITE)
+	if f == null:
+		_check("миграция v2: сейв записан", false)
+		return
+	f.store_string(JSON.stringify(old, "  "))
+	f.close()
+
+	PlayerState.reset()
+	CooldownService.reset()
+	Game.meta.reset()
+	_check("миграция v2: сейв прочитан", SaveService.load_game())
+	Game.meta.refresh()
+	_check("миграция v2: объяснение первого уровня осталось показанным",
+		bool(Game.meta.flags.get(Game.tutorial_flag("sort_basics"), false)))
+	_check("миграция v2: общий флаг убран",
+		not bool(Game.meta.flags.get("sort_taught", false)))
+	## Предупреждение второго уровня игрок ещё не видел, и переезд старого флага
+	## не должен был закрыть заодно и его.
+	_check("миграция v2: подсказка второго уровня всё ещё ждёт игрока",
+		not bool(Game.meta.flags.get(Game.tutorial_flag("sort_tray_risk"), false)))
 
 
 ## Пазла в новом обязательном пути нет ни одного — ни на экране, ни в контенте.
@@ -588,6 +843,13 @@ func _check_map_task_bar(expected_ids: PackedStringArray) -> void:
 	_check("площадь: в панели ровно %d задача — %s" % [expected_ids.size(), ", ".join(titles)],
 		rows == expected_ids.size())
 
+
+## --- обучение журналу: выключено, проверки ждут его возвращения -------------
+##
+## Само обучение выключено в контенте (`enabled: false` в tutorial/journal.json),
+## поэтому две проверки ниже сейчас никто не зовёт. Удалять их не за что: шаги
+## целиком на месте, и когда объяснению найдётся место в порядке сцен, проверять
+## его придётся ровно этим — рукой, ведущей к кнопке, и прощёлкиванием списка.
 
 ## Указатель на кнопку журнала. Кнопка живёт в оверлее, поэтому и рука там же —
 ## проверяем, что она рядом с кнопкой, а не «где-то на экране».

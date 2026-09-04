@@ -22,4 +22,6 @@ static func apply(effects: Array[MetaEffect], meta: MetaService) -> PackedString
 				meta.set_flag(e.id, true)
 			MetaEffect.Kind.NARRATIVE:
 				narrative.append(e.text)
+			MetaEffect.Kind.DIALOG:
+				meta.queue_dialog(e.dialog_id)
 	return narrative

@@ -10,7 +10,7 @@
   },
   "speakers": {
     "player": {
-      "name": "Помощница",
+      "name": "София",
       "background": "res://art/dialog_player_bakery.jpg",
       "name_rect": [0.118, 0.757, 0.284, 0.037]
     },

@@ -57,7 +57,7 @@ func _refresh_hint() -> void:
 	## Пока игрок не открывал журнал, рука ведёт к нему, а не к зданию: список
 	## заданий объясняет, зачем вообще идти в пекарню, и без него первый же
 	## переход выглядит как «ткнул наугад и что-то произошло».
-	if not bool(Game.meta.flags.get(Game.JOURNAL_FLAG, false)):
+	if Game.journal_coach_pending():
 		_point_at_journal()
 		return
 	var shop_id := _hint_shop_id()

@@ -25,7 +25,24 @@
     "duration_sec": 0,
     "effects": [
       { "type": "set_flag", "flag": "facade_cleared" },
-      { "type": "narrative", "text": "У входа пусто: ни ящиков, ни битых банок. Дверь пекарни наконец видно целиком." }
+      { "type": "narrative", "text": "У входа пусто: ни ящиков, ни битых банок. Дверь пекарни наконец видно целиком." },
+      { "type": "dialog", "dialog": "hall_invite" }
+    ]
+  },
+  {
+    "id": "clear_hall",
+    "title": "Расчистить торговый зал",
+    "description": "По залу снова можно пройти.",
+    "button_label": "Расчистить зал",
+    "_auto_note": "Как и у входа, вся работа происходит в уровне, поэтому задача закрывается сама по факту пройденного bakery_02. Здесь же зал переходит в первое восстановленное состояние: пол вымыт, но витрина и стены ещё ждут своей очереди — это второй шаг восстановления, а не последний.",
+    "auto_apply": true,
+    "requirements": [{ "type": "level", "level_id": "bakery_02" }],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "set_flag", "flag": "hall_cleared_stage_1" },
+      { "type": "set_visual_state", "shop_id": "bakery", "slot_id": "hall", "state_id": "stage_1" },
+      { "type": "dialog", "dialog": "hall_done" }
     ]
   }
 ]

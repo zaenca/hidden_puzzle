@@ -9,10 +9,10 @@ extends Node
 const SAVE_PATH := "user://save.json"
 const BACKUP_PATH := "user://save.bak"
 const TMP_PATH := "user://save.tmp"
-const CURRENT_VERSION := 2
+const CURRENT_VERSION := 3
 
 ## version -> имя метода миграции.
-const MIGRATIONS := {1: "_migrate_1_to_2"}
+const MIGRATIONS := {1: "_migrate_1_to_2", 2: "_migrate_2_to_3"}
 
 ## Всё, что осталось от старой цепочки «пазл района → зал → ключ → кладовая».
 ## Флаги и уровни, которых больше нет в контенте, надо снимать явно: задача
@@ -170,6 +170,22 @@ func _migrate_1_to_2(data: Dictionary) -> Dictionary:
 		player["items"] = bag
 		data["player"] = player
 
+	data["meta"] = meta
+	return data
+
+
+## Обучение перестало быть одним флагом на весь Sort: у каждого набора подсказок
+## теперь свой, иначе объяснение правил в первом уровне закрыло бы заодно и
+## предупреждение про лоток во втором — то, чего игрок ещё не видел.
+func _migrate_2_to_3(data: Dictionary) -> Dictionary:
+	var meta = data.get("meta", {})
+	if not (meta is Dictionary):
+		return data
+	var flags: Dictionary = meta.get("flags", {})
+	if bool(flags.get("sort_taught", false)):
+		flags["tutorial_done:sort_basics"] = true
+	flags.erase("sort_taught")
+	meta["flags"] = flags
 	data["meta"] = meta
 	return data
 

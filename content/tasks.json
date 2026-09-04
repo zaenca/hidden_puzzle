@@ -29,5 +29,21 @@
     "level_ids": ["bakery_01"],
     "action_id": "clear_facade",
     "hotspot": ""
+  },
+  {
+    "_note": "Второй уровень. Открывается разобранным входом и запускается сразу после разговора «Уже можно пройти» (play_task в dialogs/hall_invite.json). location=shop: работа идёт внутри пекарни, и после победы игрок остаётся в зале, а не уезжает на площадь.",
+    "id": "task_clear_hall",
+    "reward": { "coins": 25 },
+    "play_label": "Расчистить",
+    "order": 3,
+    "shop_id": "bakery",
+    "room_id": "hall",
+    "location": "shop",
+    "title": "Расчистить торговый зал",
+    "hint": "Зал завален так, что не пройти. Разберём по частям.",
+    "unlock": [{ "type": "flag", "flag": "facade_cleared" }],
+    "level_ids": ["bakery_02"],
+    "action_id": "clear_hall",
+    "hotspot": ""
   }
 ]

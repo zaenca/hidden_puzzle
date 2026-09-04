@@ -1,53 +1,72 @@
 {
+  "_note": "Второй Sort. Тот же core, что и в первом уровне, но впервые с порядком ходов: восемнадцать предметов, шесть категорий по три, лоток по-прежнему на семь. Взяв по одному из шести категорий, игрок упирается в переполнение — и это первое место, где лоток становится настоящим ограничением, а не декорацией.",
   "id": "bakery_02",
   "shop_id": "bakery",
   "task_id": "task_clear_hall",
   "order": 2,
-  "difficulty": 1,
+  "difficulty": 2,
+  "mode": "sort",
   "title": "Торговый зал",
-  "narrative": [
-    "Витрина пустая, полки в пыли, под ногами хрустит сухая листва.",
-    "Начнём с того, что здесь вообще можно найти."
-  ],
-  "_art_note": "background — пустая комната, её собирает пазл. objects_background — тот же кадр с метлой, щёткой и мешком: они проявляются после сборки. Дальше кадр переключают шаги уборки.",
   "art": {
+    "_note": "Заброшенный зал: витрина пустая, полки в пыли, пол в разводах. Это временный фон-заглушка — уровень встанет на процедурную комнату, когда лаборатория комнат до него дойдёт. Раскладка привязана к игровому полю, а не к картинке, поэтому смена фона её не сломает.",
     "reference_size": [720, 1280],
     "background": "res://art/bakery_interior.jpg",
-    "objects_background": "res://art/bakery_interior_objects.png",
     "palette": "bakery",
-    "seed": 2022
+    "seed": 2202
   },
-  "_puzzle_note": "Зал без сборки: игрок пришёл сюда убираться, и собирать ту же комнату из кусков перед уборкой значит показать одну картинку дважды.",
-  "puzzle": { "module_id": "" },
-  "hidden_object": { "targets": [] },
-  "_cleanup_note": "Уборка в два захода. Сперва найти в кадре метлу, щётку и мешок (find) — найденное стирается из кадра и загорается в полосе. Потом нажать туда, где предмет нужен (rect), и комната переходит в следующее нарисованное состояние. Почему сперва все три: нарисованные состояния «пол вымыт» и дальше предметов уже не содержат, и искать оставшееся после первой смены кадра было бы негде. rect и find нормализованы к кадру 720x1280.",
-  "cleanup": [
-    {
-      "item_id": "broom",
-      "find": [0.770, 0.490, 0.230, 0.300],
-      "find_hint": "Найди метлу, щётку и мешок",
-      "rect": [0.350, 0.700, 0.630, 0.290],
-      "art": "res://art/bakery_interior_floor.jpg",
-      "hint": "Нажми на пол — подметём его метлой"
-    },
-    {
-      "item_id": "brush",
-      "find": [0.390, 0.315, 0.270, 0.095],
-      "find_hint": "Осталось найти щётку и мешок",
-      "rect": [0.020, 0.470, 0.420, 0.300],
-      "art": "res://art/bakery_interior_showcase.png",
-      "hint": "Нажми на витрину — обметём её щёткой"
-    },
-    {
-      "item_id": "trash_bag",
-      "find": [0.260, 0.780, 0.300, 0.145],
-      "find_hint": "Остался мешок",
-      "rect": [0.010, 0.010, 0.980, 0.980],
-      "art": "res://art/bakery_interior_clean.jpg",
-      "hint": "Нажми на зал — соберём мусор в мешок"
-    }
-  ],
+  "_layout_note": "pos нормализован к ИГРОВОМУ ПОЛЮ, как и в первом уровне. Предметы разложены по местам, где вещи действительно лежат: на полках шкафа, на прилавке, в витрине и на полу. Раскладка curated и детерминированная — «Заново» после проигрыша обязано вернуть ту же задачу, а не другую.",
+  "_difficulty_note": "Двенадцать предметов доступны сразу, шесть накрыты. Накрывают всегда предметы тех категорий, которые можно закрыть целиком не сходя с места (инструменты, уборка, мусор), а под ними лежат недостающие третьи предметы выпечки, посуды и тары. Отсюда и урок уровня: сначала закрой то, что закрывается, и этим освободишь остальное.",
+  "sort": {
+    "tray_size": 7,
+    "group_size": 3,
+    "seed": 2202,
+    "tutorial": "sort_tray_risk",
+    "categories": [
+      { "id": "baking",   "name": "Выпечка",      "color": "#e8d5aa" },
+      { "id": "kitchen",  "name": "Посуда",       "color": "#7fb8d5" },
+      { "id": "storage",  "name": "Тара",         "color": "#c79a5e" },
+      { "id": "tools",    "name": "Инструменты",  "color": "#8a8f9c" },
+      { "id": "cleaning", "name": "Уборка",       "color": "#7fd5b8" },
+      { "id": "trash",    "name": "Мусор",        "color": "#a3a08f" }
+    ],
+    "items": [
+      { "_shelves": "полки буфета: кружка на виду, банка варенья под молотком",
+        "id": "k1", "item_id": "mug",           "category": "kitchen",  "pos": [0.440, 0.180], "size": 0.12, "layer": 0, "rotation": 0 },
+      { "id": "t1", "item_id": "hammer",        "category": "tools",    "pos": [0.600, 0.160], "size": 0.12, "layer": 1, "rotation": -12 },
+      { "id": "s3", "item_id": "jam_jar",       "category": "storage",  "pos": [0.650, 0.212], "size": 0.12, "layer": 0, "rotation": 0,
+        "blocked_by": ["t1"] },
+
+      { "_counter": "прилавок: мука на виду, тарелка под метлой",
+        "id": "f1", "item_id": "flour",         "category": "baking",   "pos": [0.480, 0.375], "size": 0.13, "layer": 0, "rotation": 0 },
+      { "id": "c1", "item_id": "broom",         "category": "cleaning", "pos": [0.640, 0.355], "size": 0.13, "layer": 1, "rotation": 18 },
+      { "id": "k2", "item_id": "plate",         "category": "kitchen",  "pos": [0.690, 0.400], "size": 0.12, "layer": 0, "rotation": 0,
+        "blocked_by": ["c1"] },
+
+      { "_showcase": "витрина слева: обрывки бумаги, коробка и скалка под ней",
+        "id": "r2", "item_id": "scrap_paper",   "category": "trash",    "pos": [0.095, 0.490], "size": 0.12, "layer": 0, "rotation": -8 },
+      { "id": "s1", "item_id": "cardboard_box", "category": "storage",  "pos": [0.115, 0.630], "size": 0.13, "layer": 1, "rotation": -5 },
+      { "id": "f2", "item_id": "rolling_pin",   "category": "baking",   "pos": [0.175, 0.672], "size": 0.12, "layer": 0, "rotation": 24,
+        "blocked_by": ["s1"] },
+
+      { "_floor_right": "правая половина пола: ключ и щётка открыты, кастрюля под банкой, венчик под ведром",
+        "id": "t2", "item_id": "wrench",        "category": "tools",    "pos": [0.700, 0.560], "size": 0.12, "layer": 0, "rotation": 34 },
+      { "id": "c2", "item_id": "brush",         "category": "cleaning", "pos": [0.880, 0.600], "size": 0.12, "layer": 0, "rotation": -16 },
+      { "id": "r3", "item_id": "crumpled_can",  "category": "trash",    "pos": [0.760, 0.700], "size": 0.12, "layer": 1, "rotation": 8 },
+      { "id": "k3", "item_id": "pot",           "category": "kitchen",  "pos": [0.700, 0.755], "size": 0.13, "layer": 0, "rotation": 0,
+        "blocked_by": ["r3"] },
+      { "id": "c3", "item_id": "bucket",        "category": "cleaning", "pos": [0.900, 0.780], "size": 0.13, "layer": 1, "rotation": 0 },
+      { "id": "f3", "item_id": "whisk",         "category": "baking",   "pos": [0.850, 0.845], "size": 0.12, "layer": 0, "rotation": -28,
+        "blocked_by": ["c3"] },
+
+      { "_floor_left": "левая половина пола: отвёртка открыта, мешок под бутылкой",
+        "id": "t3", "item_id": "screwdriver",   "category": "tools",    "pos": [0.200, 0.800], "size": 0.12, "layer": 0, "rotation": -40 },
+      { "id": "r1", "item_id": "bottle",        "category": "trash",    "pos": [0.360, 0.760], "size": 0.13, "layer": 1, "rotation": 12 },
+      { "id": "s2", "item_id": "sack",          "category": "storage",  "pos": [0.400, 0.845], "size": 0.13, "layer": 0, "rotation": 0,
+        "blocked_by": ["r1"] }
+    ]
+  },
+  "_reward_note": "Экрана результата у Sort нет: разобранный зал и есть отчёт о работе.",
   "show_result": false,
-  "rewards": { "coins": 70, "xp": 12 },
+  "rewards": { "coins": 70, "xp": 18 },
   "quest_grants": []
 }

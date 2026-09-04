@@ -11,6 +11,7 @@ enum Kind {
 	UNLOCK_TASK,       ## открыть задачу
 	SET_FLAG,          ## поставить флаг прогресса
 	NARRATIVE,         ## показать реплику
+	DIALOG,            ## показать сцену-диалог из content/dialogs
 }
 
 @export var kind: Kind = Kind.GRANT
@@ -21,3 +22,8 @@ enum Kind {
 @export var id: String = ""
 @export var amount: int = 1
 @export var text: String = ""
+## Диалог, который играется после того, как действие применилось. Отдельно от
+## NARRATIVE: та показывает строку поверх меты, а этот открывает целую сцену с
+## говорящими — и именно так между уровнями появляются два слова от Марго,
+## не превращая Game.gd в список «после какого уровня что сказать».
+@export var dialog_id: String = ""

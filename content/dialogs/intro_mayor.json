@@ -16,7 +16,7 @@
       "name_rect": [0.082, 0.764, 0.311, 0.034]
     },
     "player": {
-      "name": "Помощница",
+      "name": "София",
       "background": "res://art/dialog_assistant.jpg",
       "name_rect": [0.583, 0.767, 0.311, 0.033]
     }

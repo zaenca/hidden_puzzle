@@ -11,6 +11,8 @@ const MIN_TARGET_SIDE := 0.035   ## ~38 px при базовом 1080 — мин
 
 var errors: PackedStringArray = PackedStringArray()
 var warnings: PackedStringArray = PackedStringArray()
+## Замеры, которые надо видеть даже когда всё в порядке.
+var notes: PackedStringArray = PackedStringArray()
 
 var items := {}
 var tasks := {}
@@ -335,9 +337,26 @@ func _check_sort_solvable(lvl: LevelDefinition, s: SortDefinition) -> void:
 	if int(plan["max_tray"]) > s.tray_size:
 		_err("%s: известное решение переполняет лоток (%d при %d ячейках)"
 			% [lvl.id, int(plan["max_tray"]), s.tray_size])
+	## Пиковая занятость — главная цифра уровня: по ней видно, насколько тесно
+	## игроку на найденном пути и остаётся ли ему запас на ошибку. Печатается
+	## всегда, даже когда всё в порядке: «ошибок нет» об этом не говорит.
+	notes.append("%s: решение из %d ходов, лоток в пике %d из %d"
+		% [lvl.id, path.size(), int(plan["max_tray"]), s.tray_size])
 
 
 func _check_actions() -> void:
+	## Диалог, который действие обещает показать, обязан существовать: сцена
+	## ищется по имени файла, и опечатка здесь заканчивается пустым экраном
+	## ровно в момент сюжетного перехода.
+	for a in actions.values():
+		for e in a.effects:
+			if e.kind != MetaEffect.Kind.DIALOG:
+				continue
+			if e.dialog_id.is_empty():
+				_err("action %s: эффект dialog без имени диалога" % a.id)
+			elif not FileAccess.file_exists("%sdialogs/%s.json" % [ROOT, e.dialog_id]):
+				_err("action %s: диалога '%s' нет в content/dialogs" % [a.id, e.dialog_id])
+
 	for a in actions.values():
 		for r in a.requirements:
 			if r.kind == Requirement.Kind.ITEM:
@@ -870,6 +889,8 @@ func _report() -> void:
 	print("=== Валидация контента ===")
 	print("Предметы: %d | Задачи: %d | Действия: %d | Уровни: %d | Магазины: %d"
 		% [items.size(), tasks.size(), actions.size(), levels.size(), shops.size()])
+	for n in notes:
+		print("  [note]  " + n)
 	for w in warnings:
 		print("  [warn]  " + w)
 	for e in errors:

@@ -32,10 +32,12 @@ const SEARCH_FLAG := "search_taught"
 ## «Игрок уже видел журнал заданий». Пока флага нет, указатель на карте ведёт к
 ## кнопке журнала, а первое его открытие объясняет, как список устроен.
 const JOURNAL_FLAG := "journal_seen"
-## «Игрок уже понял Sort». Пока флага нет, уровень получает шаги обучения из
-## своего же контента; после первого доигранного объяснения — не получает
-## никогда. Флаг живёт в мете, потому что это факт об игроке, а не о уровне.
-const SORT_FLAG := "sort_taught"
+## «Это объяснение игрок уже видел». К префиксу дописывается id обучения, и у
+## каждого набора подсказок получается свой флаг: первый уровень объясняет
+## правила, второй предупреждает про лоток, и закрывать их одним общим флагом
+## значит показать игроку только первое. Флаги живут в мете, потому что это
+## факт об игроке, а не об уровне.
+const TUTORIAL_FLAG_PREFIX := "tutorial_done:"
 const INTRO_ID := "opening"
 
 signal screen_changed(screen: int)
@@ -208,7 +210,10 @@ func _route_after(on_finish: Dictionary) -> void:
 		open_shop(shop_id)
 		return
 
-	open_map()
+	## Сцена без своего продолжения отпускает игрока туда, откуда он пришёл.
+	## Не на карту: разговор после уровня в пекарне заканчивается в пекарне, и
+	## выкидывать из неё на площадь значит отменять только что показанный зал.
+	back_to_meta()
 
 
 ## Игрок хочет войти в локацию. Первый визит может быть обставлен сценой — это
@@ -312,12 +317,32 @@ func play_level(level_id: String, replay: bool = false) -> void:
 ## ли его вообще — знает мета. Ни того, ни другого игровой модуль решать не
 ## может: первое сделало бы его знающим про конкретный уровень, второе — про
 ## прогресс игрока.
+##
+## Флаг у каждого обучения свой. Один общий «Sort объяснён» закрыл бы вместе с
+## правилами первого уровня и все будущие подсказки — а второй уровень учит уже
+## другому, и его предупреждение игрок не видел ни разу.
 func _tutorial_steps_for(def: LevelDefinition) -> Array:
 	if def.sort == null or def.sort.tutorial_id.is_empty():
 		return []
-	if bool(meta.flags.get(SORT_FLAG, false)):
+	if bool(meta.flags.get(tutorial_flag(def.sort.tutorial_id), false)):
 		return []
 	return ContentDB.tutorial(def.sort.tutorial_id).get("steps", [])
+
+
+func tutorial_flag(tutorial_id: String) -> String:
+	return TUTORIAL_FLAG_PREFIX + tutorial_id
+
+
+## Ждёт ли игрока объяснение журнала. Спрашивают двое — карта (вести ли руку к
+## кнопке) и сам журнал (играть ли объяснение при открытии), и ответ у них
+## обязан быть один: разъехавшись, они дают руку, ведущую к молчаливому окну.
+##
+## Выключается из контента полем `enabled`, а не удалением файла: шаги ещё
+## понадобятся, когда для объяснения найдётся своё место в порядке сцен.
+func journal_coach_pending() -> bool:
+	if bool(meta.flags.get(JOURNAL_FLAG, false)):
+		return false
+	return bool(ContentDB.tutorial("journal").get("enabled", true))
 
 
 ## Обучающие подсказки показываем, пока игрок не прошёл ни одного уровня.
@@ -363,12 +388,33 @@ func _on_level_finished(result: LevelResult) -> void:
 			+ int(result.stats.get("normal_found", 0))
 		if found > 0:
 			meta.set_flag(SEARCH_FLAG, true)
-		## Объяснение Sort доиграно до конца — второй раз его показывать не за
-		## что. Флаг ставит мета, а не уровень: уровень только сообщает факт.
+		## Объяснение доиграно до конца — второй раз его показывать не за что.
+		## Флаг ставит мета, а не уровень: уровень только сообщает факт, и какое
+		## именно обучение он показывал, знает его определение.
 		if bool(result.stats.get("tutorial_done", false)):
-			meta.set_flag(SORT_FLAG, true)
+			var played: LevelDefinition = ContentDB.level(result.level_id)
+			if played != null and played.sort != null and not played.sort.tutorial_id.is_empty():
+				meta.set_flag(tutorial_flag(played.sort.tutorial_id), true)
 	var focus := meta.apply_level_result(result)
 	SaveService.save_game()
+	_return_to_meta(focus)
+
+
+## Куда игрок попадает после уровня. Между победой и метой может стоять сцена:
+## эффект выполненного действия вправе попросить диалог, и тогда сперва играется
+## он, а уже его `on_finish` ведёт дальше — хоть в локацию, хоть сразу в
+## следующий уровень. Порядок «две реплики, потом работа» описан в контенте, и
+## Game не знает, после какого уровня кто что говорит.
+func _return_to_meta(focus: MetaFocus) -> void:
+	var next_dialog := meta.take_dialog()
+	if not next_dialog.is_empty():
+		## Куда возвращаться после сцены, помнят _last_shop_id/_last_meta_screen:
+		## диалог без своего продолжения просто отпустит игрока туда же.
+		if focus != null and not focus.shop_id.is_empty():
+			_last_shop_id = focus.shop_id
+			_last_meta_screen = Screen.SHOP if focus.location != "map" else Screen.MAP
+		open_dialog(next_dialog)
+		return
 	if focus.location == "map":
 		open_map(focus)
 	else:

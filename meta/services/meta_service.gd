@@ -20,6 +20,10 @@ var completed_levels: Dictionary = {} ## level_id -> сколько раз пр�
 var flags: Dictionary = {}
 var levels_completed_total: int = 0
 var pending_narrative: PackedStringArray = PackedStringArray()
+## Диалоги, которые эффекты попросили показать. Очередь, а не одно поле: два
+## действия могут закрыться одним пересчётом, и второй диалог не должен молча
+## затирать первый.
+var pending_dialogs: Array[String] = []
 ## task_id -> true. Задачи, за которые награда уже выдана.
 var rewarded_tasks: Dictionary = {}
 
@@ -443,6 +447,30 @@ func take_narrative() -> PackedStringArray:
 	return out
 
 
+## --- отложенный диалог ------------------------------------------------------
+
+## Эффект действия может попросить показать сцену-диалог. Мета её не открывает
+## сама: экранами распоряжается Game, и вызов сцены отсюда сделал бы мету
+## зависимой от того, что вообще есть экраны. Поэтому диалог складывается сюда,
+## а забирает его тот, кто в этот момент решает, куда вести игрока.
+##
+## В сейв не попадает намеренно: это событие момента, а не состояние мира.
+## Диалог, не показанный из-за выхода из игры, не должен всплыть через неделю
+## посреди другого занятия — а то, ради чего он игрался, уже записано флагом.
+func queue_dialog(dialog_id: String) -> void:
+	if dialog_id.is_empty():
+		return
+	pending_dialogs.append(dialog_id)
+
+
+func take_dialog() -> String:
+	if pending_dialogs.is_empty():
+		return ""
+	var next: String = pending_dialogs[0]
+	pending_dialogs.remove_at(0)
+	return next
+
+
 ## --- save -------------------------------------------------------------------
 
 func save_data() -> Dictionary:
@@ -483,4 +511,5 @@ func reset() -> void:
 	rewarded_tasks.clear()
 	levels_completed_total = 0
 	pending_narrative = PackedStringArray()
+	pending_dialogs.clear()
 	ensure_defaults()
