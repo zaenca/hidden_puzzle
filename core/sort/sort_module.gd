@@ -18,6 +18,9 @@ const PLAY_TRAY_GAP := 22.0
 ## Насколько фон заходит под лоток. Лоток нарисован плашкой со скруглениями, и
 ## ровно по его верхней кромке под ним просвечивал бы пустой экран.
 const BACKGROUND_UNDER_TRAY := 90.0
+## Куда именно обучающая рука целится внутри предмета — доля его размера от
+## центра. Не в середину: см. `_tutorial_targets`.
+const HINT_AIM_OFFSET := Vector2(0.30, 0.30)
 
 const FLY_SEC := 0.30
 const GROUP_FLASH_SEC := 0.30
@@ -242,15 +245,36 @@ func _build_tutorial() -> void:
 
 
 ## Куда обучение показывает рукой. Точки живут здесь, а не в обучении: где
-## лежит первый доступный предмет, знает только уровень.
+## лежит доступный предмет, знает только уровень.
+##
+## Показываем не первый по списку, а ближайший к середине поля. Порядок в
+## данных — это порядок авторской записи, и первым там легко оказывается
+## предмет у самого края: палец, ткнувший в угол экрана, читается как «нажми
+## куда-нибудь там», а не как «нажми вот на это».
 func _tutorial_targets() -> Dictionary:
 	var out := {"tray": _tray.slot_center(0)}
-	var available := _state.available_ids()
-	if not available.is_empty():
-		var view: SortItemView = _views.get(String(available[0]))
-		if view != null:
-			out["item"] = view.position
+	var view := _hint_view()
+	if view != null:
+		## Целимся не в центр предмета, а в его правый нижний край. Рука и круг
+		## от нажатия расходятся вниз-вправо от кончика пальца, и поставленный в
+		## середину палец закрывает собой ровно то, на что показывает.
+		out["item"] = view.position + view.drawn_size() * HINT_AIM_OFFSET
 	return out
+
+
+func _hint_view() -> SortItemView:
+	var center := play_rect.get_center()
+	var best: SortItemView = null
+	var best_dist := INF
+	for id in _state.available_ids():
+		var view: SortItemView = _views.get(String(id))
+		if view == null:
+			continue
+		var d: float = view.position.distance_to(center)
+		if d < best_dist:
+			best_dist = d
+			best = view
+	return best
 
 
 ## --- ввод -------------------------------------------------------------------

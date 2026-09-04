@@ -177,8 +177,12 @@ func _check_sort_scene() -> void:
 		_check("L1: раскладка Sort загрузилась", false)
 		return
 	_check("L1: на поле 12 предметов", def.sort.items.size() == 12)
-	_check("L1: четыре категории по три", def.sort.categories.size() == 4
-		and def.sort.category_counts().values().all(func(n): return int(n) == 3))
+	## Групп три, но паутины шесть: она уходит двумя тройками. Проверяем не
+	## «по три штуки», а кратность — иначе любая категория, собранная в две
+	## тройки, будет выглядеть поломкой контента.
+	_check("L1: три категории, и каждая делится на тройки",
+		def.sort.categories.size() == 3
+		and def.sort.category_counts().values().all(func(n): return int(n) % 3 == 0))
 	_check("L1: лоток на 7 ячеек", def.sort.tray_size == 7)
 	_check("L1: фон уровня — вход в пекарню",
 		def.art.background_path == "res://art/bakery_door.png")
@@ -239,6 +243,47 @@ func _check_sort_scene() -> void:
 	_check("L1: тап по предмету попадает именно в него", mismatched == 0)
 
 
+## Правило проигрыша само по себе — на выдуманной раскладке, без сцены.
+## Четыре категории по три, лоток на семь: по два предмета из четырёх категорий
+## дают восемь, и седьмой кладётся уже в переполненный лоток.
+func _check_fail_rule() -> void:
+	var def := SortDefinition.new()
+	def.tray_size = 7
+	def.group_size = 3
+	def.fail_on_full_tray = true
+	var made: Array[SortItemInstance] = []
+	for c in ["a", "b", "c", "d"]:
+		var cat := SortCategory.new()
+		cat.id = String(c)
+		def.categories.append(cat)
+		for n in 3:
+			var inst := SortItemInstance.new()
+			inst.id = "%s%d" % [c, n]
+			inst.item_id = "scrap_paper"
+			inst.category = String(c)
+			made.append(inst)
+	def.items = made
+
+	var state := SortState.new()
+	state.setup(def)
+	for id in ["a0", "a1", "b0", "b1", "c0", "c1"]:
+		state.pick(String(id))
+	_check("правило: шесть разрозненных предметов — ещё не проигрыш",
+		not state.is_failed())
+	state.pick("d0")
+	_check("правило: седьмой предмет без тройки переполняет лоток",
+		state.tray.size() == 7 and state.is_failed())
+
+	## Тройка освобождает ячейки — иначе «проигрыш» наступал бы просто по
+	## количеству ходов, независимо от того, что игрок собрал.
+	var ok := SortState.new()
+	ok.setup(def)
+	for id in ["a0", "a1", "a2"]:
+		ok.pick(String(id))
+	_check("правило: собранная тройка освобождает лоток",
+		ok.tray.is_empty() and not ok.is_failed())
+
+
 ## Проигрыш и мгновенный перезапуск. Проверяем и то, чего игрок не видит:
 ## неудача не должна оставить в мете ни следа.
 func _check_sort_fail_and_restart() -> void:
@@ -247,26 +292,36 @@ func _check_sort_fail_and_restart() -> void:
 		_check("L1: модуль доступен для проверки проигрыша", false)
 		return
 
-	## Раскладку снимаем ДО первого тапа: после проигрыша семь предметов лежат
-	## в ячейках лотка, и сравнивать с их положением там значит проверять не
-	## раскладку уровня, а расстановку лотка.
+	## Раскладку снимаем ДО проигрыша: сравнивать её с положением предметов в
+	## лотке значит проверять не раскладку уровня, а расстановку ячеек.
 	var layout_before := {}
 	for id in module._views:
 		layout_before[String(id)] = module._views[id].position
 
-	## Семь предметов, ни одной тройки: по две штуки трёх категорий и одна
-	## четвёртой. Это и есть единственный способ проиграть в Sort.
-	var dead_end := ["p1", "p2", "w1", "w2", "d1", "d2", "f1"]
+	## Само правило проигрыша проверяется на выдуманном наборе, а не на первом
+	## уровне: там категорий три, и семь предметов без тройки в лоток физически
+	## не набрать. Это свойство обучения, а не пробел в проверке, — но правило
+	## от этого не перестаёт существовать, и ломаться молча ему нельзя.
+	_check_fail_rule()
+
+	## А на живом уровне проверяем обратное утверждение: набрать больше шести
+	## без тройки здесь нельзя. Если однажды в уровень добавят четвёртую
+	## категорию, обучение станет проигрываемым — и об этом надо узнать тут.
+	var worst := ["p1", "p2", "d1", "d2", "w1", "w2"]
 	var before: int = module._views.size()
-	for id in dead_end:
+	for id in worst:
 		module._on_pick(String(id))
 		await _tree.create_timer(0.06).timeout
-	_check("L1: лоток заполнился семью предметами", module._state.tray.size() == 7)
-	_check("L1: ни одна группа при этом не закрылась",
-		module._views.size() == before)
+	_check("L1: шесть предметов без тройки лоток не переполнили",
+		module._state.tray.size() == 6 and module._views.size() == before)
+	_check("L1: на обучающем уровне проиграть нельзя", not module._state.is_failed())
+
+	## Дальше — то, что видит игрок на проигрыше. Состояние до него довести
+	## невозможно, поэтому экран проверяется вызовом напрямую: работает
+	## блокировка, кнопка и чистота меты, а не способ туда попасть.
+	module._fail()
 	await _tree.create_timer(0.5).timeout
 
-	_check("L1: переполненный лоток — это проигрыш", module._state.is_failed())
 	_check("L1: после проигрыша ввод заблокирован", module._input_locked)
 	_check("L1: игрок остался на уровне, а не уехал на карту",
 		Game.screen == Game.Screen.LEVEL)
