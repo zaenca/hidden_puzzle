@@ -24,6 +24,10 @@ var category_color: Color = Color.WHITE
 ## Габарит предмета по большей стороне, px. Картинки не квадратные, вторая
 ## сторона считается по пропорциям исходника.
 var span: float = 140.0
+## Предмет прямо сейчас проявляется из открывшейся зоны. Пока это так, его
+## прозрачностью распоряжается только появление: приглушение недоступных, если
+## перекрасить его в этот момент, оборвало бы проявление на середине.
+var revealing: bool = false
 
 var _icon: Sprite2D
 
@@ -76,6 +80,24 @@ func press_feedback() -> void:
 		.set_trans(Tween.TRANS_SINE)
 	tw.tween_property(self, "scale", Vector2.ONE, 0.09) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Предмет был спрятан в закрытой зоне и теперь показался. Появление с задержкой
+## и снизу вверх: вещь как будто вынули из ящика, а не подставили на экран.
+func reveal(duration: float, delay: float = 0.0) -> void:
+	visible = true
+	revealing = true
+	modulate.a = 0.0
+	var target := position
+	position = target + Vector2(0, 14)
+	scale = Vector2(0.82, 0.82)
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(self, "modulate:a", 1.0, duration).set_delay(delay)
+	tw.tween_property(self, "position", target, duration).set_delay(delay) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(self, "scale", Vector2.ONE, duration).set_delay(delay) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_callback(func(): revealing = false)
 
 
 ## «Не могу»: предмет придавлен и никуда не летит. Короткое покачивание на

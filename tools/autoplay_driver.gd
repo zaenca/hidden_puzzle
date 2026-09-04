@@ -181,20 +181,47 @@ func run(tree: SceneTree) -> void:
 		bool(Game.meta.flags.get(Game.tutorial_flag("sort_blockers"), false)))
 	_check("L3: начислено 40+70+95 за уровни и 10+15+25+35 за задачи",
 		PlayerState.amount_of("coins") == 290)
-	## Кладовая — следующий шаг, и его в этой партии ещё нет. Уровень четыре не
-	## должен появиться сам собой из-за того, что диалог что-то пообещал.
-	_check("L3: четвёртого уровня в контенте пока нет",
-		ContentDB.level("bakery_04") == null)
+	## Дверь ещё завалена: подойти к ней нельзя, и тапать по ней тоже.
+	_check("после L3 дверь кладовой ещё недоступна",
+		Game.meta.current_slot_state("bakery", "storeroom_door") == "blocked")
 
+	## Разговор про дверь сам открывает следующую работу — как и два прошлых.
 	_check_dialog_runs()
-	await tree.create_timer(0.5).timeout
-	## Разговор о зале заканчивается в зале, а не на площади: задача жила в
-	## локации, и выкидывать оттуда значит отменять только что показанный кадр.
-	_check("после разговора игрок остаётся в пекарне", Game.screen == Game.Screen.SHOP)
-	_check_hall_repainted("stage_2")
-	_check_task_notification("Освободить витрину")
+	await tree.create_timer(0.6).timeout
+	_check("после разговора про дверь четвёртый уровень начинается сам",
+		Game.screen == Game.Screen.LEVEL)
+
+	# --- уровень 4: Sort с закрытой зоной ----------------------------------
+	_check_approach_scene()
+	await _check_approach_zone()
+	await _check_approach_roomy_path()
+	await _check_approach_fail_and_restart()
+	await _finish_current_level()
+
+	_check("L4: уровень записан пройденным",
+		Game.meta.completed_levels.has("bakery_04"))
+	_check("L4: постоянное состояние подхода сохранено",
+		bool(Game.meta.flags.get("storeroom_approach_cleared", false)))
+	_check("L4: задача про подход закрылась сама",
+		Game.meta.task_state("task_clear_approach") == MetaService.TaskState.COMPLETED)
+	_check("L4: зал перешёл в последнее восстановленное состояние",
+		Game.meta.current_slot_state("bakery", "hall") == "stage_3")
+	_check("L4: объяснение зон отмечено показанным",
+		bool(Game.meta.flags.get(Game.tutorial_flag("sort_zones"), false)))
+	_check("L4: начислено 40+70+95+120 за уровни и 10+15+25+35+45 за задачи",
+		PlayerState.amount_of("coins") == 455)
+	## Разговора сразу после уровня нет намеренно: игрок выходит к двери и сам
+	## решает, дёргать ли её. Сцена, начатая без его действия, отобрала бы у
+	## этого шага единственное, что в нём есть.
+	_check("после L4 игрок сразу в пекарне, без сцены", Game.screen == Game.Screen.SHOP)
+	_check_hall_repainted("stage_3")
+
+	# --- дверь кладовой: доступна, но заперта -------------------------------
+	await _check_storeroom_door()
+
 	_check_journal_all_done(["Осмотреть пекарню", "Разобрать завал у входа",
-		"Расчистить торговый зал", "Освободить витрину"])
+		"Расчистить торговый зал", "Освободить витрину",
+		"Разобрать подход к кладовой", "Проверить дверь кладовой"])
 
 	_check_no_jigsaw()
 
@@ -207,7 +234,7 @@ func run(tree: SceneTree) -> void:
 	_check("состояние в памяти очищено",
 		not bool(Game.meta.flags.get("facade_cleared", false)))
 	SaveService.load_game()
-	Game.meta.refresh()
+	Game.meta.refresh_after_load()
 	_check("сейв: фасад остался разобранным",
 		bool(Game.meta.flags.get("facade_cleared", false)))
 	_check("сейв: завязка не запустится заново",
@@ -231,12 +258,25 @@ func run(tree: SceneTree) -> void:
 		Game.meta.completed_levels.has("bakery_02"))
 	_check("сейв: витрина осталась освобождённой",
 		bool(Game.meta.flags.get("hall_showcase_cleared", false)))
-	_check("сейв: локация показывает зал с целой витриной",
-		Game.meta.current_slot_state("bakery", "hall") == "stage_2")
+	_check("сейв: локация показывает последнее восстановленное состояние зала",
+		Game.meta.current_slot_state("bakery", "hall") == "stage_3")
 	_check("сейв: третий уровень остался пройденным",
 		Game.meta.completed_levels.has("bakery_03"))
 	_check("сейв: объяснение перекрытий больше не повторится",
 		bool(Game.meta.flags.get(Game.tutorial_flag("sort_blockers"), false)))
+	_check("сейв: подход к кладовой остался разобранным",
+		bool(Game.meta.flags.get("storeroom_approach_cleared", false)))
+	_check("сейв: четвёртый уровень остался пройденным",
+		Game.meta.completed_levels.has("bakery_04"))
+	## Главное, чего перезагрузка не должна сделать: ни отменить работу, ни
+	## доделать её за игрока. Дверь как была заперта, так и осталась, ключа нет.
+	_check("сейв: дверь кладовой доступна, но по-прежнему заперта",
+		Game.meta.current_slot_state("bakery", "storeroom_door") == "locked")
+	_check("сейв: ключ не появился сам собой", PlayerState.amount_of("bakery_key") == 0)
+	_check("сейв: отметка о проверенной двери на месте",
+		bool(Game.meta.flags.get("storeroom_door_tried", false)))
+	_check("сейв: объяснение зон больше не повторится",
+		bool(Game.meta.flags.get(Game.tutorial_flag("sort_zones"), false)))
 
 	_check_v1_migration()
 
@@ -747,6 +787,355 @@ func _check_showcase_fail_and_restart() -> void:
 	_check("L3: ввод снова принимается", not module._input_locked)
 
 
+## --- уровень 4: тот же Sort, но с закрытой зоной ---------------------------
+
+func _check_approach_scene() -> void:
+	var def: LevelDefinition = ContentDB.level("bakery_04")
+	_check("L4: уровень идёт в режиме sort", def != null and def.mode == "sort")
+	if def == null or def.sort == null:
+		_check("L4: раскладка Sort загрузилась", false)
+		return
+	_check("L4: сборки из кусков перед дверью нет", def.puzzle.module_id.is_empty())
+	_check("L4: старой уборки инструментами перед дверью нет", def.cleanup.is_empty())
+	_check("L4: предметы не ищут — фазы поиска нет", def.hidden_object.targets.is_empty())
+	_check("L4: на поле 24 предмета", def.sort.items.size() == 24)
+	_check("L4: лоток по-прежнему на 7 ячеек", def.sort.tray_size == 7)
+	_check("L4: фон — зал в том состоянии, в котором его оставил третий уровень",
+		def.art.background_path == "res://art/bakery_interior_showcase.png")
+
+	var counts := def.sort.category_counts()
+	_check("L4: шесть категорий, каждая делится на тройки",
+		def.sort.categories.size() == 6 and counts.size() == 6
+		and counts.values().all(func(n): return int(n) % 3 == 0))
+	var groups := 0
+	for cid in counts:
+		groups += int(counts[cid]) / 3
+	_check("L4: всего восемь групп", groups == 8)
+
+	var layers := {}
+	var blocked := 0
+	for inst in def.sort.items:
+		layers[inst.layer] = true
+		if not inst.blocked_by.is_empty():
+			blocked += 1
+	_check("L4: слоёв по-прежнему ровно два", layers.size() == 2)
+	_check("L4: накрыто %d предметов" % blocked, blocked == 5)
+
+	## Зона — главное, чем этот уровень отличается от третьего.
+	_check("L4: ровно одна закрытая зона", def.sort.zones.size() == 1)
+	if def.sort.zones.is_empty():
+		return
+	var zone: SortZone = def.sort.zones[0]
+	_check("L4: в зоне 4 предмета", zone.items.size() == 4)
+	_check("L4: зону держат 3 предмета", zone.blocked_by.size() == 3)
+	## Держат её вещи из разных категорий: снять всё сразу стоит трёх ячеек
+	## лотка, и момент открытия зоны становится решением, а не формальностью.
+	var lid_categories := {}
+	for id in zone.blocked_by:
+		lid_categories[def.sort.item(String(id)).category] = true
+	_check("L4: замок зоны собран из трёх разных категорий", lid_categories.size() == 3)
+	## Без зоны не закрыть ни инструменты, ни посуду — иначе её можно было бы
+	## не открывать вовсе, и вся механика существовала бы на бумаге.
+	var need_zone := {}
+	for id in zone.items:
+		need_zone[def.sort.item(String(id)).category] = true
+	_check("L4: в зоне лежат предметы 4 категорий", need_zone.size() == 4)
+
+	var state := SortState.new()
+	state.setup(def.sort)
+	_check("L4: зона закрыта в стартовой позиции", not state.is_zone_open(zone.id))
+	var open_now: int = state.available_ids().size()
+	_check("L4: сразу доступно %d предметов" % open_now, open_now == 15)
+	for id in zone.items:
+		if state.is_available(String(id)):
+			_check("L4: предмет '%s' из закрытой зоны недоступен" % id, false)
+			break
+
+	## Инструментов доступен ровно один: второй под молотком, третий в зоне.
+	## Это самая длинная связка уровня и его главный вопрос.
+	var open_by_category := {}
+	for id in state.available_ids():
+		var inst := def.sort.item(String(id))
+		open_by_category[inst.category] = int(open_by_category.get(inst.category, 0)) + 1
+	_check("L4: инструмент доступен ровно один",
+		int(open_by_category.get("tools", 0)) == 1)
+	var closable := PackedStringArray()
+	for cid in open_by_category:
+		if int(open_by_category[cid]) >= 3:
+			closable.append(String(cid))
+	closable.sort()
+	_check("L4: с ходу закрываются только тара и мусор — два безопасных старта",
+		"|".join(closable) == "storage|trash")
+
+	var module := _sort_module()
+	if module == null:
+		_check("L4: модуль уровня доступен", false)
+		return
+	_check("L4: на экране ровно 24 предмета", module._views.size() == 24)
+	_check("L4: закрытая зона нарисована", module._zone_views.size() == 1)
+	var hidden := 0
+	for id in zone.items:
+		var view: SortItemView = module._views.get(String(id))
+		if view != null and not view.visible:
+			hidden += 1
+	_check("L4: содержимое зоны не показано игроку", hidden == 4)
+
+	var small := 0
+	var outside := 0
+	for id in module._views:
+		var view: SortItemView = module._views[id]
+		if view.span < 120.0:
+			small += 1
+		var box: Rect2 = view.hit_rect()
+		if box.end.y > module.tray_rect.position.y \
+				or box.position.y < module.play_rect.position.y \
+				or box.position.x < module.play_rect.position.x \
+				or box.end.x > module.play_rect.end.x:
+			outside += 1
+	_check("L4: предметы крупные — под палец, а не под пиксель", small == 0)
+	_check("L4: ни один предмет не заехал под HUD или лоток", outside == 0)
+
+	## Двадцать четыре предмета на экране — плотнее, чем где-либо до сих пор.
+	## Пересекаться вправе только те, кто друг друга держит, и те, кто стоит на
+	## зоне: у остальных тап стал бы лотереей.
+	var in_zone := {}
+	for id in zone.items:
+		in_zone[String(id)] = true
+	var lids := {}
+	for id in zone.blocked_by:
+		lids[String(id)] = true
+	var stray := PackedStringArray()
+	for a in def.sort.items:
+		for b in def.sort.items:
+			if a.id >= b.id:
+				continue
+			if a.blocked_by.has(b.id) or b.blocked_by.has(a.id):
+				continue
+			## Крышка зоны и её содержимое обязаны накладываться: этим зона и
+			## закрыта.
+			if (in_zone.has(a.id) and lids.has(b.id)) or (in_zone.has(b.id) and lids.has(a.id)):
+				continue
+			var va: SortItemView = module._views.get(a.id)
+			var vb: SortItemView = module._views.get(b.id)
+			if va != null and vb != null and va.hit_rect().intersects(vb.hit_rect()):
+				stray.append("%s+%s" % [a.id, b.id])
+	_check("L4: пересекаются только держащие друг друга и стоящие на зоне (%s)"
+		% ("нет лишних" if stray.is_empty() else " ".join(stray)), stray.is_empty())
+
+
+## Зона в деле: закрыта, ловит тап, объясняет причину, открывается снятием
+## последнего, что на ней стояло, и показывает содержимое.
+func _check_approach_zone() -> void:
+	var module := _sort_module()
+	if module == null:
+		return
+	var def: LevelDefinition = ContentDB.level("bakery_04")
+	var zone: SortZone = def.sort.zones[0]
+
+	## Тап в закрытую зону. Ловит его именно зона: внутри ничего не нарисовано,
+	## и без этого тап по ящику означал бы ровно ничего.
+	var center: Vector2 = module.play_rect.position \
+		+ (zone.rect.position + zone.rect.size * 0.5) * module.play_rect.size
+	_check("L4: закрытая зона ловит тап по себе", module._zone_at(center) != null)
+	module._refuse_zone(zone)
+	await _tree.create_timer(0.15).timeout
+	_check("L4: тап по закрытой зоне ничего не кладёт в лоток",
+		module._state.tray.is_empty())
+	_check("L4: отказ зоны засчитан", module._zone_refused == 1)
+	if module._tutorial != null:
+		_check("L4: подсказка про зоны показана первым же тапом по ней",
+			module._tutorial._shown.has("first_locked_zone_attempt"))
+		var plate: Rect2 = module._tutorial.plate_rect()
+		var covered := 0
+		for id in module._views:
+			var v: SortItemView = module._views[id]
+			if v.visible and plate.intersects(v.hit_rect()):
+				covered += 1
+		_check("L4: подсказка не накрывает предметы", covered == 0)
+
+	## Снимаем замок по одному: пока стоит хоть что-то, зона закрыта.
+	var lids: PackedStringArray = zone.blocked_by
+	for i in lids.size() - 1:
+		module._on_pick(String(lids[i]))
+		await _tree.create_timer(0.2).timeout
+		_check("L4: снято %d из %d — зона всё ещё закрыта" % [i + 1, lids.size()],
+			not module._state.is_zone_open(zone.id))
+	module._on_pick(String(lids[lids.size() - 1]))
+	await _tree.create_timer(0.6).timeout
+	_check("L4: снят последний — зона открылась", module._state.is_zone_open(zone.id))
+	_check("L4: крышка зоны убрана с экрана", module._zone_views.is_empty())
+
+	var shown := 0
+	var takeable := 0
+	for id in zone.items:
+		var view: SortItemView = module._views.get(String(id))
+		if view != null and view.visible:
+			shown += 1
+		if module._state.is_available(String(id)):
+			takeable += 1
+	_check("L4: содержимое зоны показалось", shown == 4)
+	_check("L4: и его теперь можно брать", takeable == 4)
+
+	## Перезапуск возвращает зону закрытой вместе со всем остальным.
+	module.restart()
+	await _tree.create_timer(0.4).timeout
+	_check("L4: перезапуск вернул все 24 предмета", module._views.size() == 24)
+	_check("L4: перезапуск снова закрыл зону",
+		not module._state.is_zone_open(zone.id) and module._zone_views.size() == 1)
+	var still_shown := 0
+	for id in zone.items:
+		var view: SortItemView = module._views.get(String(id))
+		if view != null and view.visible:
+			still_shown += 1
+	_check("L4: содержимое зоны снова спрятано", still_shown == 0)
+	var moved := 0
+	for inst in def.sort.items:
+		var view: SortItemView = module._views.get(inst.id)
+		if view == null:
+			moved += 1
+			continue
+		if absf(view.position.x - (module.play_rect.position.x
+				+ inst.position.x * module.play_rect.size.x)) > 0.5:
+			moved += 1
+	_check("L4: раскладка после перезапуска совпадает с данными", moved == 0)
+
+
+## У уровня должен быть не только путь перебора, но и просторный человеческий:
+## тот, где лоток не доходит до края. Иначе «проходим» означало бы «проходим
+## ровно одним способом» — то есть угадывание авторского замысла.
+func _check_approach_roomy_path() -> void:
+	var def: LevelDefinition = ContentDB.level("bakery_04")
+	if def == null or def.sort == null:
+		return
+	var human := ["box_b", "tin", "box_a",
+		"news_a", "can_a", "bottle_a",
+		"flour", "pin", "whisk",
+		"pot", "bucket", "sponge", "rag",
+		"crate", "bag", "mug", "plate",
+		"jam", "sack",
+		"paper", "news_zone",
+		"hammer", "wrench", "screw"]
+	var state := SortState.new()
+	state.setup(def.sort)
+	var zone_id: String = (def.sort.zones[0] as SortZone).id
+	var peak := 0
+	var opened_at := 0
+	var refused := PackedStringArray()
+	for i in human.size():
+		var res := state.pick(String(human[i]))
+		if not bool(res["ok"]):
+			refused.append(String(human[i]))
+			continue
+		peak = maxi(peak, int(res["peak"]))
+		if opened_at == 0 and state.is_zone_open(zone_id):
+			opened_at = i + 1
+	_check("L4: человеческий порядок проходит без единого запрещённого хода (%s)"
+		% ("чисто" if refused.is_empty() else " ".join(refused)), refused.is_empty())
+	_check("L4: он разбирает поле целиком", state.is_complete())
+	_check("L4: зона открывается на ходу %d из 24 — в середине, а не в конце"
+		% opened_at, opened_at >= 8 and opened_at <= 18)
+	_check("L4: и держит лоток на %d ячейках из 7 — запас на ошибку есть" % peak,
+		peak <= 5)
+
+	var plan := SortSolver.solve(def.sort)
+	_check("L4: солвер тоже находит решение", bool(plan["solved"]))
+	_check("L4: решение солвера разбирает все 24 предмета",
+		(plan["path"] as PackedStringArray).size() == 24)
+	_check("L4: путь солвера держится в пределах лотка (пик %d из 7)"
+		% int(plan["max_tray"]), int(plan["max_tray"]) <= 7)
+
+
+## Переполнение здесь достижимо тем же способом, что и раньше, — набором
+## вразнобой. Шесть категорий на семь ячеек, седьмой предмет класть некуда.
+func _check_approach_fail_and_restart() -> void:
+	var module := _sort_module()
+	if module == null:
+		return
+	var greedy := ["plate", "pin", "tin", "news_a", "sponge", "hammer", "flour"]
+	for id in greedy:
+		module._on_pick(String(id))
+		await _tree.create_timer(0.06).timeout
+	_check("L4: набор вразнобой заполнил лоток", module._state.tray.size() == 7)
+	await _tree.create_timer(0.5).timeout
+	_check("L4: переполненный лоток — проигрыш", module._state.is_failed())
+	_check("L4: после проигрыша ввод заблокирован", module._input_locked)
+	_check("L4: проигрыш не записал победу",
+		not Game.meta.completed_levels.has("bakery_04"))
+	_check("L4: проигрыш не тронул мету",
+		not bool(Game.meta.flags.get("storeroom_approach_cleared", false)))
+
+	var again := _find_button(Game.current(), "Заново")
+	_check("L4: на проигрыше есть кнопка «Заново»", again != null)
+	if again == null:
+		return
+	again.pressed.emit()
+	await _tree.create_timer(0.4).timeout
+	_check("L4: после перезапуска поле снова полное",
+		module._views.size() == 24 and module._state.tray.is_empty())
+	_check("L4: ввод снова принимается", not module._input_locked)
+
+
+## Дверь кладовой после четвёртого уровня: подойти можно, войти — нет. Самое
+## важное здесь — то, чего происходить НЕ должно: ключ не выдаётся и дверь не
+## открывается. Прежний путь выдавал ключ прямо по тапу, и вернуться этому
+## поведению нельзя.
+func _check_storeroom_door() -> void:
+	_check("дверь: после уровня стала доступной",
+		Game.meta.current_slot_state("bakery", "storeroom_door") == "locked")
+	_check("дверь: задача «проверить дверь» открылась",
+		Game.meta.task_state("task_try_storeroom_door") == MetaService.TaskState.AVAILABLE)
+	_check("дверь: до тапа ключа в сумке нет", PlayerState.amount_of("bakery_key") == 0)
+
+	var slot := _find_node_named(Game.current(), "Slot_storeroom_door")
+	_check("дверь: слот есть в сцене", slot != null)
+	if slot == null:
+		return
+	var def: ShopDefinition = ContentDB.shop("bakery")
+	var slot_def: ShopSlotDefinition = def.slot("storeroom_door")
+	_check("дверь: подсвечена как то, с чем есть что сделать",
+		slot_def.highlight_on("locked", Game.meta.flags))
+	## Тап идёт через сцену локации, а не через мету напрямую: у игрока есть
+	## только палец, и «правило сработало» ничего не говорит о том, покажут ли
+	## ему после этого обещанный разговор.
+	var shop: Node = Game.current()
+	if shop == null or not shop.has_method("_interact"):
+		_check("дверь: локация умеет обработать тап по слоту", false)
+		return
+	shop._interact("storeroom_door")
+	await _tree.create_timer(0.6).timeout
+	_check("дверь: тап НЕ выдал ключ", PlayerState.amount_of("bakery_key") == 0)
+	_check("дверь: тап НЕ открыл дверь",
+		Game.meta.current_slot_state("bakery", "storeroom_door") == "locked")
+	_check("дверь: отмечено, что её пробовали",
+		bool(Game.meta.flags.get("storeroom_door_tried", false)))
+	_check("дверь: после тапа — разговор о пропавшем ключе",
+		Game.screen == Game.Screen.DIALOG)
+	_check("дверь: задача «проверить дверь» закрылась сама",
+		Game.meta.task_state("task_try_storeroom_door") == MetaService.TaskState.COMPLETED)
+	_check_dialog_runs()
+	await tree_wait(0.6)
+	_check("дверь: после разговора игрок остаётся в пекарне",
+		Game.screen == Game.Screen.SHOP)
+	_check("дверь: разговор ключа тоже не выдал", PlayerState.amount_of("bakery_key") == 0)
+	## Пятый уровень — поиск ключа — в этой партии ещё не сделан, и появиться
+	## сам собой из-за того, что разговор его пообещал, он не должен.
+	_check("дверь: пятого уровня в контенте пока нет",
+		ContentDB.level("bakery_05") == null)
+	var again: Node = Game.current()
+	if again != null and again.has_method("_interact"):
+		again._interact("storeroom_door")
+		await _tree.create_timer(0.4).timeout
+	_check("дверь: повторный тап по-прежнему ничего не выдаёт и не открывает",
+		PlayerState.amount_of("bakery_key") == 0
+		and Game.meta.current_slot_state("bakery", "storeroom_door") == "locked")
+	_check("дверь: повторный тап не заводит разговор заново",
+		Game.screen == Game.Screen.SHOP)
+
+
+func tree_wait(sec: float) -> void:
+	await _tree.create_timer(sec).timeout
+
+
 ## Правило проигрыша само по себе — на выдуманной раскладке, без сцены.
 ## Четыре категории по три, лоток на семь: по два предмета из четырёх категорий
 ## дают восемь, и седьмой кладётся уже в переполненный лоток.
@@ -884,7 +1273,7 @@ func _check_v1_migration() -> void:
 	CooldownService.reset()
 	Game.meta.reset()
 	_check("миграция: старый сейв прочитан", SaveService.load_game())
-	Game.meta.refresh()
+	Game.meta.refresh_after_load()
 
 	_check("миграция: завязка не проигрывается заново",
 		bool(Game.meta.flags.get(Game.INTRO_FLAG, false)))
@@ -941,7 +1330,7 @@ func _check_tutorial_flag_migration() -> void:
 	CooldownService.reset()
 	Game.meta.reset()
 	_check("миграция v2: сейв прочитан", SaveService.load_game())
-	Game.meta.refresh()
+	Game.meta.refresh_after_load()
 	_check("миграция v2: объяснение первого уровня осталось показанным",
 		bool(Game.meta.flags.get(Game.tutorial_flag("sort_basics"), false)))
 	_check("миграция v2: общий флаг убран",

@@ -60,5 +60,35 @@
       { "type": "set_visual_state", "shop_id": "bakery", "slot_id": "hall", "state_id": "stage_2" },
       { "type": "dialog", "dialog": "showcase_done" }
     ]
+  },
+  {
+    "id": "clear_approach",
+    "title": "Разобрать подход к кладовой",
+    "description": "К двери кладовой можно подойти.",
+    "button_label": "Разобрать подход",
+    "_auto_note": "Как и на трёх прошлых шагах, работа происходит в уровне, и задача закрывается сама по факту пройденного bakery_04. Здесь зал переходит в последнее состояние восстановления, а дверь кладовой из недоступной становится обычным слотом, по которому можно нажать. Открыть её этот шаг не может и не должен: ключа нет, и искать его будет отдельный уровень.",
+    "auto_apply": true,
+    "requirements": [{ "type": "level", "level_id": "bakery_04" }],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "set_flag", "flag": "storeroom_approach_cleared" },
+      { "type": "set_visual_state", "shop_id": "bakery", "slot_id": "hall", "state_id": "stage_3" },
+      { "type": "set_visual_state", "shop_id": "bakery", "slot_id": "storeroom_door", "state_id": "locked" }
+    ]
+  },
+  {
+    "id": "try_storeroom_door",
+    "title": "Проверить дверь кладовой",
+    "description": "Дверь заперта, ключа нет.",
+    "_auto_note": "Закрывается самим тапом по двери: правило слота ставит флаг storeroom_door_tried, и задача закрывается по нему. Кнопки у задачи нет намеренно — нажимать её после того, как игрок уже подёргал дверь, не за чем. Разговор о пропавшем ключе идёт отсюда, а не из правила слота: слот умеет показать строчку, а две реплики двух людей — это сцена.",
+    "auto_apply": true,
+    "requirements": [{ "type": "flag", "flag": "storeroom_door_tried" }],
+    "costs": [],
+    "duration_sec": 0,
+    "effects": [
+      { "type": "set_flag", "flag": "storeroom_key_missing" },
+      { "type": "dialog", "dialog": "storeroom_locked" }
+    ]
   }
 ]

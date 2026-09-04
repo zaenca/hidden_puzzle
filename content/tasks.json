@@ -61,5 +61,36 @@
     "level_ids": ["bakery_03"],
     "action_id": "clear_showcase",
     "hotspot": ""
+  },
+  {
+    "_note": "Четвёртый уровень. Открывается освобождённой витриной и запускается сразу после разговора «Вот эта дверь» (play_task в dialogs/showcase_done.json). Работа идёт там же, в зале, поэтому location=shop: после победы игрок остаётся стоять перед дверью, до которой только что добрался.",
+    "id": "task_clear_approach",
+    "reward": { "coins": 45 },
+    "play_label": "Разобрать",
+    "order": 5,
+    "shop_id": "bakery",
+    "room_id": "storeroom",
+    "location": "shop",
+    "title": "Разобрать подход к кладовой",
+    "hint": "К двери кладовой не подойти: перед ней свалены ящики и всё остальное.",
+    "unlock": [{ "type": "flag", "flag": "hall_showcase_cleared" }],
+    "level_ids": ["bakery_04"],
+    "action_id": "clear_approach",
+    "hotspot": ""
+  },
+  {
+    "_note": "Не работа, а один тап: игрок пробует дверь и убеждается, что она заперта. Уровней у задачи нет — она закрывается самим взаимодействием со слотом двери, как первая задача закрывалась знакомством с Марго. Ключа этот тап не даёт: искать его будет отдельный уровень.",
+    "id": "task_try_storeroom_door",
+    "reward": { "coins": 10 },
+    "order": 6,
+    "shop_id": "bakery",
+    "room_id": "storeroom",
+    "location": "shop",
+    "title": "Проверить дверь кладовой",
+    "hint": "К двери наконец можно подойти. Посмотрим, открыта ли она.",
+    "unlock": [{ "type": "flag", "flag": "storeroom_approach_cleared" }],
+    "level_ids": [],
+    "action_id": "try_storeroom_door",
+    "hotspot": ""
   }
 ]

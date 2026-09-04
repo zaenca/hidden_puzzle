@@ -125,7 +125,9 @@ func boot() -> void:
 	SaveService.register("meta", meta)
 	if not SaveService.load_game():
 		new_game()
-	meta.refresh()
+	else:
+		## Загрузка догоняет состояния, но не заводит сцены: см. refresh_after_load.
+		meta.refresh_after_load()
 	_open_start_screen()
 
 
@@ -419,6 +421,23 @@ func _return_to_meta(focus: MetaFocus) -> void:
 		open_map(focus)
 	else:
 		open_shop(focus.shop_id if not focus.shop_id.is_empty() else _last_shop_id, focus)
+
+
+## Показать сцену, которую попросил показать применённый эффект, если она есть.
+##
+## Очередь разбирается не только на возврате с уровня: действие может примениться
+## и прямо в локации — от тапа по объекту, — и тогда показать сцену должен тот,
+## кто этот тап обработал. Без этого поставленный из локации диалог висел бы в
+## очереди до ближайшего пройденного уровня и всплыл бы посреди чужого перехода.
+func play_pending_dialog() -> bool:
+	if screen != Screen.SHOP and screen != Screen.MAP:
+		return false
+	var next := meta.take_dialog()
+	if next.is_empty():
+		return false
+	_last_meta_screen = screen
+	open_dialog(next)
+	return true
 
 
 func _on_level_abandoned() -> void:

@@ -22,6 +22,12 @@ const BACKGROUND_UNDER_TRAY := 90.0
 ## центра. Не в середину: см. `_tutorial_targets`.
 const HINT_AIM_OFFSET := Vector2(0.30, 0.30)
 
+## Раскрытие зоны: затемнение уходит, и содержимое проявляется вслед за ним,
+## по одному предмету. Дольше — и ход игрока повисает; короче — и связь между
+## снятой коробкой и появившимися вещами не читается.
+const ZONE_OPEN_SEC := 0.32
+const ZONE_REVEAL_STEP := 0.07
+
 const FLY_SEC := 0.30
 const GROUP_FLASH_SEC := 0.30
 const GROUP_VANISH_SEC := 0.24
@@ -49,6 +55,7 @@ var tray_rect: Rect2 = Rect2()
 
 var _state: SortState = SortState.new()
 var _views: Dictionary = {}        ## instance_id -> SortItemView
+var _zone_views: Dictionary = {}   ## zone_id -> SortZoneView (только закрытые)
 var _tutorial: SortTutorial = null
 
 var _title: Label
@@ -59,6 +66,7 @@ var _input_locked: bool = false    ## проигрыш, победа, уход �
 var _animations: int = 0           ## идущих схлопываний группы
 var _picks: int = 0
 var _refused: int = 0              ## тапов по придавленным предметам
+var _zone_refused: int = 0         ## тапов по закрытым зонам
 var _restarts: int = 0
 var _tutorial_done: bool = false
 var _started_msec: int = 0
@@ -192,6 +200,7 @@ func _build_board() -> void:
 	for c in _tray_items.get_children():
 		c.queue_free()
 	_views.clear()
+	_zone_views.clear()
 	_state.setup(sort)
 
 	for inst in sort.items:
@@ -204,7 +213,11 @@ func _build_board() -> void:
 		view.setup(inst, context.items.get(inst.item_id), sort.category_color(inst.category),
 			inst.size * play_rect.size.x)
 		_views[inst.id] = view
+		## Что лежит в закрытой зоне, игрок не видит: зона закрыта именно этим.
+		view.visible = _state.is_zone_open_for(inst.id)
 		_dim_blocked(inst.id)
+
+	_build_zones()
 
 	_input_locked = false
 	_animations = 0
@@ -217,11 +230,82 @@ func _build_board() -> void:
 	_update_hud()
 
 
+## Закрытые зоны рисуются поверх своего содержимого, но под тем, что на них
+## стоит: коробки видны, а то, что под ними, — нет, и именно это игрок и должен
+## прочитать с экрана.
+func _build_zones() -> void:
+	for zone in _state.closed_zones():
+		var view := SortZoneView.new()
+		view.z_index = 0
+		_board.add_child(view)
+		view.setup(Rect2(play_rect.position + zone.rect.position * play_rect.size,
+			zone.rect.size * play_rect.size), zone.color, zone.label)
+		_zone_views[zone.id] = view
+
+
+## Зона открывается сама, как только с неё снято последнее, что её держало.
+## Отдельной кнопки «открыть» нет намеренно: правило то же, что у придавленного
+## предмета, и второе действие поверх него игроку пришлось бы объяснять.
+func _refresh_zones() -> void:
+	for zone_id in _zone_views.keys():
+		if not _state.is_zone_open(String(zone_id)):
+			continue
+		var view: SortZoneView = _zone_views[zone_id]
+		_zone_views.erase(zone_id)
+		if is_instance_valid(view):
+			view.open(ZONE_OPEN_SEC)
+		_reveal_zone_items(String(zone_id))
+
+
+## Содержимое открывшейся зоны проявляется по одному. Разом появившиеся четыре
+## предмета читаются как подставленные движком; вразнобой — как то, что там и
+## лежало, просто до него дошли руки.
+func _reveal_zone_items(zone_id: String) -> void:
+	var zone := sort.zone(zone_id)
+	if zone == null:
+		return
+	var step := 0
+	for id in zone.items:
+		var view: SortItemView = _views.get(String(id))
+		if view == null or view.visible:
+			continue
+		view.reveal(ZONE_OPEN_SEC, step * ZONE_REVEAL_STEP)
+		step += 1
+
+
+## Тап по закрытой зоне. Ход не проходит, но ответ игрок получает, и ответ
+## показывает причину: подрагивает сама зона, подсвечивается то, что на ней
+## стоит. Первый такой тап приносит единственную подсказку про зоны.
+func _refuse_zone(zone: SortZone) -> void:
+	var view: SortZoneView = _zone_views.get(zone.id)
+	if view != null:
+		view.refuse_feedback()
+	for id in zone.blocked_by:
+		var blocker: SortItemView = _views.get(String(id))
+		if blocker != null and _state.on_board(String(id)):
+			blocker.hint_flash()
+	_zone_refused += 1
+	if _tutorial != null and _zone_refused == 1:
+		_tutorial.notify_event("first_locked_zone_attempt", _zone_targets(zone))
+
+
+## Куда показывает рука в подсказке про зону: на то, что зону держит, а не на
+## саму зону — нажимать надо туда.
+func _zone_targets(zone: SortZone) -> Dictionary:
+	var out := _tutorial_targets()
+	for id in zone.blocked_by:
+		var blocker: SortItemView = _views.get(String(id))
+		if blocker != null and _state.on_board(String(id)):
+			out["blocker"] = blocker.position + blocker.drawn_size() * HINT_AIM_OFFSET
+			break
+	return out
+
+
 ## Недоступный предмет приглушён. Молча не реагировать на тап нельзя: игрок
 ## решит, что не попал, и будет бить в то же место.
 func _dim_blocked(instance_id: String) -> void:
 	var view: SortItemView = _views.get(instance_id)
-	if view == null:
+	if view == null or view.revealing:
 		return
 	view.modulate = Color.WHITE if _state.is_available(instance_id) else Color(0.62, 0.62, 0.66, 0.9)
 
@@ -298,9 +382,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var world: Vector2 = get_canvas_transform().affine_inverse() * event.position
 	var hit := _hit_test(world)
-	if hit.is_empty():
+	if not hit.is_empty():
+		_on_pick(hit)
 		return
-	_on_pick(hit)
+	## Мимо предметов — но, возможно, по закрытой зоне. Она ловит тап сама:
+	## внутри неё ничего не нарисовано, и без этого тап по ящику с вещами
+	## означал бы ровно ничего.
+	var zone := _zone_at(world)
+	if zone != null:
+		_refuse_zone(zone)
 
 
 ## Верхние предметы забирают тап первыми. Внутри одного слоя выигрывает тот,
@@ -314,6 +404,10 @@ func _hit_test(world: Vector2) -> String:
 		if not _state.on_board(String(id)):
 			continue
 		var view: SortItemView = _views[id]
+		## Спрятанное в закрытой зоне тап не ловит: его на экране нет, и
+		## попадание по невидимому было бы попаданием наугад.
+		if not view.visible:
+			continue
 		if not view.contains_point(world):
 			continue
 		var layer: int = view.instance.layer
@@ -323,6 +417,15 @@ func _hit_test(world: Vector2) -> String:
 			best_layer = layer
 			best_dist = dist
 	return best
+
+
+## Закрытая зона под точкой тапа, если она там есть.
+func _zone_at(world: Vector2) -> SortZone:
+	for zone_id in _zone_views:
+		var view: SortZoneView = _zone_views[zone_id]
+		if is_instance_valid(view) and view.contains_point(world):
+			return sort.zone(String(zone_id))
+	return null
 
 
 func _on_pick(instance_id: String) -> void:
@@ -344,6 +447,9 @@ func _on_pick(instance_id: String) -> void:
 
 	_picks += 1
 	_send_to_tray(view)
+	## Зоны раньше приглушения: снятая коробка могла открыть целое место, и
+	## появившиеся из него предметы должны сразу получить верный вид.
+	_refresh_zones()
 	_refresh_blocked()
 	_update_hud()
 	_notify_tutorial()

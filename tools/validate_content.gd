@@ -243,8 +243,6 @@ func _check_sort(lvl: LevelDefinition) -> void:
 			% [lvl.id, s.tray_size])
 	if s.seed == 0:
 		_err("%s: нет seed — «Заново» вернёт не тот же уровень" % lvl.id)
-	if not s.zones.is_empty():
-		_err("%s: zones пока не поддерживаются модулем — уровень с ними не сыграется" % lvl.id)
 	if not s.tutorial_id.is_empty() \
 			and not FileAccess.file_exists("%stutorial/%s.json" % [ROOT, s.tutorial_id]):
 		_err("%s: обучение '%s' не найдено в content/tutorial" % [lvl.id, s.tutorial_id])
@@ -311,7 +309,71 @@ func _check_sort(lvl: LevelDefinition) -> void:
 		if not s.category_counts().has(c.id):
 			_warn("%s: категория '%s' описана, но на поле её нет" % [lvl.id, c.id])
 
+	_check_sort_zones(lvl, s, ids)
 	_check_sort_solvable(lvl, s)
+
+
+## Закрытые зоны. Самая дорогая ошибка здесь — зона, которую нечем открыть:
+## уровень выглядит нормальным ровно до того момента, когда оказывается, что
+## последние предметы лежат в ящике, а ящик не открывается никогда. Солвер это
+## тоже поймает, но скажет «уровень непроходим» и спрячет причину.
+func _check_sort_zones(lvl: LevelDefinition, s: SortDefinition, ids: Dictionary) -> void:
+	var zone_ids := {}
+	var owner_of := {}      ## instance_id -> zone_id, ловит предмет в двух зонах
+	for zone in s.zones:
+		var who := "%s / зона %s" % [lvl.id, zone.id]
+		if zone.id.is_empty():
+			_err("%s: зона без id" % lvl.id)
+			continue
+		if zone_ids.has(zone.id):
+			_err("%s: дубль id зоны" % who)
+		zone_ids[zone.id] = true
+
+		if zone.items.is_empty():
+			_err("%s: пустая зона — открывать её незачем" % who)
+		## Зона без замка это просто место на поле: она открыта с первого кадра,
+		## и вся её механика существует только на бумаге.
+		if zone.blocked_by.is_empty():
+			_err("%s: зону ничего не держит — она открыта с самого начала" % who)
+
+		for raw in zone.items:
+			var item_id := String(raw)
+			if not ids.has(item_id):
+				_err("%s: содержит несуществующий предмет '%s'" % [who, item_id])
+				continue
+			if owner_of.has(item_id):
+				_err("%s: предмет '%s' лежит сразу в двух зонах" % [who, item_id])
+			owner_of[item_id] = zone.id
+
+		for raw in zone.blocked_by:
+			var blocker_id := String(raw)
+			if not ids.has(blocker_id):
+				_err("%s: держится несуществующим предметом '%s'" % [who, blocker_id])
+				continue
+			## Замок, лежащий внутри собственного ящика, снять невозможно.
+			if zone.items.has(blocker_id):
+				_err("%s: её держит '%s', который лежит внутри неё же" % [who, blocker_id])
+
+		var r := zone.rect
+		if r.position.x < 0.0 or r.position.y < 0.0 or r.end.x > 1.0 or r.end.y > 1.0:
+			_err("%s: выходит за игровое поле" % who)
+		if r.size.x < MIN_TARGET_SIDE * 2.0 or r.size.y < MIN_TARGET_SIDE * 2.0:
+			_warn("%s: мельче удобного touch-таргета — по ней трудно попасть" % who)
+
+	## Предмет, лежащий в зоне, не должен вдобавок быть чьим-то блокером снаружи:
+	## зона прячет его с экрана, и игрок не может узнать, почему видимая вещь
+	## не берётся.
+	for inst in s.items:
+		if owner_of.has(inst.id):
+			continue
+		for blocker in inst.blocked_by:
+			if owner_of.has(String(blocker)):
+				_err("%s / %s: его держит '%s', спрятанный в зоне '%s' — причина не видна с экрана"
+					% [lvl.id, inst.id, blocker, owner_of[String(blocker)]])
+
+	if not s.zones.is_empty():
+		notes.append("%s: зон %d, в них %d предметов из %d"
+			% [lvl.id, s.zones.size(), owner_of.size(), s.items.size()])
 
 
 ## Перекрытие обязано быть честным: предмет, который нельзя взять, должен
@@ -360,9 +422,23 @@ func _check_sort_solvable(lvl: LevelDefinition, s: SortDefinition) -> void:
 				if not reachable.has(String(blocker)):
 					free = false
 					break
+			## Предмет в зоне достижим не раньше, чем зону станет чем открыть:
+			## её замок это такие же предметы, и до них тоже надо добраться.
+			var zone := s.zone_of(inst.id)
+			if free and zone != null:
+				for blocker in zone.blocked_by:
+					if not reachable.has(String(blocker)):
+						free = false
+						break
 			if free:
 				reachable[inst.id] = true
 				changed = true
+	for zone in s.zones:
+		for blocker in zone.blocked_by:
+			if not reachable.has(String(blocker)):
+				_err("%s / зона %s: её нечем открыть — до '%s' не добраться"
+					% [lvl.id, zone.id, blocker])
+				return
 	for inst in s.items:
 		if not reachable.has(inst.id):
 			_err("%s / %s: до предмета нельзя добраться — блокировки замкнуты в кольцо"
@@ -403,6 +479,30 @@ func _check_sort_solvable(lvl: LevelDefinition, s: SortDefinition) -> void:
 		% [lvl.id, s.items.size(), s.items.size() / s.group_size, blocked_count,
 			path.size(), int(plan["max_tray"]), s.tray_size])
 	notes.append("%s: путь решения — %s" % [lvl.id, " ".join(path)])
+	_note_zone_openings(lvl, s, path)
+
+
+## На каком ходу известного решения открывается каждая зона. Цифра нужна не для
+## красоты: зона, открывающаяся последним ходом, механикой уровня не является —
+## её содержимое игрок разберёт и без единого решения, — а открывшаяся первым
+## ходом не успевает поставить перед ним вопрос.
+func _note_zone_openings(lvl: LevelDefinition, s: SortDefinition, path: PackedStringArray) -> void:
+	if s.zones.is_empty():
+		return
+	var state := SortState.new()
+	state.setup(s)
+	var opened := {}
+	for step in path.size():
+		state.pick(String(path[step]))
+		for zone in s.zones:
+			if not opened.has(zone.id) and state.is_zone_open(zone.id):
+				opened[zone.id] = step + 1
+	for zone in s.zones:
+		if opened.has(zone.id):
+			notes.append("%s: зона '%s' открывается на ходу %d из %d"
+				% [lvl.id, zone.id, int(opened[zone.id]), path.size()])
+		else:
+			_err("%s: зона '%s' не открывается за всё решение" % [lvl.id, zone.id])
 
 
 func _check_actions() -> void:

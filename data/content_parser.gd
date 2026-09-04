@@ -157,6 +157,17 @@ static func sort_item_instance(d: Dictionary) -> SortItemInstance:
 	return i
 
 
+static func sort_zone(d: Dictionary) -> SortZone:
+	var z := SortZone.new()
+	z.id = String(d.get("id", ""))
+	z.items = PackedStringArray(d.get("items", []))
+	z.blocked_by = PackedStringArray(d.get("blocked_by", []))
+	z.rect = to_rect(d.get("rect", [0.4, 0.4, 0.2, 0.2]))
+	z.label = String(d.get("label", ""))
+	z.color = to_color(d.get("color", "#59422b"))
+	return z
+
+
 static func sort_definition(d: Dictionary) -> SortDefinition:
 	var s := SortDefinition.new()
 	s.tray_size = int(d.get("tray_size", 7))
@@ -164,7 +175,11 @@ static func sort_definition(d: Dictionary) -> SortDefinition:
 	s.seed = int(d.get("seed", 0))
 	s.tutorial_id = String(d.get("tutorial", ""))
 	s.fail_on_full_tray = bool(d.get("fail_on_full_tray", true))
-	s.zones = d.get("zones", [])
+
+	var zones_out: Array[SortZone] = []
+	for raw in d.get("zones", []):
+		zones_out.append(sort_zone(raw))
+	s.zones = zones_out
 
 	var cats: Array[SortCategory] = []
 	for raw in d.get("categories", []):

@@ -1,41 +1,97 @@
 {
+  "_note": "Четвёртый Sort и последний завал перед дверью кладовой. Двадцать четыре предмета, шесть категорий, восемь троек, лоток по-прежнему на семь. Новое здесь одно: закрытая зона. Ящики у двери завалены сверху, и пока с них не снято всё, что стоит, внутрь не заглянуть — а лежит там третий инструмент, третья посуда, вторая тара и второй мусор. Поэтому уровень впервые требует держать в голове сразу и лоток, и перекрытия, и то, что откроется после текущей связки ходов.",
   "id": "bakery_04",
   "shop_id": "bakery",
-  "task_id": "task_install_sign",
+  "task_id": "task_clear_approach",
   "order": 4,
-  "difficulty": 2,
-  "title": "Вывеска",
-  "narrative": [
-    "Вывеска нашлась на чердаке — рассыпанная на части.",
-    "Собери её и найди крепёж. И прихвати что-нибудь для заржавевшего замка."
-  ],
+  "difficulty": 4,
+  "mode": "sort",
+  "title": "Подход к кладовой",
   "art": {
-    "reference_size": [1080, 1350],
-    "palette": "wood",
-    "seed": 4044,
-    "clutter": 30,
-    "decor": [
-      { "rect": [0.05, 0.05, 0.90, 0.28], "color": "#6f5433", "shape": "rect" },
-      { "rect": [0.08, 0.34, 0.84, 0.18], "color": "#8f6c40", "shape": "rect" },
-      { "rect": [0.05, 0.54, 0.90, 0.40], "color": "#5d4527", "shape": "rect" }
+    "_note": "Тот же зал в состоянии stage_2 — том самом, в котором его оставил третий уровень: витрина цела, а глубина зала перед дверью ещё завалена. Кадр сфокусирован на двери справа: она видна из-за завала с первого хода и полностью открывается к последнему.",
+    "reference_size": [941, 1672],
+    "background": "res://art/bakery_interior_showcase.png",
+    "palette": "bakery",
+    "seed": 4404
+  },
+  "_layout_note": "pos нормализован к ИГРОВОМУ ПОЛЮ, как и в первых трёх уровнях. Раскладка выставлена руками и детерминирована: «Заново» обязано вернуть ту же задачу — те же позиции, те же блокировки, ту же закрытую зону с тем же содержимым.",
+  "_placement_note": "Восстановленную в третьем уровне витрину завал не трогает: на её столешнице лежат три вещи, и только. Всё остальное собрано в глубине зала — на прилавке, на полке буфета и на полу перед дверью, где стоят ящики. Так игрок видит, что пробивает дорогу именно к двери, а не пачкает заново то, что уже разобрал.",
+  "_zone_note": "Ящики у двери — закрытая зона. Её держат три предмета, которые физически на ней стоят: деревянный ящик, мешок мусора и ведро. Они из разных категорий намеренно — снять их все сразу значит занять три ячейки лотка, которые не схлопнутся, и момент открытия зоны становится решением, а не формальностью. Внутри лежат третья отвёртка, кружка, мешок и вторая газета: без зоны не закрыть ни инструменты, ни посуду.",
+  "_difficulty_note": "Сразу доступно пятнадцать предметов. Целиком закрываются с ходу только тара и мусор — два безопасных старта. Инструментов доступен ровно один: второй под молотком, третий в зоне, и это самая длинная связка уровня. Известный путь держит в пике пять ячеек из семи против четырёх в третьем уровне; «беру по одному из шести категорий» упирается в переполнение на седьмом ходу, как и раньше.",
+  "sort": {
+    "tray_size": 7,
+    "group_size": 3,
+    "seed": 4404,
+    "tutorial": "sort_zones",
+    "_category_note": "Шесть категорий и восемь троек: тара и мусор идут по два раза — у двери свалены и запасы, и хлам, и обе группы не требуют ни нового правила, ни новой картинки.",
+    "categories": [
+      { "id": "baking",      "name": "Выпечка",    "color": "#e8c98a" },
+      { "id": "kitchenware", "name": "Посуда",     "color": "#7fb8d5" },
+      { "id": "storage",     "name": "Тара",       "color": "#b5813f" },
+      { "id": "tools",       "name": "Инструмент", "color": "#8a8f9c" },
+      { "id": "cleaning",    "name": "Уборка",     "color": "#5fc2b0" },
+      { "id": "trash",       "name": "Мусор",      "color": "#9aa39a" }
+    ],
+    "_zones_note": "Зона — это место, а не предмет: пока она закрыта, содержимое не нарисовано и тапу недоступно, а рамка на её месте показывает, что там что-то есть. Открывается тем же правилом, что и придавленный предмет, — когда с неё снято всё, что на ней стояло.",
+    "zones": [
+      {
+        "id": "door_boxes",
+        "label": "Ящики",
+        "rect": [0.600, 0.575, 0.360, 0.240],
+        "color": "#7a5a34",
+        "blocked_by": ["crate", "bag", "bucket"],
+        "items": ["screw", "mug", "sack", "news_zone"]
+      }
+    ],
+    "items": [
+      { "_shelf": "полка буфета: тарелка стоит открыто, коробка придавила банку варенья",
+        "id": "plate", "item_id": "plate",         "category": "kitchenware", "pos": [0.470, 0.165], "size": 0.13, "layer": 0, "rotation": 0 },
+      { "id": "box_b", "item_id": "cardboard_box", "category": "storage",     "pos": [0.640, 0.165], "size": 0.13, "layer": 1, "rotation": -4 },
+      { "id": "jam",   "item_id": "jam_jar",       "category": "storage",     "pos": [0.695, 0.175], "size": 0.13, "layer": 0, "rotation": 0,
+        "blocked_by": ["box_b"] },
+
+      { "_showcase": "столешница восстановленной витрины: скалка, газета и придавленный ею венчик — больше на витрину ничего не свалено",
+        "id": "pin",    "item_id": "rolling_pin",   "category": "baking", "pos": [0.100, 0.317], "size": 0.13, "layer": 0, "rotation": -14 },
+      { "id": "news_a", "item_id": "old_newspaper", "category": "trash",  "pos": [0.310, 0.317], "size": 0.13, "layer": 1, "rotation": 8 },
+      { "id": "whisk",  "item_id": "whisk",         "category": "baking", "pos": [0.255, 0.353], "size": 0.13, "layer": 0, "rotation": 20,
+        "blocked_by": ["news_a"] },
+
+      { "_counter": "прилавок: жестянка, мешок муки и придавленные им обрывки",
+        "id": "tin",   "item_id": "tin_can",     "category": "storage", "pos": [0.480, 0.298], "size": 0.13, "layer": 0, "rotation": 0 },
+      { "id": "flour", "item_id": "flour",       "category": "baking",  "pos": [0.640, 0.298], "size": 0.13, "layer": 1, "rotation": 0 },
+      { "id": "paper", "item_id": "scrap_paper", "category": "trash",   "pos": [0.705, 0.334], "size": 0.13, "layer": 0, "rotation": -11,
+        "blocked_by": ["flour"] },
+
+      { "_floor_left": "пол у витрины: кастрюля накрыла тряпку, губка лежит отдельно",
+        "id": "pot",    "item_id": "pot",    "category": "kitchenware", "pos": [0.150, 0.820], "size": 0.13, "layer": 1, "rotation": 0 },
+      { "id": "rag",    "item_id": "rag",    "category": "cleaning",    "pos": [0.210, 0.856], "size": 0.13, "layer": 0, "rotation": 9,
+        "blocked_by": ["pot"] },
+      { "id": "sponge", "item_id": "sponge", "category": "cleaning",    "pos": [0.360, 0.810], "size": 0.13, "layer": 0, "rotation": 5 },
+
+      { "_floor_mid": "середина прохода: молоток лёг на гаечный ключ, рядом брошена коробка",
+        "id": "hammer", "item_id": "hammer",        "category": "tools",   "pos": [0.510, 0.695], "size": 0.13, "layer": 1, "rotation": 16 },
+      { "id": "wrench", "item_id": "wrench",        "category": "tools",   "pos": [0.565, 0.745], "size": 0.13, "layer": 0, "rotation": -18,
+        "blocked_by": ["hammer"] },
+      { "id": "box_a",  "item_id": "cardboard_box", "category": "storage", "pos": [0.520, 0.880], "size": 0.13, "layer": 0, "rotation": 6 },
+
+      { "_floor_front": "у самого низа кадра: смятая банка и бутылка",
+        "id": "can_a",    "item_id": "crumpled_can", "category": "trash", "pos": [0.680, 0.895], "size": 0.13, "layer": 0, "rotation": -7 },
+      { "id": "bottle_a", "item_id": "bottle",       "category": "trash", "pos": [0.850, 0.895], "size": 0.13, "layer": 0, "rotation": 22 },
+
+      { "_zone_lids": "стоит НА ящиках и держит их закрытыми: ящик, мешок и ведро. Три разные категории — снять всё сразу стоит трёх ячеек лотка",
+        "id": "crate",  "item_id": "wooden_crate", "category": "storage",  "pos": [0.665, 0.600], "size": 0.13, "layer": 1, "rotation": -5 },
+      { "id": "bag",    "item_id": "trash_bag",    "category": "trash",    "pos": [0.815, 0.600], "size": 0.13, "layer": 1, "rotation": 4 },
+      { "id": "bucket", "item_id": "bucket",       "category": "cleaning", "pos": [0.740, 0.720], "size": 0.13, "layer": 1, "rotation": 0 },
+
+      { "_zone_inside": "внутри ящиков — не видно и не взять, пока сверху что-то стоит",
+        "id": "screw",      "item_id": "screwdriver",   "category": "tools",       "pos": [0.680, 0.635], "size": 0.13, "layer": 0, "rotation": -20 },
+      { "id": "mug",        "item_id": "mug",           "category": "kitchenware", "pos": [0.850, 0.635], "size": 0.13, "layer": 0, "rotation": 12 },
+      { "id": "sack",       "item_id": "sack",          "category": "storage",     "pos": [0.720, 0.755], "size": 0.13, "layer": 0, "rotation": 0 },
+      { "id": "news_zone",  "item_id": "old_newspaper", "category": "trash",       "pos": [0.870, 0.750], "size": 0.13, "layer": 0, "rotation": -9 }
     ]
   },
-  "puzzle": { "module_id": "jigsaw", "cols": 4, "rows": 4, "seed": 4401, "tab_ratio": 0.22, "snap_distance_px": 85 },
-  "hidden_object": {
-    "required_normal": 5,
-    "targets": [
-      { "id": "t01", "item_id": "glue",       "rect": [0.10, 0.18, 0.07, 0.07] },
-      { "id": "t02", "item_id": "bolt",       "rect": [0.30, 0.14, 0.06, 0.06] },
-      { "id": "t03", "item_id": "lamp_bulb",  "rect": [0.50, 0.20, 0.07, 0.07] },
-      { "id": "t04", "item_id": "ruler",      "rect": [0.70, 0.16, 0.12, 0.045] },
-      { "id": "t05", "item_id": "wire",       "rect": [0.14, 0.36, 0.11, 0.045] },
-      { "id": "t06", "item_id": "level_tool", "rect": [0.42, 0.38, 0.11, 0.05] },
-      { "id": "q01", "item_id": "sign_letter", "kind": "quest", "rect": [0.68, 0.36, 0.09, 0.08] },
-      { "id": "q02", "item_id": "sign_screw",  "kind": "quest", "rect": [0.20, 0.56, 0.07, 0.07] },
-      { "id": "q03", "item_id": "lock_oil",    "kind": "quest", "rect": [0.46, 0.60, 0.07, 0.075] },
-      { "id": "q04", "item_id": "wire_brush",  "kind": "quest", "rect": [0.70, 0.62, 0.10, 0.06] }
-    ]
-  },
-  "rewards": { "coins": 80, "xp": 14 },
-  "quest_grants": ["sign_letter", "sign_screw", "lock_oil", "wire_brush"]
+  "_reward_note": "Экрана результата у Sort нет: свободный подход и дверь кладовой во весь кадр и есть отчёт о работе.",
+  "show_result": false,
+  "rewards": { "coins": 120, "xp": 30 },
+  "quest_grants": []
 }

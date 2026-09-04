@@ -1,5 +1,6 @@
 [
   { "id": "bakery_01", "path": "res://content/levels/bakery_01.json", "shop_id": "bakery", "task_id": "task_clear_facade",   "order": 1 },
   { "id": "bakery_02", "path": "res://content/levels/bakery_02.json", "shop_id": "bakery", "task_id": "task_clear_hall",     "order": 2 },
-  { "id": "bakery_03", "path": "res://content/levels/bakery_03.json", "shop_id": "bakery", "task_id": "task_clear_showcase", "order": 3 }
+  { "id": "bakery_03", "path": "res://content/levels/bakery_03.json", "shop_id": "bakery", "task_id": "task_clear_showcase", "order": 3 },
+  { "id": "bakery_04", "path": "res://content/levels/bakery_04.json", "shop_id": "bakery", "task_id": "task_clear_approach", "order": 4 }
 ]

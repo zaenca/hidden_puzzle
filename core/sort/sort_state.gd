@@ -43,7 +43,8 @@ func on_board(instance_id: String) -> bool:
 	return place_of(instance_id) == Place.BOARD
 
 
-## Предмет доступен, если он ещё на поле и всё, что его накрывает, уже ушло.
+## Предмет доступен, если он ещё на поле, всё, что его накрывает, уже ушло, и
+## зона, в которой он лежит, открыта.
 ## «Ушло» — значит не на поле: предмет, лежащий в лотке, физически из завала
 ## уже вынут, и ждать его окончательного исчезновения незачем.
 func is_available(instance_id: String) -> bool:
@@ -55,7 +56,40 @@ func is_available(instance_id: String) -> bool:
 	for blocker in inst.blocked_by:
 		if on_board(String(blocker)):
 			return false
+	var zone := definition.zone_of(instance_id)
+	if zone != null and not is_zone_open(zone.id):
+		return false
 	return true
+
+
+## Зона открыта, когда с неё снято всё, что её держало. Правило то же, что у
+## предмета под блокером, и намеренно: игрок уже знает «убери верхнее», и
+## второе правило про то же самое ему пришлось бы учить заново.
+func is_zone_open(zone_id: String) -> bool:
+	var zone := definition.zone(zone_id)
+	if zone == null:
+		return true
+	for blocker in zone.blocked_by:
+		if on_board(String(blocker)):
+			return false
+	return true
+
+
+## Доступно ли место, где лежит предмет. Предмет вне зон доступен всегда — про
+## него этот вопрос просто не задаётся.
+func is_zone_open_for(instance_id: String) -> bool:
+	var zone := definition.zone_of(instance_id)
+	return zone == null or is_zone_open(zone.id)
+
+
+## Зоны, которые прямо сейчас закрыты. Нужно сцене — нарисовать их крышки — и
+## валидатору, который доказывает, что каждая из них однажды откроется.
+func closed_zones() -> Array[SortZone]:
+	var out: Array[SortZone] = []
+	for z in definition.zones:
+		if not is_zone_open(z.id):
+			out.append(z)
+	return out
 
 
 func available_ids() -> PackedStringArray:
