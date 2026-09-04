@@ -11,7 +11,7 @@
 
   { "id": "trash_pile",  "name": "Куча мусора", "color": "#7a6a4f", "shape": "circle" },
   { "id": "box",         "name": "Коробка",     "color": "#a9743c", "shape": "rect" },
-  { "id": "bottle",      "name": "Бутылка",     "color": "#6fbf73", "shape": "circle" },
+  { "id": "bottle",      "name": "Бутылка",     "icon": "res://art/garbage/bottle.png", "color": "#6fbf73", "shape": "circle" },
   { "id": "newspaper",   "name": "Газета",      "color": "#e6e2d3", "shape": "rect" },
   { "id": "can",         "name": "Банка",       "color": "#b5b5c2", "shape": "circle" },
   { "id": "leaf_pile",   "name": "Листья",      "color": "#8f9e4a", "shape": "triangle" },
